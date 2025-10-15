@@ -60,6 +60,9 @@ impl GitTreeWalker {
         let blob_size = blob.data.len();
         debug!("[BLOB] Attempting to read blob {} ({} bytes)", oid, blob_size);
 
+        let blob_size = blob.data.len();
+        debug!("[BLOB] Attempting to read blob {} ({} bytes)", oid, blob_size);
+
         // Try to convert to UTF-8 string
         match String::from_utf8(blob.data.to_vec()) {
             Ok(content) => {
