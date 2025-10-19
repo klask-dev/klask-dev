@@ -63,12 +63,13 @@ impl EncryptionService {
 
         let (nonce_bytes, ciphertext) = combined.split_at(12);
         // Create nonce from slice using try_into - aes_gcm's Nonce can be created from [u8; 12]
-        let nonce_array: [u8; 12] = nonce_bytes.try_into()
-            .map_err(|_| anyhow::anyhow!("Invalid nonce length"))?;
+        let nonce_array: [u8; 12] = nonce_bytes.try_into().map_err(|_| anyhow::anyhow!("Invalid nonce length"))?;
 
         // Decrypt
-        let plaintext =
-            self.cipher.decrypt((&nonce_array).into(), ciphertext).map_err(|e| anyhow::anyhow!("Decryption failed: {:?}", e))?;
+        let plaintext = self
+            .cipher
+            .decrypt((&nonce_array).into(), ciphertext)
+            .map_err(|e| anyhow::anyhow!("Decryption failed: {:?}", e))?;
 
         String::from_utf8(plaintext).map_err(|e| anyhow::anyhow!("Failed to convert decrypted data to string: {:?}", e))
     }

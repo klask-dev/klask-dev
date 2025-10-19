@@ -56,7 +56,6 @@ et les permissions Contents en readonly et Metadata
 - il faudrait gérer les erreurs de crawling sur l'interface, par exemple vpn pas monté, accès réseau down
 - dans la configuration de l'index, on devrait pouvoir setter du tuning dessus, exemple, 10MB max par fichier, liste des extensions, tuning fin mémoire pour tantivy, à rajouter peut-être un onglet settings
 - parti profile du user à implémenter
-- sécuriser l'accès à l'API backend
 - on gère les exclude, mais ce serait mieux de gérer aussi les includes
 _ parfois j'ai INFO tantivy::indexer::index_writer: Buffer limit reached, flushing segment with maxdoc=1484.
 - on flush pas régulièrement comme avant, lors des longs crawl c'est problèmatique

@@ -39,10 +39,7 @@ pub struct AuthenticatedUser {
 impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AuthError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         let token = extract_token_from_auth_header(&parts.headers)?;
         extract_authenticated_user(state, &token).await
     }
@@ -55,10 +52,7 @@ pub struct AdminUser(pub AuthenticatedUser);
 impl FromRequestParts<AppState> for AdminUser {
     type Rejection = AuthError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         debug!("Attempting to extract AdminUser from request");
 
         let token = extract_token_from_auth_header(&parts.headers)?;
@@ -84,10 +78,7 @@ pub struct OptionalUser(pub Option<AuthenticatedUser>);
 impl FromRequestParts<AppState> for OptionalUser {
     type Rejection = std::convert::Infallible;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         let token = match extract_token_from_auth_header(&parts.headers) {
             Ok(t) => t,
             Err(_) => return Ok(OptionalUser(None)),
@@ -115,10 +106,7 @@ fn extract_token_from_auth_header(headers: &axum::http::HeaderMap) -> Result<Str
 }
 
 /// Helper function to extract and validate an authenticated user from a token
-async fn extract_authenticated_user(
-    state: &AppState,
-    token: &str,
-) -> Result<AuthenticatedUser, AuthError> {
+async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<AuthenticatedUser, AuthError> {
     debug!("Extracting AuthenticatedUser from request");
 
     // Decode and validate token

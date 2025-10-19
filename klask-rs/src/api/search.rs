@@ -118,9 +118,7 @@ pub struct SearchResult {
 }
 
 pub async fn create_router() -> Result<Router<AppState>> {
-    let router = Router::new()
-        .route("/", get(search_files))
-        .route("/facets", get(get_facets_with_filters));
+    let router = Router::new().route("/", get(search_files)).route("/facets", get(get_facets_with_filters));
 
     Ok(router)
 }
@@ -320,65 +318,44 @@ mod validation_tests {
     #[test]
     fn test_validate_filter_param_valid_multiple_values() {
         let result = validate_filter_param("test", "value1,value2,value3");
-        assert!(
-            result.is_ok(),
-            "Multiple comma-separated values should be valid"
-        );
+        assert!(result.is_ok(), "Multiple comma-separated values should be valid");
     }
 
     #[test]
     fn test_validate_filter_param_valid_with_spaces() {
         let result = validate_filter_param("test", "value1, value2, value3");
-        assert!(
-            result.is_ok(),
-            "Values with spaces around commas should be valid"
-        );
+        assert!(result.is_ok(), "Values with spaces around commas should be valid");
     }
 
     #[test]
     fn test_validate_filter_param_valid_with_leading_trailing_whitespace() {
         let result = validate_filter_param("test", "  value1,value2  ");
-        assert!(
-            result.is_ok(),
-            "Leading and trailing whitespace should be trimmed"
-        );
+        assert!(result.is_ok(), "Leading and trailing whitespace should be trimmed");
     }
 
     #[test]
     fn test_validate_filter_param_empty_after_trim() {
         let result = validate_filter_param("test", "   ");
-        assert!(
-            result.is_err(),
-            "Empty string after trimming should be invalid"
-        );
+        assert!(result.is_err(), "Empty string after trimming should be invalid");
     }
 
     #[test]
     fn test_validate_filter_param_empty_values() {
         let result = validate_filter_param("test", "value1,,value2");
-        assert!(
-            result.is_err(),
-            "Empty values (consecutive commas) should be invalid"
-        );
+        assert!(result.is_err(), "Empty values (consecutive commas) should be invalid");
     }
 
     #[test]
     fn test_validate_filter_param_empty_values_with_spaces() {
         let result = validate_filter_param("test", "value1, , value2");
-        assert!(
-            result.is_err(),
-            "Empty values with only spaces should be invalid"
-        );
+        assert!(result.is_err(), "Empty values with only spaces should be invalid");
     }
 
     #[test]
     fn test_validate_filter_param_exceeds_max_length() {
         let long_value = "x".repeat(MAX_FILTER_LENGTH + 1);
         let result = validate_filter_param("test", &long_value);
-        assert!(
-            result.is_err(),
-            "Value exceeding max length should be invalid"
-        );
+        assert!(result.is_err(), "Value exceeding max length should be invalid");
     }
 
     #[test]
@@ -391,19 +368,13 @@ mod validation_tests {
     #[test]
     fn test_validate_filter_param_comma_at_end() {
         let result = validate_filter_param("test", "value1,value2,");
-        assert!(
-            result.is_err(),
-            "Trailing comma should be invalid (empty value)"
-        );
+        assert!(result.is_err(), "Trailing comma should be invalid (empty value)");
     }
 
     #[test]
     fn test_validate_filter_param_comma_at_start() {
         let result = validate_filter_param("test", ",value1,value2");
-        assert!(
-            result.is_err(),
-            "Leading comma should be invalid (empty value)"
-        );
+        assert!(result.is_err(), "Leading comma should be invalid (empty value)");
     }
 
     #[test]

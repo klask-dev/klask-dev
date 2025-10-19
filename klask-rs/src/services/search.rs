@@ -1254,8 +1254,7 @@ impl SearchService {
         }))?;
 
         let repo_collector = AggregationCollector::from_aggs(repo_agg_req, Default::default());
-        let repo_agg_res: AggregationResults =
-            searcher.search(&match_all_query, &repo_collector)?;
+        let repo_agg_res: AggregationResults = searcher.search(&match_all_query, &repo_collector)?;
 
         // Extract repository counts from aggregation results
         let mut documents_by_repository: HashMap<String, u64> = HashMap::new();

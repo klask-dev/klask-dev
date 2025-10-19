@@ -88,8 +88,8 @@ impl SchedulerService {
 
         // Parse and validate the cron expression (with 6-field format: seconds minutes hours day month weekday)
         // croner 3.0 uses parse() directly - validate by attempting to parse
-        let _cron: croner::Cron = cron_expr.parse()
-            .with_context(|| format!("Failed to parse cron expression: {}", cron_expr))?;
+        let _cron: croner::Cron =
+            cron_expr.parse().with_context(|| format!("Failed to parse cron expression: {}", cron_expr))?;
 
         info!(
             "Scheduling repository {} ({}) with cron: {}",
@@ -237,8 +237,8 @@ impl SchedulerService {
 
     /// Update the next crawl time for a repository in the database
     async fn update_next_crawl_time(&self, repository_id: Uuid, cron_expr: &str) -> Result<()> {
-        let cron: Cron = cron_expr.parse()
-            .with_context(|| format!("Failed to parse cron expression: {}", cron_expr))?;
+        let cron: Cron =
+            cron_expr.parse().with_context(|| format!("Failed to parse cron expression: {}", cron_expr))?;
 
         let next_run = cron.find_next_occurrence(&Utc::now(), false).context("Failed to calculate next occurrence")?;
 
