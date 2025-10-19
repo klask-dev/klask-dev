@@ -838,9 +838,9 @@ dependencies = [
 
 [[package]]
 name = "ed25519-dalek"
-version = "2.1.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
+checksum = "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
@@ -2569,9 +2569,9 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "10.0.0"
+version = "10.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1417155a38e99d7704ddb3ea7445fe57fdbd5d756d727740a9ed8b9ebaed6e1"
+checksum = "3d119c6924272d16f0ab9ce41f7aa0bfef9340c00b0bb7ca3dd3b263d4a9150b"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -2592,7 +2592,7 @@ dependencies = [
 
 [[package]]
 name = "klask-rs"
-version = "0.1.0"
+version = "2.1.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3728,9 +3728,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.26"
+version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56e6fa9c48d24d85fb3de5ad847117517440f6beceb7798af16b4a87d616b8d0"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
 
 [[package]]
 name = "serde"
@@ -4219,9 +4219,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.106"
+version = "2.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ede7c438028d4436d71104916910f5bb611972c5cfd7f89b8300a8186e6fada6"
+checksum = "2a26dbd934e5451d21ef060c018dae56fc073894c5a7896f882928a76e6d081b"
 dependencies = [
  "proc-macro2",
  "quote",
