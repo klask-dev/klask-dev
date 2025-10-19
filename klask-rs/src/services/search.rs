@@ -577,7 +577,7 @@ impl SearchService {
         query: &dyn tantivy::query::Query,
     ) -> Result<SnippetGenerator> {
         let mut snippet_generator = SnippetGenerator::create(searcher, query, self.fields.content)?;
-        snippet_generator.set_max_num_chars(200);
+        snippet_generator.set_max_num_chars(600);
         Ok(snippet_generator)
     }
 
@@ -589,7 +589,18 @@ impl SearchService {
     ) -> Result<(String, Option<u32>)> {
         // Generate the snippet with HTML highlighting - this is now much faster
         let snippet = generator.snippet_from_doc(doc);
-        let highlighted_html = snippet.to_html();
+        let mut highlighted_html = snippet.to_html();
+
+        // Adjust snippet to only include complete lines (start after first newline, end at last newline)
+        if let Some(first_newline_pos) = highlighted_html.find('\n') {
+            // Find the last newline in the snippet
+            if let Some(last_newline_pos) = highlighted_html.rfind('\n') {
+                if last_newline_pos > first_newline_pos {
+                    // Trim to only include complete lines (after first \n, up to last \n)
+                    highlighted_html = highlighted_html[first_newline_pos + 1..last_newline_pos].to_string();
+                }
+            }
+        }
 
         // For line number, use a simple approach to avoid scanning the entire content
         let line_number = if let Some(content) = doc.get_first(self.fields.content).and_then(|v| v.as_str()) {
