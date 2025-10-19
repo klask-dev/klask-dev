@@ -71,20 +71,42 @@ impl GitOperations {
                 .map_err(|e| anyhow!("Failed to create parent directories for {:?}: {}", parent, e))?;
         }
 
-        let clone_url = repository.url.clone();
+        // Decrypt token before moving to spawn_blocking
+        let access_token = if let Some(encrypted_token) = &repository.access_token {
+            match self.encryption_service.decrypt(encrypted_token) {
+                Ok(token) => Some(token),
+                Err(e) => {
+                    warn!(
+                        "Failed to decrypt access token: {}. Proceeding without authentication.",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Prepare clone URL with embedded credentials if available
+        let mut clone_url = gix::url::parse(repository.url.as_str().into())
+            .map_err(|e| anyhow!("Failed to parse repository URL: {}", e))?;
+
+        if let Some(token) = access_token {
+            clone_url.set_user(Some("oauth2".into()));
+            clone_url.set_password(Some(token));
+        }
+
         let repo_path_owned = repo_path.to_owned();
 
         tokio::time::timeout(
             std::time::Duration::from_secs(300),
             tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
                 // Disable interactive credential prompts for server-mode operation
-                // This prevents gix from prompting on GitLab/GitHub private repos
                 std::env::set_var("GIT_TERMINAL_PROMPT", "0");
 
-                let mut prep = gix::prepare_clone(clone_url.clone(), &repo_path_owned)
+                let mut prep = gix::prepare_clone(clone_url, &repo_path_owned)
                     .map_err(|e| anyhow!("prepare_clone failed: {}", e))?;
 
-                // Configure fetch options (shallow clone, no tags)
                 prep = prep.configure_remote(|remote| Ok(remote.with_fetch_tags(gix::remote::fetch::Tags::None)));
 
                 let (_prep, _outcome) = prep
