@@ -381,37 +381,8 @@ impl BranchProcessor {
             files_read_failed
         );
 
-        // Commit the Tantivy index to make changes visible after each branch
-        let indexed_count = progress.files_indexed;
-        if indexed_count > 0 {
-            info!(
-                "Committing Tantivy index for branch '{}' in repository {} ({} files indexed)",
-                branch_name, repository.name, indexed_count
-            );
-            match tokio::time::timeout(
-                std::time::Duration::from_secs(60), // 1 minute timeout for branch commit
-                self.search_service.commit(),
-            )
-            .await
-            .map_err(|_| anyhow!("Tantivy branch commit timed out after 1 minute"))
-            .and_then(|r| r)
-            {
-                Ok(()) => {
-                    info!(
-                        "Successfully committed Tantivy index for branch '{}' in repository {}",
-                        branch_name, repository.name
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to commit Tantivy index for branch '{}' in repository {}: {}",
-                        branch_name, repository.name, e
-                    );
-                    return Err(e);
-                }
-            }
-        }
-
+        // Note: Tantivy commit is now done once at the end of the entire crawl in crawler_service
+        // (not after each branch) for better performance
         Ok(())
     }
 
@@ -608,36 +579,8 @@ impl BranchProcessor {
             progress.errors.len()
         );
 
-        // Commit the Tantivy index to make changes visible
-        if progress.files_indexed > 0 {
-            info!(
-                "Committing {} indexed files to Tantivy for branch '{}' in repository {}",
-                progress.files_indexed, branch_name, repository.name
-            );
-            match tokio::time::timeout(
-                std::time::Duration::from_secs(60), // 1 minute timeout for branch commit
-                self.search_service.commit(),
-            )
-            .await
-            .map_err(|_| anyhow!("Tantivy branch commit timed out after 1 minute"))
-            .and_then(|r| r)
-            {
-                Ok(()) => {
-                    info!(
-                        "Successfully committed Tantivy index for branch '{}' in repository {}",
-                        branch_name, repository.name
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to commit Tantivy index for branch '{}' in repository {}: {}",
-                        branch_name, repository.name, e
-                    );
-                    return Err(e);
-                }
-            }
-        }
-
+        // Note: Tantivy commit is now done once at the end of the entire crawl in crawler_service
+        // (not after each branch) for better performance
         Ok(())
     }
 

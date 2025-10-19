@@ -301,17 +301,7 @@ impl GitHubCrawler {
                 .await;
         }
 
-        // Commit the Tantivy index to persist all indexed files
-        info!(
-            "Committing Tantivy index for GitHub repository: {} ({} files indexed)",
-            repository.name, total_files_indexed
-        );
-        tokio::time::timeout(
-            std::time::Duration::from_secs(120), // 2 minute timeout for Tantivy commit
-            self.search_service.commit(),
-        )
-        .await
-        .map_err(|_| anyhow!("Tantivy commit timed out after 2 minutes"))??;
+        // Note: Tantivy commit is now done once at the end in crawler_service, not here, for better performance
 
         // Update repository crawl time with duration
         let github_crawl_duration_seconds = github_crawl_start_time.elapsed().as_secs() as i32;
