@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Main crawler service that orchestrates all crawl operations
@@ -336,7 +336,7 @@ impl CrawlerService {
                     .await;
             }
         };
-
+        debug!("let repo_path = {:?}", repo_path);
         // Check for cancellation after path setup
         if cancellation_token.is_cancelled() {
             self.progress_tracker.cancel_crawl(repository.id).await;
