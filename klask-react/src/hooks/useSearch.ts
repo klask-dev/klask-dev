@@ -449,17 +449,24 @@ export const useFacetsWithFilters = (
   } = options;
 
   // State to manage debounced filters
+  // If debounceMs is 0, update immediately without setTimeout to avoid event loop delay
   const [debouncedFilters, setDebouncedFilters] = React.useState(filters);
 
   // Debounce effect: wait before updating filters
   React.useEffect(() => {
-    const timer = setTimeout(() => {
+    if (debounceMs === 0) {
+      // No debounce: update immediately
       setDebouncedFilters(filters);
-    }, debounceMs);
+    } else {
+      // Apply debounce with the specified delay
+      const timer = setTimeout(() => {
+        setDebouncedFilters(filters);
+      }, debounceMs);
 
-    return () => {
-      clearTimeout(timer);
-    };
+      return () => {
+        clearTimeout(timer);
+      };
+    }
   }, [filters, debounceMs]);
 
   // Serialize filters for consistent query key generation

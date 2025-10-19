@@ -101,11 +101,11 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Fetch facets when filters change (automatically triggered when filters have values)
   // Pass currentQuery to combine with filters for accurate facet counts
-  // Debounce is set to 300ms to prevent excessive API calls during rapid filter selections
+  // No debounce: facet requests are lightweight, caching handles duplication anyway
   const { data: filterFacets, isLoading: isFacetsLoading } = useFacetsWithFilters(
     filterParams,
     currentQuery,
-    { enabled: true, staleTime: 60000, debounceMs: 300 }
+    { enabled: true, staleTime: 60000, debounceMs: 0 }
   );
 
   // Initialize lastValidFacets with staticFilters when they become available
