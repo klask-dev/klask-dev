@@ -29,6 +29,11 @@ impl GitOperations {
             let result = tokio::time::timeout(
                 std::time::Duration::from_secs(180),
                 tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
+                    // Disable ALL interactive prompts for server-mode operation
+                    std::env::set_var("GIT_TERMINAL_PROMPT", "0");
+                    std::env::set_var("GIT_ASKPASS", "");
+                    std::env::set_var("SSH_ASKPASS", "");
+
                     let git_repo = gix::open(&repo_path_owned)?;
 
                     info!("Fetching latest changes from remote");
