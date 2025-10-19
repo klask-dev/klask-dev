@@ -87,7 +87,23 @@ impl GitOperations {
             None
         };
 
-        let clone_url = repository.url.clone();
+        // Build clone URL with embedded credentials if available
+        let clone_url = if let Some(ref token) = access_token {
+            // Inject credentials into the URL: https://oauth2:token@host/path
+            let url_str = repository.url.as_str();
+            if url_str.starts_with("https://") {
+                // Insert credentials after https://
+                format!("https://oauth2:{}@{}", token, &url_str[8..])
+            } else if url_str.starts_with("http://") {
+                format!("http://oauth2:{}@{}", token, &url_str[7..])
+            } else {
+                // For SSH or other schemes, use as-is (credentials won't work but won't break either)
+                repository.url.clone()
+            }
+        } else {
+            repository.url.clone()
+        };
+
         let repo_path_owned = repo_path.to_owned();
 
         tokio::time::timeout(
@@ -101,36 +117,11 @@ impl GitOperations {
                 let mut prep = gix::prepare_clone(clone_url, &repo_path_owned)
                     .map_err(|e| anyhow!("prepare_clone failed: {}", e))?;
 
-                // Configure credential helper to provide token or refuse explicitly
-                if let Some(ref token) = access_token {
-                    let token_for_creds = token.clone();
-                    prep = prep.configure_connection(move |connection| {
-                        let token_for_closure = token_for_creds.clone();
-                        connection.set_credentials(move |action| {
-                            // Extract context from the action
-                            if let gix::credentials::helper::Action::Get(ctx) = action {
-                                Ok(Some(gix::credentials::protocol::Outcome {
-                                    identity: gix::sec::identity::Account {
-                                        username: "oauth2".to_string(),
-                                        password: token_for_closure.clone(),
-                                        oauth_refresh_token: None,
-                                    },
-                                    next: ctx.into(),
-                                }))
-                            } else {
-                                // Ignore store/erase operations
-                                Ok(None)
-                            }
-                        });
-                        Ok(())
-                    });
-                } else {
-                    // No token - refuse credentials to prevent prompting
-                    prep = prep.configure_connection(move |connection| {
-                        connection.set_credentials(move |_action| Err(gix::credentials::protocol::Error::Quit));
-                        Ok(())
-                    });
-                }
+                // Configure to refuse any credential requests (credentials are embedded in URL)
+                prep = prep.configure_connection(move |connection| {
+                    connection.set_credentials(move |_action| Err(gix::credentials::protocol::Error::Quit));
+                    Ok(())
+                });
 
                 prep = prep.configure_remote(|remote| Ok(remote.with_fetch_tags(gix::remote::fetch::Tags::None)));
 
