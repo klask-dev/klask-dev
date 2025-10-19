@@ -164,14 +164,6 @@ class ApiClient {
     return this.request<SearchResponse>(`/api/search?${params.toString()}`);
   }
 
-  async getSearchFilters(): Promise<{
-    projects: Array<{value: string; count: number}>;
-    versions: Array<{value: string; count: number}>;
-    extensions: Array<{value: string; count: number}>;
-  }> {
-    return this.request('/api/search/filters');
-  }
-
   // File API
   async getFile(id: string): Promise<File> {
     return this.request<File>(`/api/files/${id}`);
@@ -415,8 +407,6 @@ export const api = {
 
   // Search
   search: (query: SearchQuery) => apiClient.search(query),
-  getSearchFilters: () => apiClient.getSearchFilters(),
-
   // Files
   getFile: (id: string) => apiClient.getFile(id),
   getFileByDocAddress: (docAddress: string) => apiClient.getFileByDocAddress(docAddress),

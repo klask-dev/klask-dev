@@ -13,24 +13,6 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tracing;
 
-// Cache for search filters to avoid expensive recalculations
-struct FilterCache {
-    data: Option<SearchFilters>,
-    timestamp: Instant,
-}
-
-fn get_filter_cache() -> &'static Arc<RwLock<FilterCache>> {
-    use once_cell::sync::Lazy;
-    static FILTER_CACHE: Lazy<Arc<RwLock<FilterCache>>> = Lazy::new(|| {
-        Arc::new(RwLock::new(FilterCache {
-            data: None,
-            timestamp: Instant::now() - Duration::from_secs(600), // Start expired
-        }))
-    });
-    &FILTER_CACHE
-}
-
-const CACHE_TTL: Duration = Duration::from_secs(5 * 60); // 5 minutes
 const MAX_FILTER_LENGTH: usize = 1000; // Maximum length for filter parameters
 
 /// Validates filter parameters for search endpoints.
@@ -138,7 +120,6 @@ pub struct SearchResult {
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/", get(search_files))
-        .route("/filters", get(get_search_filters))
         .route("/facets", get(get_facets_with_filters));
 
     Ok(router)
@@ -232,75 +213,6 @@ pub struct SearchFilters {
     pub projects: Vec<FacetValue>,
     pub versions: Vec<FacetValue>,
     pub extensions: Vec<FacetValue>,
-}
-
-async fn get_search_filters(
-    _auth: AuthenticatedUser,
-    State(app_state): State<AppState>,
-) -> Result<Json<SearchFilters>, StatusCode> {
-    // Check cache first
-    {
-        let cache = get_filter_cache().read().unwrap();
-        if let Some(ref cached_data) = cache.data {
-            if cache.timestamp.elapsed() < CACHE_TTL {
-                return Ok(Json(cached_data.clone()));
-            }
-        }
-    }
-
-    // Get all facets by performing an empty search
-    let search_query = SearchQuery {
-        query: "*".to_string(), // Match all documents
-        repository_filter: None,
-        project_filter: None,
-        version_filter: None,
-        extension_filter: None,
-        limit: 0, // We only need facets, not results
-        offset: 0,
-        include_facets: true, // Always include facets for the filters endpoint
-    };
-
-    match app_state.search_service.search(search_query).await {
-        Ok(search_response) => {
-            if let Some(facets) = search_response.facets {
-                let filters = SearchFilters {
-                    repositories: facets
-                        .repositories
-                        .into_iter()
-                        .map(|(value, count)| FacetValue { value, count })
-                        .collect(),
-                    projects: facets.projects.into_iter().map(|(value, count)| FacetValue { value, count }).collect(),
-                    versions: facets.versions.into_iter().map(|(value, count)| FacetValue { value, count }).collect(),
-                    extensions: facets
-                        .extensions
-                        .into_iter()
-                        .map(|(value, count)| FacetValue { value, count })
-                        .collect(),
-                };
-
-                // Update cache
-                {
-                    let mut cache = get_filter_cache().write().unwrap();
-                    cache.data = Some(filters.clone());
-                    cache.timestamp = Instant::now();
-                }
-
-                Ok(Json(filters))
-            } else {
-                // No facets available, return empty filters
-                Ok(Json(SearchFilters {
-                    repositories: vec![],
-                    projects: vec![],
-                    versions: vec![],
-                    extensions: vec![],
-                }))
-            }
-        }
-        Err(e) => {
-            tracing::error!("Failed to get search filters: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
 }
 
 async fn get_facets_with_filters(

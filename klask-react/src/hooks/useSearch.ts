@@ -105,35 +105,17 @@ export const useInfiniteSearch = (
 
 export const useSearchFilters = (options?: { enabled?: boolean }) => {
   return useQuery({
-    queryKey: ['search', 'filters'],
+    queryKey: ['search', 'static-filters'],
     queryFn: async () => {
-      const filters = await apiClient.getSearchFilters();
-      // Transform the response to include both value and count for facets
-      // @ts-ignore - repositories field will be added by backend
-      return {
-        projects: filters.projects?.map((p: any) => ({
-          value: p.value || p,
-          label: p.value || p,
-          count: p.count || 0,
-        })) || [],
-        versions: filters.versions?.map((v: any) => ({
-          value: v.value || v,
-          label: v.value || v,
-          count: v.count || 0,
-        })) || [],
-        extensions: filters.extensions?.map((e: any) => ({
-          value: e.value || e,
-          label: e.value || e,
-          count: e.count || 0,
-        })) || [],
-        // @ts-expect-error - repositories field will be added by backend
-        repositories: filters.repositories?.map((r: any) => ({
-          value: r.value || r,
-          label: r.value || r,
-          count: r.count || 0,
-        })) || [],
-        languages: [], // TODO: Derive from extensions or add separate field
-      };
+      // Fetch static filters (all documents) using the facets endpoint with no parameters
+      const response = await fetchWithAuth(`/api/search/facets`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch filters: ${response.statusText}`);
+      }
+      const facets = await response.json();
+
+      // Transform the facets response to match the expected format
+      return normalizeFacetsResponse(facets);
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 3,
