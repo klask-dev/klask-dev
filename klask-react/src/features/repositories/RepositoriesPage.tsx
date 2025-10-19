@@ -493,9 +493,8 @@ const RepositoriesPage: React.FC = () => {
                 };
             
             return (
-              <div className="relative" style={{ isolation: 'isolate' }}>
+              <div key={repo.id} className="relative" style={{ isolation: 'isolate' }}>
                 <SelectableRepositoryCard
-                  key={repo.id}
                   repository={repoWithStatsNormalized}
                   selected={selectedRepos.includes(repo.id)}
                   onSelect={(selected) => handleSelectRepo(repo.id, selected)}
