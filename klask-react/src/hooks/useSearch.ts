@@ -7,6 +7,24 @@ import type {
   FacetsApiResponse,
 } from '../types';
 
+// Helper function to add auth token to fetch requests
+const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem('authToken');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  } as Record<string, string>;
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+};
+
 export interface UseSearchOptions {
   enabled?: boolean;
   refetchOnWindowFocus?: boolean;
@@ -165,11 +183,11 @@ export const useMultiSelectSearch = (
       searchParams.set('page', currentPage.toString());
       searchParams.set('include_facets', 'true');
 
-      const response = await fetch(`/api/search?${searchParams.toString()}`);
+      const response = await fetchWithAuth(`/api/search?${searchParams.toString()}`);
       if (!response.ok) {
         throw new Error(`Search failed: ${response.statusText}`);
       }
-      
+
       return response.json();
     },
     enabled: enabled && !!query.trim(),
@@ -511,8 +529,8 @@ export const useFacetsWithFilters = (
         searchParams.set('repositories', filterKey.repository.join(','));
       }
 
-      // Call dedicated facets endpoint
-      const response = await fetch(`/api/search/facets?${searchParams.toString()}`);
+      // Call dedicated facets endpoint with auth token
+      const response = await fetchWithAuth(`/api/search/facets?${searchParams.toString()}`);
 
       if (!response.ok) {
         throw new Error(`Facets fetch failed: ${response.statusText}`);
