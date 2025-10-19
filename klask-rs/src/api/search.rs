@@ -1,4 +1,4 @@
-use crate::auth::extractors::AppState;
+use crate::auth::extractors::{AppState, AuthenticatedUser};
 use crate::services::SearchQuery;
 use anyhow::Result;
 use axum::{
@@ -145,6 +145,7 @@ pub async fn create_router() -> Result<Router<AppState>> {
 }
 
 async fn search_files(
+    _auth: AuthenticatedUser,
     State(app_state): State<AppState>,
     Query(params): Query<SearchRequest>,
 ) -> Result<Json<SearchResponse>, StatusCode> {
@@ -233,7 +234,10 @@ pub struct SearchFilters {
     pub extensions: Vec<FacetValue>,
 }
 
-async fn get_search_filters(State(app_state): State<AppState>) -> Result<Json<SearchFilters>, StatusCode> {
+async fn get_search_filters(
+    _auth: AuthenticatedUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<SearchFilters>, StatusCode> {
     // Check cache first
     {
         let cache = get_filter_cache().read().unwrap();
@@ -300,6 +304,7 @@ async fn get_search_filters(State(app_state): State<AppState>) -> Result<Json<Se
 }
 
 async fn get_facets_with_filters(
+    _auth: AuthenticatedUser,
     State(app_state): State<AppState>,
     Query(params): Query<FacetsRequest>,
 ) -> Result<Json<SearchFacets>, StatusCode> {

@@ -1,4 +1,4 @@
-use crate::auth::extractors::AppState;
+use crate::auth::extractors::{AppState, AuthenticatedUser};
 use anyhow::Result;
 use axum::{
     extract::{Path, State},
@@ -28,7 +28,11 @@ pub async fn create_router() -> Result<Router<AppState>> {
     Ok(router)
 }
 
-async fn get_file(State(app_state): State<AppState>, Path(id): Path<Uuid>) -> Result<Json<FileResponse>, StatusCode> {
+async fn get_file(
+    _auth: AuthenticatedUser,
+    State(app_state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<FileResponse>, StatusCode> {
     tracing::debug!("Getting file by id: {}", id);
 
     // Get file from Tantivy search index only
@@ -64,6 +68,7 @@ async fn get_file(State(app_state): State<AppState>, Path(id): Path<Uuid>) -> Re
 }
 
 async fn get_file_by_doc_address(
+    _auth: AuthenticatedUser,
     State(app_state): State<AppState>,
     Path(doc_address): Path<String>,
 ) -> Result<Json<FileResponse>, StatusCode> {
