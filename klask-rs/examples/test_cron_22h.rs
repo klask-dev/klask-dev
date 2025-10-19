@@ -10,7 +10,7 @@ fn main() {
     println!("\nTesting cron expression: {}", cron_expr);
     println!("Expected: Should run at 22:00:00 UTC every day");
 
-    match Cron::new(cron_expr).with_seconds_required().parse() {
+    match cron_expr.parse::<Cron>() {
         Ok(cron) => match cron.find_next_occurrence(&now, false) {
             Ok(next) => {
                 println!("\nNext run time: {}", next);

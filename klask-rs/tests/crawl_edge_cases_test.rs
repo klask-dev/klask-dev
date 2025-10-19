@@ -206,10 +206,10 @@ mod crawl_edge_cases_tests {
         // Apply random operations
         let mut handles = vec![];
         for _ in 0..500 {
-            let repo_id = repo_ids[rand::thread_rng().gen_range(0..repo_ids.len())];
+            let repo_id = repo_ids[rand::rng().random_range(0..repo_ids.len())];
             let tracker_clone = Arc::clone(&tracker);
 
-            let random_operation = rand::thread_rng().gen_range(0..8);
+            let random_operation = rand::rng().random_range(0..8);
             let handle = tokio::spawn(async move {
                 match random_operation {
                     0 => tracker_clone.is_crawling(repo_id).await,

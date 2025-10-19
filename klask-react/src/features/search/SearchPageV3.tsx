@@ -276,7 +276,7 @@ const SearchPageV3: React.FC = () => {
             projects: facets?.projects?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.projects || [],
             versions: facets?.versions?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.versions || [],
             extensions: facets?.extensions?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.extensions || [],
-            languages: availableFilters?.languages || [],
+            languages: facets?.languages?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.languages || [],
           }}
           isLoading={filtersLoading || isFetching}
           collapsible={false}

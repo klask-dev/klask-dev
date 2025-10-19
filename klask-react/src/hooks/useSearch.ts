@@ -378,6 +378,7 @@ const normalizeFacetsResponse = (data: unknown): FacetsApiResponse => {
       versions: [],
       extensions: [],
       repositories: [],
+      languages: [],
     };
   }
 
@@ -405,6 +406,7 @@ const normalizeFacetsResponse = (data: unknown): FacetsApiResponse => {
     versions: normalizeFacetArray(response.versions),
     extensions: normalizeFacetArray(response.extensions),
     repositories: normalizeFacetArray(response.repositories),
+    languages: normalizeFacetArray(response.languages),
   };
 };
 

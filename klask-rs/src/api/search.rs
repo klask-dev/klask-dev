@@ -9,9 +9,6 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
-use tracing;
 
 const MAX_FILTER_LENGTH: usize = 1000; // Maximum length for filter parameters
 
@@ -203,14 +200,6 @@ async fn search_files(
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchFilters {
-    pub repositories: Vec<FacetValue>,
-    pub projects: Vec<FacetValue>,
-    pub versions: Vec<FacetValue>,
-    pub extensions: Vec<FacetValue>,
 }
 
 async fn get_facets_with_filters(

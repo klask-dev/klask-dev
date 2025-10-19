@@ -29,7 +29,6 @@ pub struct CrawlProgress {
 /// Branch processing operations for the crawler
 #[derive(Clone)]
 pub struct BranchProcessor {
-    search_service: Arc<SearchService>,
     progress_tracker: Arc<ProgressTracker>,
     file_processor: FileProcessor,
 }
@@ -37,7 +36,7 @@ pub struct BranchProcessor {
 impl BranchProcessor {
     pub fn new(search_service: Arc<SearchService>, progress_tracker: Arc<ProgressTracker>) -> Self {
         let file_processor = FileProcessor::new(search_service.clone());
-        Self { search_service, progress_tracker, file_processor }
+        Self { progress_tracker, file_processor }
     }
 
     /// Process all branches in a repository

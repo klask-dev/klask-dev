@@ -10,7 +10,7 @@ fn main() {
     println!("\nTesting cron expression: {}", cron_expr);
     println!("Expected: Should run at 01:00:00 every day");
 
-    match Cron::new(cron_expr).with_seconds_required().parse() {
+    match cron_expr.parse::<Cron>() {
         Ok(cron) => {
             match cron.find_next_occurrence(&now, false) {
                 Ok(next) => {
@@ -46,7 +46,7 @@ fn main() {
 
     for (expr, description) in test_cases {
         println!("\nExpression: {} ({})", expr, description);
-        if let Ok(cron) = Cron::new(expr).with_seconds_required().parse() {
+        if let Ok(cron) = expr.parse::<Cron>() {
             if let Ok(next) = cron.find_next_occurrence(&now, false) {
                 let duration = next - now;
                 println!("Next: {} (in {}m)", next, duration.num_minutes());

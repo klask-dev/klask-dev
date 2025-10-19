@@ -23,7 +23,7 @@ mod search_repository_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files from different repositories
-        let repositories = vec![
+        let repositories = [
             ("klask-io/klask", "Klask search engine"),
             ("rust-lang/rust", "Rust compiler"),
             ("facebook/react", "React framework"),
@@ -81,7 +81,7 @@ mod search_repository_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files from different repositories with common search term
-        let repositories = vec![
+        let repositories = [
             ("klask-io/klask", "fn search() { /* Klask search */ }"),
             ("rust-lang/rust", "fn search() { /* Rust search */ }"),
             ("facebook/react", "function search() { /* React search */ }"),
@@ -166,7 +166,7 @@ mod search_repository_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files from multiple repositories
-        let repositories = vec!["repo-a", "repo-b", "repo-c", "repo-d"];
+        let repositories = ["repo-a", "repo-b", "repo-c", "repo-d"];
 
         for (i, repo) in repositories.iter().enumerate() {
             let file_id = Uuid::new_v4();

@@ -4,7 +4,7 @@ use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 use uuid::Uuid;
 
 /// Supported file extensions for indexing
@@ -199,7 +199,7 @@ impl FileProcessor {
             // otherwise use repository name (for regular Git repos)
             let repository_field = parent_project_name.unwrap_or(&repository.name);
 
-            info!(
+            debug!(
                 "Indexing file {} with deterministic ID {} for branch '{}' - repository: {}, project: {}",
                 relative_path, file_id, branch_name, repository_field, repository.name
             );

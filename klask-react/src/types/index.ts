@@ -121,12 +121,14 @@ export interface FacetsApiResponse {
   versions: FacetResponseItem[];
   extensions: FacetResponseItem[];
   repositories: FacetResponseItem[];
+  languages: FacetResponseItem[];
 }
 
 export interface SearchFacets {
   projects: FacetValue[];
   versions: FacetValue[];
   extensions: FacetValue[];
+  languages: FacetValue[];
   repositories?: FacetValue[]; // Repository facets for filtering
 }
 
