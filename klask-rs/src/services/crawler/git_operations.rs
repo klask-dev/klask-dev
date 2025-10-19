@@ -155,9 +155,11 @@ impl GitOperations {
                     .map_err(|e| anyhow!("Failed to prepare clone: {}", e))?;
 
                 // Configure for non-interactive mode (no credential prompts)
-                // This is critical for public repositories and server environments
+                // This is critical for cloud-native environments and public repositories
                 let mut config_overrides = vec![
-                    "credential.helper=".to_string(), // Disable credential helpers
+                    "credential.helper=".to_string(),     // Disable credential helpers
+                    "core.askPass=".to_string(),          // Disable interactive password prompts
+                    "GIT_ASKPASS=/bin/false".to_string(), // Prevent any prompts
                 ];
 
                 // Configure authentication using http.extraHeader if we have a token
@@ -166,8 +168,12 @@ impl GitOperations {
                     config_overrides.push(format!("http.extraHeader={}", header));
                 }
 
-                prepare_clone = prepare_clone
-                    .with_in_memory_config_overrides(config_overrides.iter().map(|s| s.as_str()));
+                // Set environment variables to prevent interactive prompts
+                std::env::set_var("GIT_ASKPASS", "/bin/false");
+                std::env::set_var("SSH_ASKPASS_REQUIRE", "force");
+
+                prepare_clone =
+                    prepare_clone.with_in_memory_config_overrides(config_overrides.iter().map(|s| s.as_str()));
 
                 // Configure shallow clone (depth=1) to speed up large repositories
                 // This clones only the latest commit, significantly reducing download time
