@@ -316,7 +316,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       errorCount: tabErrors.length
     };
   };
-  
+
   // Debug: Monitor button state
   React.useEffect(() => {
     const shouldDisable = (() => {
@@ -324,15 +324,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       if (!isEditing) return false;
       return !isDirty && !hasSchedulingChanged;
     })();
-    
-    console.log('Form state:', {
-      isValid,
-      isEditing,
-      isDirty,
-      hasSchedulingChanged,
-      buttonWillBeDisabled: shouldDisable,
-      errors: Object.keys(errors).length > 0 ? errors : 'none'
-    });
+
   }, [isValid, isLoading, isEditing, isDirty, hasSchedulingChanged, errors]);
 
   // Handle scheduling data changes
@@ -348,41 +340,41 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       crawlFrequencyHours: newSchedulingData.crawlFrequencyHours || undefined,
       maxCrawlDurationMinutes: newSchedulingData.maxCrawlDurationMinutes || 60,
     });
-    
+
     if (isEditing && repository) {
       // Check if scheduling data has changed
       // For comparison, treat undefined, null, and empty string as equivalent
       const areEqual = (a: string | null | undefined, b: string | null | undefined) => {
-        if ((a === undefined || a === null || a === '') && 
+        if ((a === undefined || a === null || a === '') &&
             (b === undefined || b === null || b === '')) {
           return true;
         }
         return a === b;
       };
-      
-      const hasChanged = 
+
+      const hasChanged =
         repository.autoCrawlEnabled !== newSchedulingData.autoCrawlEnabled ||
         !areEqual(repository.cronSchedule, newSchedulingData.cronSchedule) ||
         repository.crawlFrequencyHours !== newSchedulingData.crawlFrequencyHours ||
         (repository.maxCrawlDurationMinutes || 60) !== newSchedulingData.maxCrawlDurationMinutes;
-      
+
       // Only log when there's an actual change
       if (hasChanged) {
         console.log('Schedule changed:', hasChanged);
       }
-      
+
       setHasSchedulingChanged(hasChanged);
     }
   }, [isEditing, repository]);
 
   // Track the repository ID to detect when we switch repositories
   const [currentRepositoryId, setCurrentRepositoryId] = React.useState(repository?.id);
-  
+
   React.useEffect(() => {
     // Only reset when we actually switch to a different repository
     if (repository?.id !== currentRepositoryId) {
       setCurrentRepositoryId(repository?.id);
-      
+
       if (repository) {
         const formData = {
           name: repository.name,
