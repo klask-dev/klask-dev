@@ -88,6 +88,8 @@ pub struct SearchRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FacetsRequest {
+    // Optional search query to combine with filters
+    pub query: Option<String>,
     // Multi-select filters as comma-separated strings
     pub repositories: Option<String>,
     pub projects: Option<String>,
@@ -332,9 +334,10 @@ async fn get_facets_with_filters(
         }
     }
 
-    // Build search query with an empty search (match all) and filters
+    // Build search query with optional search query and filters
+    // If no query provided, use "*" to match all documents
     let search_query = SearchQuery {
-        query: "*".to_string(), // Match all documents
+        query: params.query.clone().unwrap_or_else(|| "*".to_string()),
         repository_filter: params.repositories,
         project_filter: params.projects,
         version_filter: params.versions,

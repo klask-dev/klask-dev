@@ -438,6 +438,7 @@ export const useFacetsWithFilters = (
     extension?: string[];
     repository?: string[];
   } = {},
+  query: string = '',
   options: UseSearchOptions = {}
 ) => {
   const {
@@ -476,10 +477,15 @@ export const useFacetsWithFilters = (
   const hasActiveFilters = Object.values(filterKey).some((arr) => arr.length > 0);
 
   return useQuery({
-    // Include filter values in query key for automatic deduplication by React Query
-    queryKey: ['search', 'facets', filterKey],
+    // Include filter values and query in query key for automatic deduplication by React Query
+    queryKey: ['search', 'facets', filterKey, query],
     queryFn: async (): Promise<FacetsApiResponse> => {
       const searchParams = new URLSearchParams();
+
+      // Add optional search query
+      if (query.trim()) {
+        searchParams.set('query', query.trim());
+      }
 
       // Add filters as comma-separated query parameters
       if (filterKey.project.length > 0) {
