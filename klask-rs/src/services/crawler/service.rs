@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 /// Main crawler service that orchestrates all crawl operations
@@ -165,25 +165,17 @@ impl CrawlerService {
             return Ok(());
         }
 
-        let repo_path = match repository.repository_type {
-            RepositoryType::FileSystem => {
-                // For filesystem repositories, use the URL as the direct path
-                PathBuf::from(&repository.url)
-            }
+        // Initialize progress for all repository types
+        let mut progress = CrawlProgress { files_processed: 0, files_indexed: 0, errors: Vec::new() };
+
+        let repo_path_git = match repository.repository_type {
             RepositoryType::Git => {
+                let temp_path = self.temp_dir.join(format!("{}-{}", repository.name, repository.id));
+
                 // For Git repositories, use temp directory with cloning
                 self.progress_tracker
                     .update_status(repository.id, crate::services::progress::CrawlStatus::Cloning)
                     .await;
-
-                // Check for cancellation before cloning
-                if cancellation_token.is_cancelled() {
-                    self.progress_tracker.cancel_crawl(repository.id).await;
-                    self.cleanup_cancellation_token(repository.id).await;
-                    return Ok(());
-                }
-
-                let temp_path = self.temp_dir.join(format!("{}-{}", repository.name, repository.id));
 
                 // Try to clone the repository, handle errors gracefully
                 match self.git_operations.clone_or_update_repository(repository, &temp_path).await {
@@ -198,6 +190,60 @@ impl CrawlerService {
                         return Err(anyhow!(error_msg));
                     }
                 }
+            }
+            RepositoryType::FileSystem => {
+                // For filesystem repositories, use the URL as the direct path
+                PathBuf::from(&repository.url)
+            }
+            _ => PathBuf::new(),
+        };
+
+        match repository.repository_type {
+            RepositoryType::FileSystem | RepositoryType::Git => {
+                // Validate that the path exists
+                if !repo_path_git.exists() {
+                    let error_msg = format!("Repository path does not exist: {:?}", repo_path_git);
+                    self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
+                    // Mark crawl as failed in database
+                    let _ = repo_repo.fail_crawl(repository.id).await;
+                    self.cleanup_cancellation_token(repository.id).await;
+                    return Err(anyhow!(error_msg));
+                }
+
+                if !repo_path_git.is_dir() {
+                    let error_msg = format!("Repository path is not a directory: {:?}", repo_path_git);
+                    self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
+                    // Mark crawl as failed in database
+                    let _ = repo_repo.fail_crawl(repository.id).await;
+                    self.cleanup_cancellation_token(repository.id).await;
+                    return Err(anyhow!(error_msg));
+                }
+
+                // Update status to processing
+                self.progress_tracker
+                    .update_status(repository.id, crate::services::progress::CrawlStatus::Processing)
+                    .await;
+
+                // Check for cancellation before processing
+                if cancellation_token.is_cancelled() {
+                    self.progress_tracker.cancel_crawl(repository.id).await;
+                    self.cleanup_cancellation_token(repository.id).await;
+                    return Ok(());
+                }
+
+                self.process_repository_files(repository, &repo_path_git, &mut progress, &cancellation_token).await?;
+
+                // Check for cancellation before indexing
+                if cancellation_token.is_cancelled() {
+                    self.progress_tracker.cancel_crawl(repository.id).await;
+                    self.cleanup_cancellation_token(repository.id).await;
+                    return Ok(());
+                }
+
+                // Update status to indexing
+                self.progress_tracker
+                    .update_status(repository.id, crate::services::progress::CrawlStatus::Indexing)
+                    .await;
             }
             RepositoryType::GitLab => {
                 // For GitLab repositories, discover and clone all sub-projects
@@ -255,8 +301,7 @@ impl CrawlerService {
                         as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
                 };
 
-                return self
-                    .gitlab_crawler
+                self.gitlab_crawler
                     .crawl_gitlab_repository(
                         repository,
                         cancellation_token,
@@ -265,7 +310,7 @@ impl CrawlerService {
                         update_crawl_time_fn,
                         cleanup_token_fn,
                     )
-                    .await;
+                    .await?;
             }
             RepositoryType::GitHub => {
                 // For GitHub repositories, discover and clone all sub-repositories
@@ -323,8 +368,7 @@ impl CrawlerService {
                         as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
                 };
 
-                return self
-                    .github_crawler
+                self.github_crawler
                     .crawl_github_repository(
                         repository,
                         cancellation_token,
@@ -333,82 +377,12 @@ impl CrawlerService {
                         update_crawl_time_fn,
                         cleanup_token_fn,
                     )
-                    .await;
+                    .await?;
             }
         };
-        debug!("let repo_path = {:?}", repo_path);
-        // Check for cancellation after path setup
-        if cancellation_token.is_cancelled() {
-            self.progress_tracker.cancel_crawl(repository.id).await;
-            self.cleanup_cancellation_token(repository.id).await;
-            return Ok(());
-        }
 
-        // Validate that the path exists
-        if !repo_path.exists() {
-            let error_msg = format!("Repository path does not exist: {:?}", repo_path);
-            self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-            // Mark crawl as failed in database
-            let _ = repo_repo.fail_crawl(repository.id).await;
-            self.cleanup_cancellation_token(repository.id).await;
-            return Err(anyhow!(error_msg));
-        }
-
-        if !repo_path.is_dir() {
-            let error_msg = format!("Repository path is not a directory: {:?}", repo_path);
-            self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-            // Mark crawl as failed in database
-            let _ = repo_repo.fail_crawl(repository.id).await;
-            self.cleanup_cancellation_token(repository.id).await;
-            return Err(anyhow!(error_msg));
-        }
-
-        // Update status to processing
-        self.progress_tracker.update_status(repository.id, crate::services::progress::CrawlStatus::Processing).await;
-
-        // Process all files in the repository
-        let mut progress = CrawlProgress { files_processed: 0, files_indexed: 0, errors: Vec::new() };
-
-        // Check for cancellation before processing
-        if cancellation_token.is_cancelled() {
-            self.progress_tracker.cancel_crawl(repository.id).await;
-            self.cleanup_cancellation_token(repository.id).await;
-            return Ok(());
-        }
-
-        self.process_repository_files(repository, &repo_path, &mut progress, &cancellation_token).await?;
-
-        // Check for cancellation before indexing
-        if cancellation_token.is_cancelled() {
-            self.progress_tracker.cancel_crawl(repository.id).await;
-            self.cleanup_cancellation_token(repository.id).await;
-            return Ok(());
-        }
-
-        // Update status to indexing
-        self.progress_tracker.update_status(repository.id, crate::services::progress::CrawlStatus::Indexing).await;
-
-        // Commit the Tantivy index to make changes searchable
-        info!("Committing Tantivy index for repository: {}", repository.name);
-        tokio::time::timeout(
-            std::time::Duration::from_secs(60), // 1 minute timeout for Tantivy commit
-            self.search_service.commit(),
-        )
-        .await
-        .map_err(|_| anyhow!("Tantivy commit timed out after 1 minute"))??;
-
-        // Update repository last_crawled timestamp with duration
-        let crawl_duration_seconds = crawl_start_time.elapsed().as_secs() as i32;
-        self.update_repository_crawl_time(repository.id, Some(crawl_duration_seconds)).await?;
-
-        // Mark crawl as completed in database
-        repo_repo.complete_crawl(repository.id).await?;
-
-        // Complete the progress tracking
-        self.progress_tracker.complete_crawl(repository.id).await;
-
-        // Clean up cancellation token
-        self.cleanup_cancellation_token(repository.id).await;
+        // Finalize the crawl: commit Tantivy index and update database
+        self.finalize_crawl(repository, crawl_start_time).await?;
 
         info!(
             "Crawl completed for repository: {}. Files processed: {}, Files indexed: {}, Errors: {}",
@@ -585,6 +559,8 @@ impl CrawlerService {
 
     /// Resume a repository crawl from where it left off
     pub async fn resume_repository_crawl(&self, repository: &Repository) -> Result<()> {
+        let crawl_start_time = std::time::Instant::now();
+
         info!(
             "Resuming crawl for repository: {} from project: {:?}",
             repository.name, repository.last_processed_project
@@ -654,7 +630,10 @@ impl CrawlerService {
                         update_crawl_time_fn,
                         cleanup_token_fn,
                     )
-                    .await
+                    .await?;
+
+                // Finalize the crawl: commit Tantivy index and update database
+                self.finalize_crawl(repository, crawl_start_time).await
             }
             RepositoryType::Git | RepositoryType::FileSystem | RepositoryType::GitHub => {
                 // For Git, FileSystem, and GitHub, just restart the entire crawl
@@ -693,6 +672,38 @@ impl CrawlerService {
             );
             repo_repo.fail_crawl(repository.id).await?;
         }
+
+        Ok(())
+    }
+
+    /// Finalize a crawl by committing the Tantivy index and updating the database
+    /// This is called once at the end of all crawl operations (regular, GitLab, GitHub, resume)
+    async fn finalize_crawl(&self, repository: &Repository, crawl_start_time: std::time::Instant) -> Result<()> {
+        let repo_repo = RepositoryRepository::new(self.database.clone());
+
+        // Commit the Tantivy index to make changes searchable
+        info!("Committing Tantivy index for repository: {}", repository.name);
+        tokio::time::timeout(
+            std::time::Duration::from_secs(60), // 1 minute timeout for Tantivy commit
+            self.search_service.commit(),
+        )
+        .await
+        .map_err(|_| anyhow!("Tantivy commit timed out after 1 minute"))??;
+
+        // Update repository last_crawled timestamp with duration
+        let crawl_duration_seconds = crawl_start_time.elapsed().as_secs() as i32;
+        self.update_repository_crawl_time(repository.id, Some(crawl_duration_seconds)).await?;
+
+        // Mark crawl as completed in database
+        repo_repo.complete_crawl(repository.id).await?;
+
+        // Complete the progress tracking
+        self.progress_tracker.complete_crawl(repository.id).await;
+
+        // Clean up cancellation token
+        self.cleanup_cancellation_token(repository.id).await;
+
+        info!("Crawl completed for repository: {}", repository.name);
 
         Ok(())
     }

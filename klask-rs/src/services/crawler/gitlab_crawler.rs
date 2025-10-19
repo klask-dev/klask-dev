@@ -54,12 +54,12 @@ impl GitLabCrawler {
             ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
             + Send
             + Sync,
-        update_crawl_time_fn: impl Fn(Uuid, Option<i32>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        _update_crawl_time_fn: impl Fn(Uuid, Option<i32>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
             + Send
             + Sync,
         cleanup_token_fn: impl Fn(Uuid) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync,
     ) -> Result<()> {
-        let gitlab_crawl_start_time = std::time::Instant::now();
+        let _gitlab_crawl_start_time = std::time::Instant::now();
         let repo_repo = RepositoryRepository::new(self.database.clone());
 
         info!("Starting GitLab discovery for repository: {}", repository.name);
@@ -310,20 +310,9 @@ impl GitLabCrawler {
             self.progress_tracker.set_error(repository.id, format!("Some projects failed: {}", combined_errors)).await;
         }
 
-        // Note: Tantivy commit is now done once at the end in crawler_service, not here, for better performance
-
-        // Update repository crawl time with duration
-        let gitlab_crawl_duration_seconds = gitlab_crawl_start_time.elapsed().as_secs() as i32;
-        update_crawl_time_fn(repository.id, Some(gitlab_crawl_duration_seconds)).await?;
-
-        // Mark crawl as completed in database
-        repo_repo.complete_crawl(repository.id).await?;
-
-        // Complete the crawl
-        self.progress_tracker.complete_crawl(repository.id).await;
-        cleanup_token_fn(repository.id).await;
-
         info!("Completed GitLab repository crawl for: {}", repository.name);
+
+        // Note: Tantivy commit, database updates, and progress completion are handled in CrawlerService::finalize_crawl()
         Ok(())
     }
 
@@ -347,13 +336,13 @@ impl GitLabCrawler {
             ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
             + Send
             + Sync,
-        update_crawl_time_fn: impl Fn(Uuid, Option<i32>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        _update_crawl_time_fn: impl Fn(Uuid, Option<i32>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
             + Send
             + Sync,
         cleanup_token_fn: impl Fn(Uuid) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync,
     ) -> Result<()> {
         let repo_repo = RepositoryRepository::new(self.database.clone());
-        let gitlab_crawl_start_time = std::time::Instant::now();
+        let _gitlab_crawl_start_time = std::time::Instant::now();
 
         info!(
             "Resuming GitLab crawl for repository: {} from project: {:?}",
@@ -547,17 +536,9 @@ impl GitLabCrawler {
                 .await;
         }
 
-        // Update repository crawl time and complete
-        let gitlab_crawl_duration_seconds = gitlab_crawl_start_time.elapsed().as_secs() as i32;
-        update_crawl_time_fn(repository.id, Some(gitlab_crawl_duration_seconds)).await?;
-
-        // Mark crawl as completed in database
-        repo_repo.complete_crawl(repository.id).await?;
-
-        self.progress_tracker.complete_crawl(repository.id).await;
-        cleanup_token_fn(repository.id).await;
-
         info!("Completed resumed GitLab repository crawl for: {}", repository.name);
+
+        // Note: Tantivy commit, database updates, and progress completion are handled in CrawlerService::finalize_crawl()
         Ok(())
     }
 }
