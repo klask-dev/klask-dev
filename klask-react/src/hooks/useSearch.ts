@@ -541,8 +541,9 @@ export const useFacetsWithFilters = (
       // Return normalized facets with proper types
       return normalizeFacetsResponse(data);
     },
-    // Only query when enabled and filters are present
-    enabled: enabled && hasActiveFilters,
+    // Query when enabled, regardless of filters
+    // Even without active filters, we need facets for display
+    enabled: enabled,
     refetchOnWindowFocus,
     staleTime,
     retry: (failureCount, error) => {
