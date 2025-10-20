@@ -577,7 +577,7 @@ impl SearchService {
         query: &dyn tantivy::query::Query,
     ) -> Result<SnippetGenerator> {
         let mut snippet_generator = SnippetGenerator::create(searcher, query, self.fields.content)?;
-        snippet_generator.set_max_num_chars(600);
+        snippet_generator.set_max_num_chars(400);
         Ok(snippet_generator)
     }
 

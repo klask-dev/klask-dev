@@ -131,19 +131,40 @@ export const SearchResult: React.FC<SearchResultProps> = ({
       <div className="p-4">
         <div className="relative">
           <div className="overflow-hidden rounded border border-gray-200">
-            <div 
+            <div
               className="p-3 bg-gray-50 text-sm font-mono overflow-auto"
               style={{
                 maxHeight: '200px',
                 lineHeight: '1.5',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
               dangerouslySetInnerHTML={{
-                __html: (result.content_snippet || 'No content preview available')
-                  .replace(/&/g, '&amp;')
-                  .replace(/</g, '&lt;')
-                  .replace(/>/g, '&gt;')
-                  .replace(/&lt;b&gt;/g, '<mark class="bg-yellow-200 font-semibold">')
-                  .replace(/&lt;\/b&gt;/g, '</mark>')
+                __html: (() => {
+                  // Tantivy sends HTML with entities encoded and <b> tags for highlighting
+                  // We need to:
+                  // 1. Decode HTML entities (safe because Tantivy already escaped them)
+                  // 2. Convert <b> tags to safe <mark> tags for highlighting
+                  const snippet = result.content_snippet || 'No content preview available';
+
+                  // Decode HTML entities
+                  const textarea = document.createElement('textarea');
+                  textarea.innerHTML = snippet;
+                  const decoded = textarea.value;
+
+                  // Now re-encode for safe insertion, except for our <b> tags
+                  let html = decoded
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+
+                  // Finally, convert <b> tags to safe highlight marks
+                  html = html
+                    .replace(/&lt;b&gt;/g, '<mark class="bg-yellow-200 font-semibold">')
+                    .replace(/&lt;\/b&gt;/g, '</mark>');
+
+                  return html;
+                })()
               }}
             />
           </div>
