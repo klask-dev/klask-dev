@@ -16,6 +16,13 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      onwarn(warning, warn) {
+        // Ignore refractor import warnings for both lib and lang directories
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.message?.includes('refractor/')) {
+          return;
+        }
+        warn(warning);
+      },
       output: {
         manualChunks: {
           // Bundle syntax highlighter core separately
@@ -43,6 +50,8 @@ export default defineConfig({
       'react-syntax-highlighter/dist/esm/styles/prism/one-light',
       'react-syntax-highlighter/dist/esm/styles/prism/one-dark',
       'react-window',
+      'refractor/lib/core',
+      'refractor/lib/all',
     ],
     exclude: [
       // Exclude individual language modules from pre-bundling
