@@ -1,0 +1,60 @@
+# Configuration pour tests locaux avec images buildées localement
+# Usage: helm install klask-test ./charts/klask -f charts/klask/values-local.yaml
+
+# Images locales (à builder avant le test)
+backend:
+  image:
+    repository: klask-backend
+    tag: local
+    pullPolicy: Never  # Ne pas télécharger, utiliser l'image locale
+
+frontend:
+  image:
+    repository: klask-frontend
+    tag: local
+    pullPolicy: Never  # Ne pas télécharger, utiliser l'image locale
+
+# Configuration simplifiée pour les tests
+postgresql:
+  auth:
+    postgresPassword: "test123"
+    username: "klask"
+    password: "test123"
+    database: "klask"
+    
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Ressources réduites pour tests locaux
+backend:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+frontend:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Ingress pour tests locaux
+ingress:
+  enabled: true
+  className: "nginx"  # ou votre ingress controller local
+  hosts:
+    - host: klask.local
+      paths:
+        - path: /
+          pathType: Prefix

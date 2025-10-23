@@ -271,12 +271,14 @@ const SearchPageV3: React.FC = () => {
           filters={filters}
           onFiltersChange={handleFiltersChange}
           availableFilters={{
-            projects: availableFilters?.projects || [],
-            versions: availableFilters?.versions || [],
-            extensions: availableFilters?.extensions || [],
-            languages: availableFilters?.languages || [],
+            // Use dynamic facets from search results if available, fallback to static filters
+            repositories: facets?.repositories?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.repositories || [],
+            projects: facets?.projects?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.projects || [],
+            versions: facets?.versions?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.versions || [],
+            extensions: facets?.extensions?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.extensions || [],
+            languages: facets?.languages?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.languages || [],
           }}
-          isLoading={filtersLoading}
+          isLoading={filtersLoading || isFetching}
           collapsible={false}
           defaultExpanded={true}
         />

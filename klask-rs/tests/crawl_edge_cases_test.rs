@@ -59,9 +59,7 @@ mod crawl_edge_cases_tests {
         let tracker = Arc::new(ProgressTracker::new());
         let repo_id = Uuid::new_v4();
 
-        tracker
-            .start_crawl(repo_id, "concurrent-updates".to_string())
-            .await;
+        tracker.start_crawl(repo_id, "concurrent-updates".to_string()).await;
 
         let mut handles = vec![];
 
@@ -83,9 +81,7 @@ mod crawl_edge_cases_tests {
         for i in 0..10 {
             let tracker_clone = Arc::clone(&tracker);
             let handle = tokio::spawn(async move {
-                tracker_clone
-                    .update_progress(repo_id, i * 10, Some(100), i * 5)
-                    .await;
+                tracker_clone.update_progress(repo_id, i * 10, Some(100), i * 5).await;
             });
             handles.push(handle);
         }
@@ -94,9 +90,7 @@ mod crawl_edge_cases_tests {
         for i in 0..5 {
             let tracker_clone = Arc::clone(&tracker);
             let handle = tokio::spawn(async move {
-                tracker_clone
-                    .set_current_file(repo_id, Some(format!("file-{}.rs", i)))
-                    .await;
+                tracker_clone.set_current_file(repo_id, Some(format!("file-{}.rs", i))).await;
             });
             handles.push(handle);
         }
@@ -123,9 +117,7 @@ mod crawl_edge_cases_tests {
             for i in 0..100 {
                 let repo_id = Uuid::new_v4();
                 repo_ids.push(repo_id);
-                tracker
-                    .start_crawl(repo_id, format!("batch-{}-repo-{}", batch, i))
-                    .await;
+                tracker.start_crawl(repo_id, format!("batch-{}-repo-{}", batch, i)).await;
             }
 
             // Complete half, fail quarter, cancel quarter
@@ -159,9 +151,7 @@ mod crawl_edge_cases_tests {
         let tracker = Arc::new(ProgressTracker::new());
         let repo_id = Uuid::new_v4();
 
-        tracker
-            .start_crawl(repo_id, "timeout-test".to_string())
-            .await;
+        tracker.start_crawl(repo_id, "timeout-test".to_string()).await;
 
         // Test that operations complete within reasonable time even under high concurrency
         let operations_future = async {
@@ -176,14 +166,10 @@ mod crawl_edge_cases_tests {
                             tracker_clone.is_crawling(repo_id).await;
                         }
                         1 => {
-                            tracker_clone
-                                .update_progress(repo_id, i, Some(1000), i / 2)
-                                .await;
+                            tracker_clone.update_progress(repo_id, i, Some(1000), i / 2).await;
                         }
                         2 => {
-                            tracker_clone
-                                .set_current_file(repo_id, Some(format!("file-{}", i)))
-                                .await;
+                            tracker_clone.set_current_file(repo_id, Some(format!("file-{}", i))).await;
                         }
                         3 => {
                             tracker_clone.get_progress(repo_id).await;
@@ -192,9 +178,7 @@ mod crawl_edge_cases_tests {
                             tracker_clone.get_all_active_progress().await;
                         }
                         _ => {
-                            tracker_clone
-                                .update_status(repo_id, CrawlStatus::Processing)
-                                .await;
+                            tracker_clone.update_status(repo_id, CrawlStatus::Processing).await;
                         }
                     }
                 });
@@ -216,37 +200,29 @@ mod crawl_edge_cases_tests {
 
         // Start crawls for all repositories
         for &repo_id in &repo_ids {
-            tracker
-                .start_crawl(repo_id, format!("stress-test-{}", repo_id))
-                .await;
+            tracker.start_crawl(repo_id, format!("stress-test-{}", repo_id)).await;
         }
 
         // Apply random operations
         let mut handles = vec![];
         for _ in 0..500 {
-            let repo_id = repo_ids[rand::thread_rng().gen_range(0..repo_ids.len())];
+            let repo_id = repo_ids[rand::rng().random_range(0..repo_ids.len())];
             let tracker_clone = Arc::clone(&tracker);
 
-            let random_operation = rand::thread_rng().gen_range(0..8);
+            let random_operation = rand::rng().random_range(0..8);
             let handle = tokio::spawn(async move {
                 match random_operation {
                     0 => tracker_clone.is_crawling(repo_id).await,
                     1 => {
-                        tracker_clone
-                            .update_status(repo_id, CrawlStatus::Processing)
-                            .await;
+                        tracker_clone.update_status(repo_id, CrawlStatus::Processing).await;
                         false
                     }
                     2 => {
-                        tracker_clone
-                            .update_progress(repo_id, 50, Some(100), 25)
-                            .await;
+                        tracker_clone.update_progress(repo_id, 50, Some(100), 25).await;
                         false
                     }
                     3 => {
-                        tracker_clone
-                            .set_current_file(repo_id, Some("test.rs".to_string()))
-                            .await;
+                        tracker_clone.set_current_file(repo_id, Some("test.rs".to_string())).await;
                         false
                     }
                     4 => {
@@ -258,9 +234,7 @@ mod crawl_edge_cases_tests {
                         false
                     }
                     6 => {
-                        tracker_clone
-                            .set_error(repo_id, "Random error".to_string())
-                            .await;
+                        tracker_clone.set_error(repo_id, "Random error".to_string()).await;
                         false
                     }
                     _ => tracker_clone.get_progress(repo_id).await.is_some(),
@@ -270,11 +244,7 @@ mod crawl_edge_cases_tests {
         }
 
         // Wait for all operations to complete
-        let results: Vec<bool> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let results: Vec<bool> = futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // Verify that operations completed without panicking
         assert!(results.len() == 500);
@@ -298,9 +268,7 @@ mod crawl_edge_cases_tests {
         let tracker = ProgressTracker::new();
         let repo_id = Uuid::new_v4();
 
-        tracker
-            .start_crawl(repo_id, "immutability-test".to_string())
-            .await;
+        tracker.start_crawl(repo_id, "immutability-test".to_string()).await;
 
         // Get initial progress
         let initial_progress = tracker.get_progress(repo_id).await.unwrap();
@@ -310,15 +278,9 @@ mod crawl_edge_cases_tests {
 
         // Update progress multiple times
         for i in 0..10 {
-            tracker
-                .update_progress(repo_id, i * 10, Some(100), i * 5)
-                .await;
-            tracker
-                .update_status(repo_id, CrawlStatus::Processing)
-                .await;
-            tracker
-                .set_current_file(repo_id, Some(format!("file-{}.rs", i)))
-                .await;
+            tracker.update_progress(repo_id, i * 10, Some(100), i * 5).await;
+            tracker.update_status(repo_id, CrawlStatus::Processing).await;
+            tracker.set_current_file(repo_id, Some(format!("file-{}.rs", i))).await;
 
             let current_progress = tracker.get_progress(repo_id).await.unwrap();
 
@@ -340,9 +302,7 @@ mod crawl_edge_cases_tests {
         let repo_ids: Vec<Uuid> = (0..20).map(|_| Uuid::new_v4()).collect();
 
         for &repo_id in &repo_ids {
-            tracker
-                .start_crawl(repo_id, format!("cleanup-test-{}", repo_id))
-                .await;
+            tracker.start_crawl(repo_id, format!("cleanup-test-{}", repo_id)).await;
         }
 
         // Complete some crawls
@@ -369,9 +329,7 @@ mod crawl_edge_cases_tests {
             let tracker_clone = Arc::clone(&tracker);
             let handle = tokio::spawn(async move {
                 for j in 0..10 {
-                    tracker_clone
-                        .update_progress(repo_id, j * 10, Some(100), j * 5)
-                        .await;
+                    tracker_clone.update_progress(repo_id, j * 10, Some(100), j * 5).await;
                     tracker_clone.is_crawling(repo_id).await;
                     sleep(Duration::from_millis(1)).await;
                 }
@@ -401,9 +359,7 @@ mod crawl_edge_cases_tests {
         let tracker_error = Arc::clone(&tracker);
         let error_handle = tokio::spawn(async move {
             sleep(Duration::from_millis(5)).await;
-            tracker_error
-                .set_error(repo_id, "Test error message".to_string())
-                .await;
+            tracker_error.set_error(repo_id, "Test error message".to_string()).await;
         });
         handles.push(error_handle);
 
@@ -412,9 +368,7 @@ mod crawl_edge_cases_tests {
             let tracker_clone = Arc::clone(&tracker);
             let handle = tokio::spawn(async move {
                 sleep(Duration::from_millis(i * 2)).await;
-                tracker_clone
-                    .update_progress(repo_id, (i * 20) as usize, Some(100), (i * 10) as usize)
-                    .await;
+                tracker_clone.update_progress(repo_id, (i * 20) as usize, Some(100), (i * 10) as usize).await;
             });
             handles.push(handle);
         }
@@ -470,14 +424,10 @@ mod crawl_edge_cases_tests {
         let tracker = ProgressTracker::new();
         let repo_id = Uuid::new_v4();
 
-        tracker
-            .start_crawl(repo_id, "extreme-values".to_string())
-            .await;
+        tracker.start_crawl(repo_id, "extreme-values".to_string()).await;
 
         // Test with extreme values
-        tracker
-            .update_progress(repo_id, usize::MAX, Some(usize::MAX), usize::MAX)
-            .await;
+        tracker.update_progress(repo_id, usize::MAX, Some(usize::MAX), usize::MAX).await;
 
         let progress = tracker.get_progress(repo_id).await.unwrap();
         assert_eq!(progress.files_processed, usize::MAX);
@@ -501,9 +451,7 @@ mod crawl_edge_cases_tests {
         let tracker = Arc::new(ProgressTracker::new());
         let repo_id = Uuid::new_v4();
 
-        tracker
-            .start_crawl(repo_id, "long-running".to_string())
-            .await;
+        tracker.start_crawl(repo_id, "long-running".to_string()).await;
 
         // Simulate a long-running operation with periodic updates
         let mut handles = vec![];
@@ -523,12 +471,8 @@ mod crawl_edge_cases_tests {
         let tracker_updater = Arc::clone(&tracker);
         let update_handle = tokio::spawn(async move {
             for i in 0..100 {
-                tracker_updater
-                    .update_progress(repo_id, i, Some(100), i / 2)
-                    .await;
-                tracker_updater
-                    .set_current_file(repo_id, Some(format!("processing-{}.rs", i)))
-                    .await;
+                tracker_updater.update_progress(repo_id, i, Some(100), i / 2).await;
+                tracker_updater.set_current_file(repo_id, Some(format!("processing-{}.rs", i))).await;
                 sleep(Duration::from_millis(1)).await;
             }
         });
@@ -542,9 +486,6 @@ mod crawl_edge_cases_tests {
         assert_eq!(final_progress.files_processed, 99);
         assert_eq!(final_progress.files_indexed, 49);
         assert_eq!(final_progress.progress_percentage, 99.0);
-        assert!(final_progress
-            .current_file
-            .unwrap()
-            .starts_with("processing-"));
+        assert!(final_progress.current_file.unwrap().starts_with("processing-"));
     }
 }

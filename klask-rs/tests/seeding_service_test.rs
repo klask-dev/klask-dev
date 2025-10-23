@@ -7,10 +7,7 @@ use klask_rs::services::seeding::SeedingStats;
 #[tokio::test]
 async fn test_seeding_stats_serialization() -> Result<()> {
     // Test that seeding stats can be serialized/deserialized correctly
-    let stats = SeedingStats {
-        users_created: 5,
-        repositories_created: 3,
-    };
+    let stats = SeedingStats { users_created: 5, repositories_created: 3 };
 
     // Test serialization to JSON
     let json = serde_json::to_string(&stats)?;
@@ -27,10 +24,7 @@ async fn test_seeding_stats_serialization() -> Result<()> {
 #[tokio::test]
 async fn test_seeding_stats_structure() -> Result<()> {
     // Test seeding statistics data structure
-    let stats = SeedingStats {
-        users_created: 10,
-        repositories_created: 5,
-    };
+    let stats = SeedingStats { users_created: 10, repositories_created: 5 };
 
     assert_eq!(stats.users_created, 10);
     assert_eq!(stats.repositories_created, 5);
@@ -42,10 +36,7 @@ async fn test_seeding_stats_structure() -> Result<()> {
 #[tokio::test]
 async fn test_seeding_stats_empty() -> Result<()> {
     // Test empty seeding stats (initial state)
-    let empty_stats = SeedingStats {
-        users_created: 0,
-        repositories_created: 0,
-    };
+    let empty_stats = SeedingStats { users_created: 0, repositories_created: 0 };
 
     assert_eq!(empty_stats.users_created, 0);
     assert_eq!(empty_stats.repositories_created, 0);
@@ -57,10 +48,7 @@ async fn test_seeding_stats_empty() -> Result<()> {
 #[tokio::test]
 async fn test_seeding_operation_calculations() -> Result<()> {
     // Test that operations can be calculated from stats
-    let stats = SeedingStats {
-        users_created: 7,
-        repositories_created: 4,
-    };
+    let stats = SeedingStats { users_created: 7, repositories_created: 4 };
 
     // Total operations can be calculated
     let total_operations = stats.users_created + stats.repositories_created;
@@ -188,15 +176,9 @@ async fn test_seeding_performance_metrics() -> Result<()> {
 #[tokio::test]
 async fn test_seeding_stats_math() -> Result<()> {
     // Test that seeding stats support mathematical operations
-    let stats1 = SeedingStats {
-        users_created: 5,
-        repositories_created: 3,
-    };
+    let stats1 = SeedingStats { users_created: 5, repositories_created: 3 };
 
-    let stats2 = SeedingStats {
-        users_created: 10,
-        repositories_created: 7,
-    };
+    let stats2 = SeedingStats { users_created: 10, repositories_created: 7 };
 
     // Can combine stats
     let total_users = stats1.users_created + stats2.users_created;

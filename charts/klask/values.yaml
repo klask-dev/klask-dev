@@ -2,167 +2,611 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 1
-
-image:
-  repository: klask
-  pullPolicy: IfNotPresent
-  tag: ""
-
+## @section Global parameters
+## Global Docker image parameters
+## Please, note that this will override the image parameters, including dependencies, configured to use the global value
+## Current available global Docker image parameters: imageRegistry, imagePullSecrets
+## @param imagePullSecrets Specify docker-registry secrets
+## Example:
+## imagePullSecrets:
+##   - myRegistryKeySecretName
 imagePullSecrets: []
+
+## @param nameOverride String to partially override klask.fullname
 nameOverride: ""
+
+## @param fullnameOverride String to fully override klask.fullname
 fullnameOverride: ""
 
+## @section ServiceAccount parameters
+
 serviceAccount:
+  ## @param serviceAccount.create Specifies whether a ServiceAccount should be created
   create: true
+  ## @param serviceAccount.automount Automatically mount a ServiceAccount's API credentials?
   automount: true
+  ## @param serviceAccount.annotations Annotations to add to the service account
   annotations: {}
+  ## @param serviceAccount.name The name of the ServiceAccount to use.
+  ## If not set and create is true, a name is generated using the fullname template
   name: ""
 
+## @section Security parameters
+
+## @param podAnnotations Annotations for Klask pods
 podAnnotations: {}
+
+## @param podLabels Extra labels for Klask pods
 podLabels: {}
 
-podSecurityContext: {}
+## @param podSecurityContext Configure Pod security context
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
 
-securityContext: {}
+## @param securityContext Configure Container security context
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
 
-service:
-  type: ClusterIP
-  port: 80
+## @section Ingress parameters
 
 ingress:
+  ## @param ingress.enabled Enable ingress record generation for Klask
   enabled: false
-  className: ""
+  ## @param ingress.className IngressClass that will be used to implement the Ingress (Kubernetes 1.18+)
+  ## This is supported in Kubernetes 1.18+ and required if you have more than one IngressClass marked as the default for your cluster.
+  className: "nginx"
+  ## @param ingress.annotations Additional annotations for the Ingress resource
+  ## For cert-manager with Let's Encrypt:
+  ## cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  ## For nginx ingress with TLS redirect:
+  ## nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  ## nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  ## For CORS:
+  ## nginx.ingress.kubernetes.io/enable-cors: "true"
+  ## nginx.ingress.kubernetes.io/cors-allow-origin: "https://klask.example.com"
   annotations: {}
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  ## @param ingress.hosts An array of host configurations for the Ingress
   hosts:
     - host: klask.local
       paths:
         - path: /
           pathType: Prefix
+  ## @param ingress.tls TLS configuration for the Ingress
   tls: []
+  #  - secretName: klask-tls
+  #    hosts:
+  #      - klask.local
 
-resources: {}
+## @section High Availability parameters
 
-livenessProbe:
-  httpGet:
-    path: /
-    port: http
-readinessProbe:
-  httpGet:
-    path: /
-    port: http
-
+## @param autoscaling Horizontal Pod Autoscaler configuration
 autoscaling:
+  ## @param autoscaling.enabled Enable Horizontal Pod Autoscaler
   enabled: false
+  ## @param autoscaling.minReplicas Minimum number of Klask replicas
   minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
+  ## @param autoscaling.maxReplicas Maximum number of Klask replicas
+  maxReplicas: 1
+  ## @param autoscaling.metrics Metrics configuration for HPA
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  ## @param autoscaling.behavior HPA behavior configuration
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
 
+## @param podDisruptionBudget Pod Disruption Budget configuration
+podDisruptionBudget:
+  ## @param podDisruptionBudget.enabled Enable PodDisruptionBudget
+  enabled: true
+  ## Backend PDB
+  backend:
+    ## @param podDisruptionBudget.backend.minAvailable Minimum available backend pods
+    minAvailable: 1
+    ## @param podDisruptionBudget.backend.maxUnavailable Maximum unavailable backend pods (use either minAvailable or maxUnavailable)
+    maxUnavailable: null
+  ## Frontend PDB
+  frontend:
+    ## @param podDisruptionBudget.frontend.minAvailable Minimum available frontend pods
+    minAvailable: 1
+    ## @param podDisruptionBudget.frontend.maxUnavailable Maximum unavailable frontend pods
+    maxUnavailable: null
+
+## @param affinity Affinity for pod assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #     - weight: 100
+  #       podAffinityTerm:
+  #         labelSelector:
+  #           matchLabels:
+  #             app.kubernetes.io/name: klask
+  #         topologyKey: kubernetes.io/hostname
+
+## @param nodeSelector Node labels for pod assignment
+## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+nodeSelector: {}
+
+## @param tolerations Tolerations for pod assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []
+
+## @param volumes Additional volumes on the output Deployment definition
 volumes: []
+
+## @param volumeMounts Additional volumeMounts on the output Deployment definition
 volumeMounts: []
 
-nodeSelector: {}
-tolerations: []
-affinity: {}
+## @section Backend parameters
 
-# Backend configuration
 backend:
+  ## @param backend.enabled Enable backend deployment
   enabled: true
+
+  ## @param replicaCount Number of backend replicas to deploy
+  replicaCount: 1
+
+  ## @param backend.image Backend image configuration
   image:
-    repository: ghcr.io/klask-io/klask-backend
-    tag: latest
+    ## @param backend.image.repository Backend image repository
+    repository: ghcr.io/klask-dev/klask-backend
+    ## @param backend.image.tag Backend image tag (immutable tags are recommended)
+    tag: "0.2.0"
+    ## @param backend.image.pullPolicy Backend image pull policy
     pullPolicy: IfNotPresent
-  
-  service:
-    type: ClusterIP
-    port: 3000
-    targetPort: 3000
-  
+
+  ## @param backend.existingSecret Name of existing secret containing backend credentials
+  ## If not specified, a secret will be created
+  existingSecret: ""
+
+  ## @param backend.secrets Additional secrets to store in backend secret
+  ## Example:
+  ## secrets:
+  ##   API_KEY: "my-secret-api-key"
+  secrets: {}
+
+  ## @param backend.config Backend configuration (non-sensitive)
+  config:
+    ## @param backend.config.rustLog Rust log level
+    rustLog: "error,klask=info"
+    ## @param backend.config.logFormat Log format (json or text)
+    logFormat: "json"
+    ## @param backend.config.gitlabAcceptInvalidCerts Accept invalid SSL certificates for GitLab (useful for self-signed certificates)
+    gitlabAcceptInvalidCerts: "false"
+    ## @param backend.config.extra Additional configuration variables
+    extra: {}
+
+  ## @param backend.env Backend environment variables (for backward compatibility)
   env:
-    - name: DATABASE_URL
-      value: "postgresql://klask:klask@klask-postgresql:5432/klask"
-    - name: RUST_LOG
-      value: "info"
-  
+    ## Database configuration
+    database:
+      ## @param backend.env.database.url External database URL (leave empty to use embedded PostgreSQL)
+      ## Example: "postgresql://user:pass@external-db:5432/klask"
+      url: ""
+    customVars: {}
+
+  ## @param backend.service Backend service configuration
+  service:
+    ## @param backend.service.type Backend service type
+    type: ClusterIP
+    ## @param backend.service.port Backend service port
+    port: 3000
+    ## @param backend.service.targetPort Backend container port
+    targetPort: 3000
+
+  ## @param backend.resources Backend resource requests and limits
+  ## Example:
+  ## resources:
+  ##   limits:
+  ##     cpu: 1000m
+  ##     memory: 1Gi
+  ##   requests:
+  ##     cpu: 500m
+  ##     memory: 512Mi
   resources:
     limits:
-      cpu: 1000m
       memory: 1Gi
     requests:
-      cpu: 500m
       memory: 512Mi
-  
+
+  ## @param backend.livenessProbe Backend liveness probe configuration
   livenessProbe:
+    enabled: true
     httpGet:
       path: /api/status
       port: 3000
     initialDelaySeconds: 30
     periodSeconds: 10
-  
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+  ## @param backend.readinessProbe Backend readiness probe configuration
   readinessProbe:
+    enabled: true
     httpGet:
       path: /api/status
       port: 3000
     initialDelaySeconds: 5
     periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
 
-# Frontend configuration
+  ## @param backend.startupProbe Backend startup probe configuration
+  startupProbe:
+    enabled: false
+    httpGet:
+      path: /api/status
+      port: 3000
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 30
+
+  ## @param backend.persistence Persistence configuration for search index
+  persistence:
+    ## @param backend.persistence.enabled Enable persistent storage for search index
+    ## NOTE: When enabled, deployment strategy is automatically set to "Recreate" 
+    ## to avoid Multi-Attach errors with ReadWriteOnce volumes during rolling updates
+    enabled: true
+
+    ## @param backend.persistence.size Persistent Volume size
+    size: 50Gi
+
+    ## @param backend.persistence.storageClass Storage class name
+    ## If empty, uses cluster default storage class
+    ## If "-", no storage class is specified (uses cluster default)
+    storageClass: ""
+
+    ## @param backend.persistence.annotations PVC annotations
+    annotations: {}
+
+  ## @param backend.tmpPersistence Persistence configuration for /tmp directory
+  tmpPersistence:
+    ## @param backend.tmpPersistence.enabled Enable persistent storage for /tmp directory
+    ## Set to false to use emptyDir instead
+    enabled: false
+
+    ## @param backend.tmpPersistence.size Persistent Volume size for /tmp
+    size: 50Gi
+
+    ## @param backend.tmpPersistence.storageClass Storage class name
+    ## If empty, uses cluster default storage class
+    ## If "-", no storage class is specified (uses cluster default)
+    storageClass: ""
+
+    ## @param backend.tmpPersistence.annotations PVC annotations
+    annotations: {}
+
+  busybox:
+    image:
+      repository: busybox
+      tag: latest
+
+
+## @section Frontend parameters
+
 frontend:
+  ## @param frontend.enabled Enable frontend deployment
   enabled: true
+
+  ## @param replicaCount Number of backend replicas to deploy
+  replicaCount: 1
+
+  ## @param frontend.image Frontend image configuration
   image:
-    repository: ghcr.io/klask-io/klask-frontend
-    tag: latest
+    ## @param frontend.image.repository Frontend image repository
+    repository: ghcr.io/klask-dev/klask-frontend
+    ## @param frontend.image.tag Frontend image tag (immutable tags are recommended)
+    tag: "0.2.0"
+    ## @param frontend.image.pullPolicy Frontend image pull policy
     pullPolicy: IfNotPresent
-  
+
+  ## @param frontend.service Frontend service configuration
   service:
+    ## @param frontend.service.type Frontend service type
     type: ClusterIP
+    ## @param frontend.service.port Frontend service port
     port: 8080
+    ## @param frontend.service.targetPort Frontend container port
     targetPort: 8080
-  
+
+  ## @param frontend.env Frontend environment variables
   env:
-    - name: VITE_API_URL
-      value: "http://klask-backend:3000"
-  
+    ## API configuration
+    api:
+      ## @param frontend.env.api.baseUrl API base URL (leave empty for auto-configuration via ingress)
+      ## Example: "https://api.example.com"
+      baseUrl: ""
+
+    ## Additional custom variables
+    customVars: {}
+
+  ## @param frontend.resources Frontend resource requests and limits
   resources:
     limits:
-      cpu: 500m
-      memory: 512Mi
+      memory: 128Mi
     requests:
-      cpu: 250m
-      memory: 256Mi
-  
+      cpu: 50m
+      memory: 32Mi
+
+  ## @param frontend.livenessProbe Frontend liveness probe configuration
   livenessProbe:
+    enabled: true
     httpGet:
       path: /health
       port: 8080
     initialDelaySeconds: 30
     periodSeconds: 10
-  
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+  ## @param frontend.readinessProbe Frontend readiness probe configuration
   readinessProbe:
+    enabled: true
     httpGet:
       path: /health
       port: 8080
     initialDelaySeconds: 5
     periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
 
-# PostgreSQL configuration
+## @section PostgreSQL parameters
+
 postgresql:
+  ## @param postgresql.enabled Enable embedded PostgreSQL deployment
+  ## When false, external database must be configured
   enabled: true
+
+  ## @param postgresql.image PostgreSQL image configuration
+  image:
+    ## @param postgresql.image.repository PostgreSQL image repository
+    repository: postgres
+    ## @param postgresql.image.tag PostgreSQL image tag (immutable tags recommended)
+    tag: "18-alpine"
+    ## @param postgresql.image.pullPolicy Image pull policy
+    pullPolicy: IfNotPresent
+
+  ## @param postgresql.auth PostgreSQL authentication configuration
   auth:
-    postgresPassword: "postgres"
+    ## @param postgresql.auth.existingSecret Use existing secret for credentials
+    ## If specified, auth.password and auth.postgresPassword are ignored
+    ## Secret must contain keys: password, postgres-password
+    existingSecret: ""
+
+    ## @param postgresql.auth.postgresPassword PostgreSQL admin (postgres user) password
+    ## If empty, a random 32-character password is generated
+    ## WARNING: Auto-generated passwords are preserved across upgrades via lookup()
+    postgresPassword: ""
+
+    ## @param postgresql.auth.username PostgreSQL application username
     username: "klask"
-    password: "klask"
+
+    ## @param postgresql.auth.password PostgreSQL application user password
+    ## If empty, a random 32-character password is generated
+    ## WARNING: Auto-generated passwords are preserved across upgrades via lookup()
+    password: ""
+
+    ## @param postgresql.auth.database PostgreSQL database name
     database: "klask"
-  
-  primary:
-    persistence:
-      enabled: true
-      size: 8Gi
+
+  ## @param postgresql.persistence Persistence configuration
+  persistence:
+    ## @param postgresql.persistence.enabled Enable persistent storage
+    enabled: true
+
+    ## @param postgresql.persistence.size Persistent Volume size
+    size: 2Gi
+
+    ## @param postgresql.persistence.storageClass Storage class name
+    ## If empty, uses cluster default storage class
+    storageClass: ""
+
+    ## @param postgresql.persistence.annotations PVC annotations
+    annotations: {}
+
+  ## @param postgresql.resources Resource requests and limits
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+  ## @param postgresql.livenessProbe Liveness probe configuration
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+
+  ## @param postgresql.readinessProbe Readiness probe configuration
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  ## @param postgresql.initdb Initialization configuration
+  initdb:
+    ## @param postgresql.initdb.scripts Custom initialization scripts
+    ## Scripts are executed in alphabetical order
+    ## Example:
+    ## scripts:
+    ##   01-extensions.sql: |
+    ##     CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    scripts: {}
+
+  ## @param postgresql.config PostgreSQL configuration
+  config:
+    ## @param postgresql.config.extraEnv Additional environment variables
+    extraEnv: []
+
+  ## @param postgresql.service Service configuration
+  service:
+    ## @param postgresql.service.annotations Service annotations
+    annotations: {}
+
+  ## @param postgresql.external External PostgreSQL configuration
+  ## Used when postgresql.enabled is false
+  external:
+    ## @param postgresql.external.host External PostgreSQL host
+    host: ""
+
+    ## @param postgresql.external.port External PostgreSQL port
+    port: 5432
+
+    ## @param postgresql.external.database External database name
+    database: ""
+
+    ## @param postgresql.external.username External database username
+    username: ""
+
+    ## @param postgresql.external.password External database password
+    password: ""
+
+    ## @param postgresql.external.url External database full URL
+    ## If provided, overrides host/port/database/username/password
+    ## Format: postgresql://user:password@host:port/database
+    url: ""
+
+## @section Network Policy parameters
+
+networkPolicy:
+  ## @param networkPolicy.enabled Enable NetworkPolicy
+  enabled: false
+
+  ## @param networkPolicy.ingress Ingress controller configuration for NetworkPolicy
+  ingress:
+    ## @param networkPolicy.ingress.namespaceSelector Namespace selector for ingress controller
+    namespaceSelector:
+      kubernetes.io/metadata.name: ingress-nginx
+    ## @param networkPolicy.ingress.podSelector Pod selector for ingress controller
+    podSelector: {}
+
+  ## @param networkPolicy.backend Backend-specific NetworkPolicy settings
+  backend:
+    ## @param networkPolicy.backend.allowExternal Allow backend to make external requests
+    allowExternal: true
+
+## @section Metrics parameters
+
+metrics:
+  ## @param metrics.enabled Enable metrics collection
+  enabled: false
+
+  ## @param metrics.serviceMonitor Prometheus ServiceMonitor configuration
+  serviceMonitor:
+    ## @param metrics.serviceMonitor.enabled Enable ServiceMonitor creation
+    enabled: false
+    ## @param metrics.serviceMonitor.namespace Namespace where ServiceMonitor should be created
+    namespace: ""
+    ## @param metrics.serviceMonitor.path Metrics endpoint path
+    path: /metrics
+    ## @param metrics.serviceMonitor.interval Metrics scrape interval
+    interval: 30s
+    ## @param metrics.serviceMonitor.scrapeTimeout Metrics scrape timeout
+    scrapeTimeout: 10s
+    ## @param metrics.serviceMonitor.labels Additional labels for ServiceMonitor
+    labels: {}
+    ## @param metrics.serviceMonitor.relabelings Relabeling rules for ServiceMonitor
+    relabelings: []
+    ## @param metrics.serviceMonitor.metricRelabelings Metric relabeling rules for ServiceMonitor
+    metricRelabelings: []
+
+## @section Istio parameters
+
+istio:
+  ## @param istio.enabled Enable Istio integration
+  enabled: false
+
+  ## @param istio.gateway Istio Gateway configuration for ingress
+  gateway:
+    ## @param istio.gateway.name Gateway name
+    name: klask-gateway
+    ## @param istio.gateway.namespace Gateway namespace
+    namespace: default
+    ## @param istio.gateway.hosts Hosts for the gateway
+    hosts:
+      - klask.local
+
+  ## @param istio.virtualService Istio VirtualService configuration for ingress
+  virtualService:
+    ## @param istio.virtualService.name VirtualService name
+    name: klask-vs
+    ## @param istio.virtualService.namespace VirtualService namespace
+    namespace: default
+    ## @param istio.virtualService.hosts Hosts for the virtual service
+    hosts:
+      - klask.local
+    ## @param istio.virtualService.gateways Gateways to attach
+    gateways:
+      - klask-gateway
+
+  ## @param istio.egress Istio egress configuration for external services (e.g., GitLab)
+  egress:
+    ## @param istio.egress.enabled Enable egress configuration
+    enabled: false
     
-    resources:
-      limits:
-        cpu: 1000m
-        memory: 1Gi
-      requests:
-        cpu: 500m
-        memory: 512Mi
+    ## @param istio.egress.gitlab GitLab egress configuration
+    gitlab:
+      ## @param istio.egress.gitlab.enabled Enable GitLab egress
+      enabled: false
+      
+      ## @param istio.egress.gitlab.host GitLab host (e.g., gitlab.example.com)
+      host: ""
+      
+      ## @param istio.egress.gitlab.port GitLab HTTPS port
+      port: 443
+      
+      ## @param istio.egress.gitlab.tls TLS configuration for GitLab
+      tls:
+        ## @param istio.egress.gitlab.tls.mode TLS mode (SIMPLE, MUTUAL, ISTIO_MUTUAL)
+        mode: SIMPLE
+        
+        ## @param istio.egress.gitlab.tls.sni SNI host for TLS connection
+        sni: ""

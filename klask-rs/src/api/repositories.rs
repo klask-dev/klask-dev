@@ -1,6 +1,8 @@
 use crate::auth::extractors::{AdminUser, AppState};
 use crate::models::{Repository, RepositoryType};
 use crate::repositories::RepositoryRepository;
+use crate::services::github::{GitHubRepository, GitHubService};
+use crate::services::gitlab::{GitLabProject, GitLabService};
 use anyhow::Result;
 use axum::{
     body::Bytes,
@@ -11,6 +13,7 @@ use axum::{
     Router,
 };
 use chrono::Utc;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -36,6 +39,10 @@ pub struct CreateRepositoryRequest {
     // GitLab exclusion fields
     pub gitlab_excluded_projects: Option<String>,
     pub gitlab_excluded_patterns: Option<String>,
+    // GitHub fields
+    pub github_namespace: Option<String>,
+    pub github_excluded_repositories: Option<String>,
+    pub github_excluded_patterns: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,6 +64,10 @@ pub struct UpdateRepositoryRequest {
     // GitLab exclusion fields
     pub gitlab_excluded_projects: Option<String>,
     pub gitlab_excluded_patterns: Option<String>,
+    // GitHub fields
+    pub github_namespace: Option<String>,
+    pub github_excluded_repositories: Option<String>,
+    pub github_excluded_patterns: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,22 +85,92 @@ pub struct RepositoriesResponse {
     pub total: usize,
 }
 
+// GitHub API request/response structures
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverGitHubRequest {
+    pub access_token: String,
+    pub namespace: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestGitHubTokenRequest {
+    pub access_token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverGitHubResponse {
+    pub repositories: Vec<GitHubRepository>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestTokenResponse {
+    pub valid: bool,
+    pub message: String,
+}
+
+// GitLab API request/response structures
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverGitLabRequest {
+    pub gitlab_url: String,
+    pub access_token: String,
+    pub namespace: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestGitLabTokenRequest {
+    pub gitlab_url: String,
+    pub access_token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverGitLabResponse {
+    pub projects: Vec<GitLabProject>,
+}
+
+/// Validates GitHub namespace format
+/// GitHub namespaces (users/organizations) can only contain:
+/// - Alphanumeric characters (a-z, A-Z, 0-9)
+/// - Hyphens (-)
+/// - Underscores (_)
+fn validate_github_namespace(namespace: &str) -> Result<(), String> {
+    // Empty namespace is valid (optional field)
+    if namespace.is_empty() {
+        return Ok(());
+    }
+
+    // GitHub namespace validation: alphanumerics, hyphens, and underscores only
+    let re = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
+    if !re.is_match(namespace) {
+        return Err(
+            "Invalid GitHub namespace format. Only alphanumeric characters, hyphens, and underscores are allowed."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/", get(list_repositories).post(create_repository))
         .route(
-            "/:id",
-            get(get_repository)
-                .put(update_repository)
-                .delete(delete_repository),
+            "/{id}",
+            get(get_repository).put(update_repository).delete(delete_repository),
         )
-        .route(
-            "/:id/crawl",
-            post(crawl_repository).delete(stop_crawl_repository),
-        )
-        .route("/:id/test", post(test_repository_connection))
-        .route("/:id/stats", get(get_repository_stats))
+        .route("/{id}/crawl", post(crawl_repository).delete(stop_crawl_repository))
+        .route("/{id}/test", post(test_repository_connection))
+        .route("/{id}/stats", get(get_repository_stats))
         .route("/import/gitlab", post(import_gitlab_projects))
+        .route("/github/discover", post(discover_github_repositories))
+        .route("/github/test-token", post(test_github_token))
+        .route("/gitlab/discover", post(discover_gitlab_repositories))
+        .route("/gitlab/test-token", post(test_gitlab_token))
         .route("/bulk/enable", post(bulk_enable_repositories))
         .route("/bulk/disable", post(bulk_disable_repositories))
         .route("/bulk/crawl", post(bulk_crawl_repositories))
@@ -110,10 +191,7 @@ async fn list_repositories(
     match repo_repository.list_repositories().await {
         Ok(repositories) => {
             // Check if stats are requested
-            let include_stats = params
-                .get("include_stats")
-                .map(|v| v == "true")
-                .unwrap_or(false);
+            let include_stats = params.get("include_stats").map(|v| v == "true").unwrap_or(false);
 
             let mut repositories_with_stats = Vec::new();
 
@@ -126,14 +204,10 @@ async fn list_repositories(
                     .map(|repo| {
                         let app_state = app_state.clone();
                         async move {
-                            let disk_size_mb =
-                                calculate_repository_disk_size(&repo).await.unwrap_or(0.0);
-                            let file_count = get_repository_file_count(&repo, &app_state)
-                                .await
-                                .unwrap_or(0);
-                            let last_crawl_duration_minutes = repo
-                                .last_crawl_duration_seconds
-                                .map(|seconds| seconds as f64 / 60.0);
+                            let disk_size_mb = calculate_repository_disk_size(&repo).await.unwrap_or(0.0);
+                            let file_count = get_repository_file_count(&repo, &app_state).await.unwrap_or(0);
+                            let last_crawl_duration_minutes =
+                                repo.last_crawl_duration_seconds.map(|seconds| seconds as f64 / 60.0);
 
                             RepositoryWithStats {
                                 repository: repo,
@@ -149,9 +223,8 @@ async fn list_repositories(
             } else {
                 // Fast path: return repositories without expensive stats
                 for repo in repositories {
-                    let last_crawl_duration_minutes = repo
-                        .last_crawl_duration_seconds
-                        .map(|seconds| seconds as f64 / 60.0);
+                    let last_crawl_duration_minutes =
+                        repo.last_crawl_duration_seconds.map(|seconds| seconds as f64 / 60.0);
 
                     repositories_with_stats.push(RepositoryWithStats {
                         repository: repo,
@@ -186,12 +259,8 @@ async fn get_repository_stats(
     match repo_repository.get_repository(id).await {
         Ok(Some(repo)) => {
             let disk_size_mb = calculate_repository_disk_size(&repo).await.unwrap_or(0.0);
-            let file_count = get_repository_file_count(&repo, &app_state)
-                .await
-                .unwrap_or(0);
-            let last_crawl_duration_minutes = repo
-                .last_crawl_duration_seconds
-                .map(|seconds| seconds as f64 / 60.0);
+            let file_count = get_repository_file_count(&repo, &app_state).await.unwrap_or(0);
+            let last_crawl_duration_minutes = repo.last_crawl_duration_seconds.map(|seconds| seconds as f64 / 60.0);
 
             Ok(Json(RepositoryWithStats {
                 repository: repo,
@@ -221,7 +290,7 @@ async fn calculate_repository_disk_size(repository: &Repository) -> Result<f64> 
                 Ok(0.0)
             }
         }
-        RepositoryType::Git | RepositoryType::GitLab => {
+        RepositoryType::Git | RepositoryType::GitLab | RepositoryType::GitHub => {
             // For Git repos, estimate based on .git directory if cloned locally
             // Or use a placeholder calculation
             // In practice, you might want to track this during crawling
@@ -248,10 +317,7 @@ async fn calculate_directory_size(dir: &PathBuf) -> Result<u64> {
             let dir_name_str = dir_name.to_string_lossy();
 
             if !dir_name_str.starts_with('.')
-                && !matches!(
-                    dir_name_str.as_ref(),
-                    "node_modules" | "target" | "build" | "dist"
-                )
+                && !matches!(dir_name_str.as_ref(), "node_modules" | "target" | "build" | "dist")
             {
                 if let Ok(subdir_size) = Box::pin(calculate_directory_size(&entry.path())).await {
                     total_size += subdir_size;
@@ -276,7 +342,7 @@ async fn get_repository_file_count(repository: &Repository, _app_state: &AppStat
                 Ok(0)
             }
         }
-        RepositoryType::Git | RepositoryType::GitLab => {
+        RepositoryType::Git | RepositoryType::GitLab | RepositoryType::GitHub => {
             // Could query the search index for files from this project
             Ok(0) // Placeholder
         }
@@ -305,10 +371,7 @@ async fn count_files_in_directory(dir: &PathBuf) -> Result<i64> {
             let dir_name_str = dir_name.to_string_lossy();
 
             if !dir_name_str.starts_with('.')
-                && !matches!(
-                    dir_name_str.as_ref(),
-                    "node_modules" | "target" | "build" | "dist"
-                )
+                && !matches!(dir_name_str.as_ref(), "node_modules" | "target" | "build" | "dist")
             {
                 if let Ok(subdir_count) = Box::pin(count_files_in_directory(&entry.path())).await {
                     file_count += subdir_count;
@@ -428,10 +491,7 @@ async fn create_repository(
     State(app_state): State<AppState>,
     body: Bytes,
 ) -> Result<Json<Repository>, StatusCode> {
-    debug!(
-        "Received raw JSON body: {:?}",
-        String::from_utf8_lossy(&body)
-    );
+    debug!("Received raw JSON body: {:?}", String::from_utf8_lossy(&body));
 
     let request: CreateRepositoryRequest = match serde_json::from_slice(&body) {
         Ok(req) => {
@@ -445,6 +505,14 @@ async fn create_repository(
         }
     };
     let repo_repository = RepositoryRepository::new(app_state.database.pool().clone());
+
+    // Validate GitHub namespace if provided
+    if let Some(ref github_namespace) = request.github_namespace {
+        if let Err(e) = validate_github_namespace(github_namespace) {
+            error!("Invalid GitHub namespace '{}': {}", github_namespace, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
 
     // Encrypt access token if provided
     let encrypted_token = if let Some(token) = &request.access_token {
@@ -480,6 +548,9 @@ async fn create_repository(
         last_crawl_duration_seconds: None,
         gitlab_excluded_projects: request.gitlab_excluded_projects,
         gitlab_excluded_patterns: request.gitlab_excluded_patterns,
+        github_namespace: request.github_namespace,
+        github_excluded_repositories: request.github_excluded_repositories,
+        github_excluded_patterns: request.github_excluded_patterns,
         crawl_state: Some("idle".to_string()),
         last_processed_project: None,
         crawl_started_at: None,
@@ -487,10 +558,7 @@ async fn create_repository(
 
     match repo_repository.create_repository(&repository).await {
         Ok(created_repo) => {
-            info!(
-                "Created repository: {} ({})",
-                created_repo.name, created_repo.id
-            );
+            info!("Created repository: {} ({})", created_repo.name, created_repo.id);
             Ok(Json(created_repo))
         }
         Err(e) => {
@@ -568,14 +636,30 @@ async fn update_repository(
     if let Some(is_group) = request.is_group {
         repository.is_group = is_group;
     }
+    // Track if scheduling was changed
+    let scheduling_changed = request.auto_crawl_enabled.is_some()
+        || request.cron_schedule.is_some()
+        || request.crawl_frequency_hours.is_some();
+
     if let Some(auto_crawl_enabled) = request.auto_crawl_enabled {
         repository.auto_crawl_enabled = auto_crawl_enabled;
     }
-    if let Some(cron_schedule) = request.cron_schedule {
-        repository.cron_schedule = Some(cron_schedule);
-    }
-    if let Some(crawl_frequency_hours) = request.crawl_frequency_hours {
-        repository.crawl_frequency_hours = Some(crawl_frequency_hours);
+
+    // Handle scheduling: cron_schedule and crawl_frequency_hours are mutually exclusive
+    match (&request.cron_schedule, &request.crawl_frequency_hours) {
+        (Some(cron), _) => {
+            // Cron mode: set cron_schedule, clear crawl_frequency_hours
+            repository.cron_schedule = Some(cron.clone());
+            repository.crawl_frequency_hours = None;
+        }
+        (None, Some(freq)) => {
+            // Frequency mode: set crawl_frequency_hours, clear cron_schedule
+            repository.crawl_frequency_hours = Some(*freq);
+            repository.cron_schedule = None;
+        }
+        (None, None) => {
+            // Neither provided: don't change
+        }
     }
     if let Some(max_crawl_duration_minutes) = request.max_crawl_duration_minutes {
         repository.max_crawl_duration_minutes = Some(max_crawl_duration_minutes);
@@ -585,6 +669,20 @@ async fn update_repository(
     }
     if let Some(gitlab_excluded_patterns) = request.gitlab_excluded_patterns {
         repository.gitlab_excluded_patterns = Some(gitlab_excluded_patterns);
+    }
+    if let Some(github_namespace) = request.github_namespace {
+        // Validate GitHub namespace before updating
+        if let Err(e) = validate_github_namespace(&github_namespace) {
+            error!("Invalid GitHub namespace '{}': {}", github_namespace, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        repository.github_namespace = Some(github_namespace);
+    }
+    if let Some(github_excluded_repositories) = request.github_excluded_repositories {
+        repository.github_excluded_repositories = Some(github_excluded_repositories);
+    }
+    if let Some(github_excluded_patterns) = request.github_excluded_patterns {
+        repository.github_excluded_patterns = Some(github_excluded_patterns);
     }
 
     // Handle access token update with encryption
@@ -612,14 +710,10 @@ async fn update_repository(
         Ok(updated_repo) => {
             // If repository name was changed, update search index
             if name_changed {
-                match app_state
-                    .search_service
-                    .update_project_name(&old_name, &updated_repo.name)
-                    .await
-                {
+                match app_state.search_service.update_project_name(&old_name, &updated_repo.name).await {
                     Ok(updated_count) => {
                         info!(
-                            "Updated {} documents in search index for repository name change: {} -> {} ({})", 
+                            "Updated {} documents in search index for repository name change: {} -> {} ({})",
                             updated_count, old_name, updated_repo.name, updated_repo.id
                         );
                     }
@@ -632,10 +726,22 @@ async fn update_repository(
                 }
             }
 
-            info!(
-                "Updated repository: {} ({})",
-                updated_repo.name, updated_repo.id
-            );
+            // If scheduling was changed, reschedule the repository
+            if scheduling_changed {
+                if let Some(scheduler) = &app_state.scheduler_service {
+                    // Unschedule first (in case it was already scheduled)
+                    let _ = scheduler.unschedule_repository(id).await;
+
+                    // Reschedule if auto_crawl is enabled
+                    if updated_repo.auto_crawl_enabled {
+                        if let Err(e) = scheduler.schedule_repository(&updated_repo).await {
+                            warn!("Failed to reschedule repository {}: {}", id, e);
+                        }
+                    }
+                }
+            }
+
+            info!("Updated repository: {} ({})", updated_repo.name, updated_repo.id);
             info!("Returning updated repository: {:?}", updated_repo);
             Ok(Json(updated_repo))
         }
@@ -657,11 +763,7 @@ async fn delete_repository(
     match repo_repository.get_repository(id).await {
         Ok(Some(repository)) => {
             // First, clean up the search index for this repository
-            match app_state
-                .search_service
-                .delete_project_documents(&repository.name)
-                .await
-            {
+            match app_state.search_service.delete_project_documents(&repository.name).await {
                 Ok(deleted_count) => {
                     info!(
                         "Deleted {} documents from search index for repository: {} ({})",
@@ -680,10 +782,7 @@ async fn delete_repository(
             // Delete the repository from database
             match repo_repository.delete_repository(id).await {
                 Ok(_) => {
-                    info!(
-                        "Deleted repository: {} ({})",
-                        repository.name, repository.id
-                    );
+                    info!("Deleted repository: {} ({})", repository.name, repository.id);
                     Ok(StatusCode::NO_CONTENT)
                 }
                 Err(e) => {
@@ -731,10 +830,7 @@ async fn crawl_repository(
     // Spawn crawl task in background
     tokio::spawn(async move {
         if let Err(e) = crawler_service.crawl_repository(&repository_clone).await {
-            error!(
-                "Crawl failed for repository {}: {}",
-                repository_clone.name, e
-            );
+            error!("Crawl failed for repository {}: {}", repository_clone.name, e);
         }
     });
 
@@ -777,10 +873,7 @@ async fn stop_crawl_repository(
     // Cancel the crawl
     match crawler_service.cancel_crawl(repository.id).await {
         Ok(true) => {
-            info!(
-                "Crawl stopped for repository: {} ({})",
-                repository.name, repository.id
-            );
+            info!("Crawl stopped for repository: {} ({})", repository.name, repository.id);
             Ok(Json(serde_json::json!({
                 "message": "Crawl stopped successfully",
                 "repository_id": repository.id,
@@ -795,10 +888,7 @@ async fn stop_crawl_repository(
             Err(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            error!(
-                "Error stopping crawl for repository {}: {}",
-                repository.id, e
-            );
+            error!("Error stopping crawl for repository {}: {}", repository.id, e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -820,6 +910,127 @@ async fn import_gitlab_projects(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // Implementation would go here
     Err(StatusCode::NOT_IMPLEMENTED)
+}
+
+// GitHub discovery endpoint
+async fn discover_github_repositories(
+    _user: AdminUser,
+    State(_app_state): State<AppState>,
+    Json(request): Json<DiscoverGitHubRequest>,
+) -> Result<Json<DiscoverGitHubResponse>, StatusCode> {
+    info!(
+        "Discovering GitHub repositories with namespace: {:?}",
+        request.namespace
+    );
+
+    // Validate GitHub namespace if provided
+    if let Some(ref namespace) = request.namespace {
+        if let Err(e) = validate_github_namespace(namespace) {
+            error!("Invalid GitHub namespace '{}': {}", namespace, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+
+    let github_service = GitHubService::new();
+
+    match github_service.discover_repositories(&request.access_token, request.namespace.as_deref()).await {
+        Ok(repositories) => {
+            info!("Successfully discovered {} GitHub repositories", repositories.len());
+            Ok(Json(DiscoverGitHubResponse { repositories }))
+        }
+        Err(e) => {
+            error!("Failed to discover GitHub repositories: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+// GitHub token test endpoint
+async fn test_github_token(
+    _user: AdminUser,
+    State(_app_state): State<AppState>,
+    Json(request): Json<TestGitHubTokenRequest>,
+) -> Result<Json<TestTokenResponse>, StatusCode> {
+    info!("Testing GitHub token");
+
+    let github_service = GitHubService::new();
+
+    match github_service.test_token(&request.access_token).await {
+        Ok(valid) => {
+            let message = if valid {
+                "GitHub token is valid".to_string()
+            } else {
+                "GitHub token is invalid".to_string()
+            };
+            info!("{}", message);
+            Ok(Json(TestTokenResponse { valid, message }))
+        }
+        Err(e) => {
+            error!("Failed to test GitHub token: {}", e);
+            Ok(Json(TestTokenResponse {
+                valid: false,
+                message: format!("Error testing token: {}", e),
+            }))
+        }
+    }
+}
+
+// GitLab discovery endpoint
+async fn discover_gitlab_repositories(
+    _user: AdminUser,
+    State(_app_state): State<AppState>,
+    Json(request): Json<DiscoverGitLabRequest>,
+) -> Result<Json<DiscoverGitLabResponse>, StatusCode> {
+    info!(
+        "Discovering GitLab projects from {} with namespace: {:?}",
+        request.gitlab_url, request.namespace
+    );
+
+    let gitlab_service = GitLabService::new();
+
+    match gitlab_service
+        .discover_projects(&request.gitlab_url, &request.access_token, request.namespace.as_deref())
+        .await
+    {
+        Ok(projects) => {
+            info!("Successfully discovered {} GitLab projects", projects.len());
+            Ok(Json(DiscoverGitLabResponse { projects }))
+        }
+        Err(e) => {
+            error!("Failed to discover GitLab projects: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+// GitLab token test endpoint
+async fn test_gitlab_token(
+    _user: AdminUser,
+    State(_app_state): State<AppState>,
+    Json(request): Json<TestGitLabTokenRequest>,
+) -> Result<Json<TestTokenResponse>, StatusCode> {
+    info!("Testing GitLab token for URL: {}", request.gitlab_url);
+
+    let gitlab_service = GitLabService::new();
+
+    match gitlab_service.test_token(&request.gitlab_url, &request.access_token).await {
+        Ok(valid) => {
+            let message = if valid {
+                "GitLab token is valid".to_string()
+            } else {
+                "GitLab token is invalid".to_string()
+            };
+            info!("{}", message);
+            Ok(Json(TestTokenResponse { valid, message }))
+        }
+        Err(e) => {
+            error!("Failed to test GitLab token: {}", e);
+            Ok(Json(TestTokenResponse {
+                valid: false,
+                message: format!("Error testing token: {}", e),
+            }))
+        }
+    }
 }
 
 async fn bulk_enable_repositories(
@@ -859,10 +1070,7 @@ async fn bulk_delete_repositories(
     // Extract repository IDs from request
     let repository_ids: Vec<String> = match request.get("repository_ids") {
         Some(ids) => match ids.as_array() {
-            Some(arr) => arr
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
+            Some(arr) => arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect(),
             None => return Err(StatusCode::BAD_REQUEST),
         },
         None => return Err(StatusCode::BAD_REQUEST),
@@ -889,11 +1097,7 @@ async fn bulk_delete_repositories(
         match repo_repository.get_repository(repo_id).await {
             Ok(Some(repository)) => {
                 // Clean up search index first
-                match app_state
-                    .search_service
-                    .delete_project_documents(&repository.name)
-                    .await
-                {
+                match app_state.search_service.delete_project_documents(&repository.name).await {
                     Ok(deleted_count) => {
                         debug!(
                             "Deleted {} documents from search index for repository: {} ({})",
@@ -912,10 +1116,7 @@ async fn bulk_delete_repositories(
                 // Delete repository from database
                 match repo_repository.delete_repository(repo_id).await {
                     Ok(_) => {
-                        info!(
-                            "Deleted repository: {} ({})",
-                            repository.name, repository.id
-                        );
+                        info!("Deleted repository: {} ({})", repository.name, repository.id);
                         successful_deletions += 1;
                     }
                     Err(e) => {

@@ -479,7 +479,7 @@ const RepositoriesPage: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ isolation: 'isolate' }}>
           {filteredRepositories.map((repositoryWithStats) => {
             // Handle both RepositoryWithStats and plain Repository
             const repo = repositoryWithStats.repository || repositoryWithStats;
@@ -493,18 +493,19 @@ const RepositoriesPage: React.FC = () => {
                 };
             
             return (
-              <SelectableRepositoryCard
-                key={repo.id}
-                repository={repoWithStatsNormalized}
-                selected={selectedRepos.includes(repo.id)}
-                onSelect={(selected) => handleSelectRepo(repo.id, selected)}
-                onEdit={setEditingRepository}
-                onDelete={handleDelete}
-                onCrawl={handleCrawl}
-                onToggleEnabled={handleToggleEnabled}
-                activeProgress={activeProgress}
-                isCrawling={crawlingRepos.has(repo.id)}
-              />
+              <div key={repo.id} className="relative" style={{ isolation: 'isolate' }}>
+                <SelectableRepositoryCard
+                  repository={repoWithStatsNormalized}
+                  selected={selectedRepos.includes(repo.id)}
+                  onSelect={(selected) => handleSelectRepo(repo.id, selected)}
+                  onEdit={setEditingRepository}
+                  onDelete={handleDelete}
+                  onCrawl={handleCrawl}
+                  onToggleEnabled={handleToggleEnabled}
+                  activeProgress={activeProgress}
+                  isCrawling={crawlingRepos.has(repo.id)}
+                />
+              </div>
             );
           })}
         </div>

@@ -66,14 +66,8 @@ async fn test_stop_crawl_error_responses() -> Result<()> {
     });
 
     assert!(!not_running_error["success"].as_bool().unwrap());
-    assert_eq!(
-        not_running_error["error"].as_str().unwrap(),
-        "No active crawl found"
-    );
-    assert_eq!(
-        not_running_error["code"].as_str().unwrap(),
-        "CRAWL_NOT_RUNNING"
-    );
+    assert_eq!(not_running_error["error"].as_str().unwrap(), "No active crawl found");
+    assert_eq!(not_running_error["code"].as_str().unwrap(), "CRAWL_NOT_RUNNING");
 
     // Test error response for permission denied
     let permission_error = json!({
@@ -85,10 +79,7 @@ async fn test_stop_crawl_error_responses() -> Result<()> {
     });
 
     assert!(!permission_error["success"].as_bool().unwrap());
-    assert_eq!(
-        permission_error["code"].as_str().unwrap(),
-        "PERMISSION_DENIED"
-    );
+    assert_eq!(permission_error["code"].as_str().unwrap(), "PERMISSION_DENIED");
 
     println!("✅ Stop crawl error responses test passed!");
     Ok(())
@@ -97,14 +88,7 @@ async fn test_stop_crawl_error_responses() -> Result<()> {
 #[tokio::test]
 async fn test_crawl_status_states() -> Result<()> {
     // Test different crawl status states
-    let status_states = vec![
-        "running",
-        "stopping",
-        "stopped",
-        "completed",
-        "failed",
-        "cancelled",
-    ];
+    let status_states = vec!["running", "stopping", "stopped", "completed", "failed", "cancelled"];
 
     for status in status_states {
         let status_response = json!({
@@ -133,10 +117,7 @@ async fn test_force_stop_parameters() -> Result<()> {
     });
 
     assert!(force_stop_request["force"].as_bool().unwrap());
-    assert_eq!(
-        force_stop_request["reason"].as_str().unwrap(),
-        "emergency_stop"
-    );
+    assert_eq!(force_stop_request["reason"].as_str().unwrap(), "emergency_stop");
     assert_eq!(force_stop_request["timeout_seconds"].as_u64().unwrap(), 30);
 
     // Test graceful stop (default)
@@ -257,16 +238,10 @@ async fn test_crawl_metrics_on_stop() -> Result<()> {
     let metrics_data = &metrics["metrics"];
     assert!(metrics_data["start_time"].is_string());
     assert!(metrics_data["stop_time"].is_string());
-    assert_eq!(
-        metrics_data["total_duration_seconds"].as_u64().unwrap(),
-        1800
-    );
+    assert_eq!(metrics_data["total_duration_seconds"].as_u64().unwrap(), 1800);
     assert_eq!(metrics_data["files_discovered"].as_u64().unwrap(), 150);
     assert_eq!(metrics_data["files_processed"].as_u64().unwrap(), 142);
-    assert_eq!(
-        metrics_data["stop_reason"].as_str().unwrap(),
-        "user_requested"
-    );
+    assert_eq!(metrics_data["stop_reason"].as_str().unwrap(), "user_requested");
 
     println!("✅ Crawl metrics on stop test passed!");
     Ok(())

@@ -31,7 +31,7 @@ A high-performance code search engine built with Rust, featuring real-time index
 4. **Access the services**:
    - API Server: http://localhost:3000
    - Health Check: http://localhost:3000/health
-   - pgAdmin: http://localhost:8080 (admin@klask.io / admin)
+   - pgAdmin: http://localhost:8080 (admin@klask.dev / admin)
 
 ## 🏗️ Architecture
 
@@ -62,7 +62,7 @@ klask-rs/
 
 **Files**
 - `GET /api/files` - List files with pagination
-- `GET /api/files/:id` - Get file details
+- `GET /api/files/{id}` - Get file details
 
 **Search**
 - `GET /api/search?query=...` - Search code with filters
@@ -70,7 +70,7 @@ klask-rs/
 **Repositories**
 - `GET /api/repositories` - List configured repositories
 - `POST /api/repositories` - Add new repository
-- `POST /api/repositories/:id/crawl` - Trigger crawling
+- `POST /api/repositories/{id}/crawl` - Trigger crawling
 
 ## 🛠️ Development Commands
 

@@ -38,12 +38,7 @@ impl JwtService {
             .map_err(|e| anyhow::anyhow!("Failed to decode JWT: {}", e))
     }
 
-    pub fn create_token_for_user(
-        &self,
-        user_id: uuid::Uuid,
-        username: String,
-        role: String,
-    ) -> Result<String> {
+    pub fn create_token_for_user(&self, user_id: uuid::Uuid, username: String, role: String) -> Result<String> {
         let claims = TokenClaims::new(user_id, username, role, self.expires_in);
         self.encode_token(&claims)
     }

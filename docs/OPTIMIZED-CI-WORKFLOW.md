@@ -131,7 +131,7 @@ git push origin v2.1.0  # → Images v2.1.0 pour production
 ```bash
 gh pr create
 # → Utiliser l'image pr-123 générée
-helm install test oci://ghcr.io/klask-io/klask \
+helm install test oci://ghcr.io/klask-dev/klask \
   --set backend.image.tag=pr-123
 ```
 

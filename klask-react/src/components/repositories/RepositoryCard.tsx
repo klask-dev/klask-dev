@@ -51,16 +51,16 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   // activeProgress is now passed as prop to avoid multiple polling instances
   const stopCrawlMutation = useStopCrawl();
-  
+
   // Extract repository data and stats
   const isWithStats = 'repository' in repository;
   const repoData = isWithStats ? (repository as RepositoryWithStats).repository : (repository as Repository);
   const stats = isWithStats ? (repository as RepositoryWithStats) : null;
-  
+
   // Check if this repository is currently crawling
   const isCurrentlyCrawling = isRepositoryCrawling(repoData.id, activeProgress);
   const crawlProgress = getRepositoryProgressFromActive(repoData.id, activeProgress);
-  
+
   // Override the isCrawling prop with real-time data
   const actuallyIsCrawling = isCurrentlyCrawling || isCrawling;
 
@@ -148,6 +148,22 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     }
   };
 
+  const formatDuration = (seconds: number | null | undefined) => {
+    if (!seconds) return null;
+
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return remainingSeconds > 0 ? `${minutes}min ${remainingSeconds}sec` : `${minutes}min`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+    }
+  };
+
   const formatCreatedAt = (date: string | null | undefined) => {
     if (!date) return 'Unknown time ago';
     try {
@@ -172,15 +188,15 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const formatCrawlDuration = (progressInfo: CrawlProgressInfo | null) => {
     if (!progressInfo) return null;
-    
+
     const startTime = new Date(progressInfo.started_at);
-    const endTime = progressInfo.completed_at 
+    const endTime = progressInfo.completed_at
       ? new Date(progressInfo.completed_at)
       : new Date(progressInfo.updated_at);
-    
+
     const durationMs = endTime.getTime() - startTime.getTime();
     const durationSeconds = Math.floor(durationMs / 1000);
-    
+
     if (durationSeconds < 60) {
       return `${durationSeconds}s`;
     } else if (durationSeconds < 3600) {
@@ -195,7 +211,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   };
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 ${className}`}>
+    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative z-10 ${className}`}>
       <div className="p-6 relative">
         {/* Actions Menu - positioned absolutely in top-right */}
         <div className="absolute top-2 right-2">
@@ -225,7 +241,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                     <PencilIcon className="h-4 w-4 mr-3" />
                     Edit
                   </button>
-                  
+
                   <button
                     onClick={() => {
                       onToggleEnabled(repository);
@@ -245,7 +261,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                       </>
                     )}
                   </button>
-                  
+
                   {actuallyIsCrawling ? (
                     <button
                       onClick={handleStopCrawlClick}
@@ -273,9 +289,9 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                       Crawl Now
                     </button>
                   )}
-                  
+
                   <hr className="my-1" />
-                  
+
                   <button
                     onClick={() => {
                       onDelete(repository);
@@ -310,7 +326,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                 <div className="flex items-center space-x-3 mt-1">
                   {stats.diskSizeMb !== undefined && stats.diskSizeMb > 0 && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                      📁 {stats.diskSizeMb < 1 
+                      📁 {stats.diskSizeMb < 1
                         ? `${(stats.diskSizeMb * 1024).toFixed(0)} KB`
                         : stats.diskSizeMb < 1024
                         ? `${stats.diskSizeMb.toFixed(1)} MB`
@@ -367,23 +383,20 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           <div className="flex items-center space-x-2">
             <ClockIcon className="h-4 w-4 flex-shrink-0" />
             <span>Last crawled: {formatLastCrawled(repoData.lastCrawled)}</span>
-            {stats?.lastCrawlDurationMinutes && (
+            {repoData.lastCrawlDurationSeconds && (
               <span className="text-gray-400">
-                ({stats.lastCrawlDurationMinutes < 1 
-                  ? `${(stats.lastCrawlDurationMinutes * 60).toFixed(0)}s`
-                  : `${stats.lastCrawlDurationMinutes.toFixed(1)}m`
-                })
+                ({formatDuration(repoData.lastCrawlDurationSeconds)})
               </span>
             )}
           </div>
-          
+
           {repoData.autoCrawlEnabled && repoData.nextCrawlAt && (
             <div className="flex items-center space-x-2 text-green-600">
               <BoltIcon className="h-4 w-4 flex-shrink-0" />
               <span>Next crawl: {formatNextCrawl(repoData.nextCrawlAt)}</span>
             </div>
           )}
-          
+
           <div className="flex items-center space-x-2">
             <span className="text-xs text-gray-500">
               Created {formatCreatedAt(repoData.createdAt)}

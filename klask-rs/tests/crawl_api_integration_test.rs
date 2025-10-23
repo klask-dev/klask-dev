@@ -36,9 +36,7 @@ mod crawl_api_integration_tests {
         }
 
         // Simulate starting the crawl
-        progress_tracker
-            .start_crawl(repository_id, format!("repo-{}", repository_id))
-            .await;
+        progress_tracker.start_crawl(repository_id, format!("repo-{}", repository_id)).await;
 
         Ok("Crawl started in background".to_string())
     }
@@ -49,9 +47,7 @@ mod crawl_api_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start a crawl first
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
 
         // Attempt to trigger another crawl
         let result = mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
@@ -93,25 +89,19 @@ mod crawl_api_integration_tests {
 
         for _ in 0..10 {
             let progress_tracker_clone = Arc::clone(&progress_tracker);
-            let handle = tokio::spawn(async move {
-                mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await
-            });
+            let handle =
+                tokio::spawn(async move { mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await });
             handles.push(handle);
         }
 
         // Wait for all requests to complete
-        let results: Vec<Result<String, StatusCode>> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let results: Vec<Result<String, StatusCode>> =
+            futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // Only one should succeed, others should get CONFLICT
         let successful = results.iter().filter(|r| r.is_ok()).count();
-        let conflicts = results
-            .iter()
-            .filter(|r| r.is_err() && r.as_ref().unwrap_err() == &StatusCode::CONFLICT)
-            .count();
+        let conflicts =
+            results.iter().filter(|r| r.is_err() && r.as_ref().unwrap_err() == &StatusCode::CONFLICT).count();
 
         assert_eq!(successful, 1);
         assert_eq!(conflicts, 9);
@@ -138,9 +128,7 @@ mod crawl_api_integration_tests {
 
             // Simulate another process starting crawl here
             if start_crawl_between_checks {
-                progress_tracker
-                    .start_crawl(repository_id, "concurrent-repo".to_string())
-                    .await;
+                progress_tracker.start_crawl(repository_id, "concurrent-repo".to_string()).await;
             }
 
             // Second check (should catch the race condition)
@@ -149,9 +137,7 @@ mod crawl_api_integration_tests {
             }
 
             // This shouldn't be reached if race condition is properly handled
-            progress_tracker
-                .start_crawl(repository_id, "test-repo".to_string())
-                .await;
+            progress_tracker.start_crawl(repository_id, "test-repo".to_string()).await;
             Ok("Crawl started".to_string())
         }
 
@@ -172,18 +158,14 @@ mod crawl_api_integration_tests {
 
         for &repo_id in &repo_ids {
             let progress_tracker_clone = Arc::clone(&progress_tracker);
-            let handle = tokio::spawn(async move {
-                mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await
-            });
+            let handle =
+                tokio::spawn(async move { mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await });
             handles.push(handle);
         }
 
         // Wait for all requests to complete
-        let results: Vec<Result<String, StatusCode>> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let results: Vec<Result<String, StatusCode>> =
+            futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // All should succeed since they're different repositories
         let successful = results.iter().filter(|r| r.is_ok()).count();
@@ -201,9 +183,7 @@ mod crawl_api_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start and complete a crawl
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
         progress_tracker.complete_crawl(repo_id).await;
 
         // Should be able to start a new crawl
@@ -219,12 +199,8 @@ mod crawl_api_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start and fail a crawl
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
-        progress_tracker
-            .set_error(repo_id, "Test error".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
+        progress_tracker.set_error(repo_id, "Test error".to_string()).await;
 
         // Should be able to start a new crawl
         let result = mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
@@ -239,9 +215,7 @@ mod crawl_api_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start and cancel a crawl
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
         progress_tracker.cancel_crawl(repo_id).await;
 
         // Should be able to start a new crawl
@@ -265,30 +239,22 @@ mod crawl_api_integration_tests {
         assert_eq!(result2.unwrap_err(), StatusCode::CONFLICT);
 
         // Update to Cloning - should still not be able to crawl
-        progress_tracker
-            .update_status(repo_id, CrawlStatus::Cloning)
-            .await;
+        progress_tracker.update_status(repo_id, CrawlStatus::Cloning).await;
         let result3 = mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
         assert_eq!(result3.unwrap_err(), StatusCode::CONFLICT);
 
         // Update to Processing - should still not be able to crawl
-        progress_tracker
-            .update_status(repo_id, CrawlStatus::Processing)
-            .await;
+        progress_tracker.update_status(repo_id, CrawlStatus::Processing).await;
         let result4 = mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
         assert_eq!(result4.unwrap_err(), StatusCode::CONFLICT);
 
         // Update to Indexing - should still not be able to crawl
-        progress_tracker
-            .update_status(repo_id, CrawlStatus::Indexing)
-            .await;
+        progress_tracker.update_status(repo_id, CrawlStatus::Indexing).await;
         let result5 = mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
         assert_eq!(result5.unwrap_err(), StatusCode::CONFLICT);
 
         // Complete the crawl - should now be able to crawl again
-        progress_tracker
-            .update_status(repo_id, CrawlStatus::Completed)
-            .await;
+        progress_tracker.update_status(repo_id, CrawlStatus::Completed).await;
         let result6 = mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
         assert!(result6.is_ok());
     }
@@ -303,25 +269,19 @@ mod crawl_api_integration_tests {
 
         for _ in 0..100 {
             let progress_tracker_clone = Arc::clone(&progress_tracker);
-            let handle = tokio::spawn(async move {
-                mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await
-            });
+            let handle =
+                tokio::spawn(async move { mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await });
             handles.push(handle);
         }
 
         // Wait for all requests to complete
-        let results: Vec<Result<String, StatusCode>> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let results: Vec<Result<String, StatusCode>> =
+            futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // Only one should succeed, all others should get CONFLICT
         let successful = results.iter().filter(|r| r.is_ok()).count();
-        let conflicts = results
-            .iter()
-            .filter(|r| r.is_err() && r.as_ref().unwrap_err() == &StatusCode::CONFLICT)
-            .count();
+        let conflicts =
+            results.iter().filter(|r| r.is_err() && r.as_ref().unwrap_err() == &StatusCode::CONFLICT).count();
 
         assert_eq!(successful, 1);
         assert_eq!(conflicts, 99);
@@ -346,11 +306,8 @@ mod crawl_api_integration_tests {
             progress_tracker.complete_crawl(repo_id).await;
 
             // Verify can't start while completing
-            progress_tracker
-                .update_status(repo_id, CrawlStatus::Processing)
-                .await;
-            let conflict_result =
-                mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
+            progress_tracker.update_status(repo_id, CrawlStatus::Processing).await;
+            let conflict_result = mock_trigger_crawl_endpoint(repo_id, &progress_tracker, true).await;
             assert_eq!(conflict_result.unwrap_err(), StatusCode::CONFLICT);
 
             // Complete it properly
@@ -374,19 +331,13 @@ mod crawl_api_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start a crawl
-        progress_tracker
-            .start_crawl(repo_id, "concurrent-test".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "concurrent-test".to_string()).await;
 
         // Spawn concurrent tasks that update status and attempt to crawl
         let mut handles = vec![];
 
         // Status update tasks
-        for status in [
-            CrawlStatus::Processing,
-            CrawlStatus::Indexing,
-            CrawlStatus::Completed,
-        ] {
+        for status in [CrawlStatus::Processing, CrawlStatus::Indexing, CrawlStatus::Completed] {
             let progress_tracker_clone = Arc::clone(&progress_tracker);
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -400,8 +351,7 @@ mod crawl_api_integration_tests {
             let progress_tracker_clone = Arc::clone(&progress_tracker);
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
-                let _result =
-                    mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await;
+                let _result = mock_trigger_crawl_endpoint(repo_id, &progress_tracker_clone, true).await;
             });
             handles.push(handle);
         }
@@ -448,9 +398,7 @@ mod crawl_api_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start a crawl
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
 
         // Stop the crawl
         let result = mock_stop_crawl_endpoint(repo_id, &progress_tracker).await;
@@ -478,9 +426,7 @@ mod crawl_api_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start and complete a crawl
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
         progress_tracker.complete_crawl(repo_id).await;
 
         // Try to stop the completed crawl
@@ -508,9 +454,7 @@ mod http_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start a crawl to create conflict
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
 
         // Simulate HTTP request that would trigger crawl
         let response_status = if progress_tracker.is_crawling(repo_id).await {
@@ -542,9 +486,7 @@ mod http_integration_tests {
                     if progress_tracker_clone.is_crawling(repo_id).await {
                         StatusCode::CONFLICT
                     } else {
-                        progress_tracker_clone
-                            .start_crawl(repo_id, "concurrent-repo".to_string())
-                            .await;
+                        progress_tracker_clone.start_crawl(repo_id, "concurrent-repo".to_string()).await;
                         StatusCode::OK
                     }
                 }
@@ -557,14 +499,8 @@ mod http_integration_tests {
         }
 
         // Only one should get OK (200), others should get CONFLICT (409)
-        let ok_count = response_statuses
-            .iter()
-            .filter(|&&s| s == StatusCode::OK)
-            .count();
-        let conflict_count = response_statuses
-            .iter()
-            .filter(|&&s| s == StatusCode::CONFLICT)
-            .count();
+        let ok_count = response_statuses.iter().filter(|&&s| s == StatusCode::OK).count();
+        let conflict_count = response_statuses.iter().filter(|&&s| s == StatusCode::CONFLICT).count();
 
         assert_eq!(ok_count, 1);
         assert_eq!(conflict_count, 9);
@@ -576,9 +512,7 @@ mod http_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Simulate successful crawl start
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
 
         // Simulate JSON response
         let response_body = json!({
@@ -598,9 +532,7 @@ mod http_integration_tests {
         let repo_id = Uuid::new_v4();
 
         // Start a crawl to create conflict
-        progress_tracker
-            .start_crawl(repo_id, "test-repo".to_string())
-            .await;
+        progress_tracker.start_crawl(repo_id, "test-repo".to_string()).await;
 
         // Simulate conflict error response
         let error_response = json!({

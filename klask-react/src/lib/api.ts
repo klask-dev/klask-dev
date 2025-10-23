@@ -164,14 +164,6 @@ class ApiClient {
     return this.request<SearchResponse>(`/api/search?${params.toString()}`);
   }
 
-  async getSearchFilters(): Promise<{
-    projects: Array<{value: string; count: number}>;
-    versions: Array<{value: string; count: number}>;
-    extensions: Array<{value: string; count: number}>;
-  }> {
-    return this.request('/api/search/filters');
-  }
-
   // File API
   async getFile(id: string): Promise<File> {
     return this.request<File>(`/api/files/${id}`);
@@ -272,6 +264,31 @@ class ApiClient {
     maxCrawlDurationMinutes?: number;
   }): Promise<Repository[]> {
     return this.request<Repository[]>('/api/repositories/gitlab/discover', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async discoverGitHubRepositories(data: {
+    githubUrl?: string;
+    accessToken: string;
+    namespace?: string;
+    autoCrawlEnabled?: boolean;
+    cronSchedule?: string;
+    crawlFrequencyHours?: number;
+    maxCrawlDurationMinutes?: number;
+  }): Promise<Repository[]> {
+    return this.request<Repository[]>('/api/repositories/github/discover', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async testGitHubToken(data: {
+    githubUrl?: string;
+    accessToken: string;
+  }): Promise<{ valid: boolean; message?: string }> {
+    return this.request<{ valid: boolean; message?: string }>('/api/repositories/github/test-token', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -390,8 +407,6 @@ export const api = {
 
   // Search
   search: (query: SearchQuery) => apiClient.search(query),
-  getSearchFilters: () => apiClient.getSearchFilters(),
-
   // Files
   getFile: (id: string) => apiClient.getFile(id),
   getFileByDocAddress: (docAddress: string) => apiClient.getFileByDocAddress(docAddress),

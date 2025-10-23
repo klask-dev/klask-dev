@@ -39,8 +39,8 @@ jobs:
     - name: Health check
       run: |
         echo "🔍 Running health checks..."
-        # curl -f http://staging.klask.io/health || exit 1
-        # curl -f http://staging.klask.io/api/status || exit 1
+        # curl -f http://staging.klask.dev/health || exit 1
+        # curl -f http://staging.klask.dev/api/status || exit 1
     
     - name: Notify deployment
       if: always()
@@ -73,8 +73,8 @@ jobs:
     - name: Production health check
       run: |
         echo "🔍 Running production health checks..."
-        # curl -f https://klask.io/health || exit 1
-        # curl -f https://klask.io/api/status || exit 1
+        # curl -f https://klask.dev/health || exit 1
+        # curl -f https://klask.dev/api/status || exit 1
     
     - name: Notify production deployment
       if: always()

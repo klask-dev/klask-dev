@@ -20,7 +20,6 @@ const SearchPage = React.lazy(() => import('./features/search/SearchPage'));
 const FileDetailPage = React.lazy(() => import('./features/files/FileDetailPage'));
 const RepositoriesPage = React.lazy(() => import('./features/repositories/RepositoriesPage'));
 const RepositoryDetailPage = React.lazy(() => import('./features/repositories/RepositoryDetailPage'));
-const FilesPage = React.lazy(() => import('./features/files/FilesPage'));
 const FileBrowserPage = React.lazy(() => import('./features/files/FileBrowserPage'));
 const AdminDashboard = React.lazy(() => import('./features/admin/AdminDashboard'));
 const UserManagement = React.lazy(() => import('./features/admin/UserManagement'));
@@ -130,30 +129,22 @@ function App() {
                 } 
               />
               
-              {/* Files routes */}
-              <Route 
-                path="files" 
-                element={
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <FilesPage />
-                  </Suspense>
-                } 
-              />
-              <Route 
-                path="files/:id" 
+              {/* File detail routes */}
+              <Route
+                path="files/:id"
                 element={
                   <Suspense fallback={<LoadingSpinner />}>
                     <FileDetailPage />
                   </Suspense>
-                } 
+                }
               />
-              <Route 
-                path="files/doc/:docAddress" 
+              <Route
+                path="files/doc/:docAddress"
                 element={
                   <Suspense fallback={<LoadingSpinner />}>
                     <FileDetailPage />
                   </Suspense>
-                } 
+                }
               />
               
               {/* Repository file browser routes */}

@@ -1,0 +1,109 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "klask.postgresql.fullname" . }}
+  labels:
+    {{- include "klask.postgresql.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "klask.postgresql.fullname" . }}-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "klask.postgresql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "klask.postgresql.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/postgresql/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/postgresql/secret.yaml") . | sha256sum }}
+    spec:
+      # Pas de securityContext strict pour PostgreSQL avec local-path
+      containers:
+      - name: postgresql
+        image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+        imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+        env:
+        - name: POSTGRES_DB
+          value: {{ .Values.postgresql.auth.database | quote }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgresql.auth.username | quote }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "klask.postgresql.secretName" . }}
+              key: password
+        - name: PGDATA
+          value: /mnt/data/pgdata
+        {{- with .Values.postgresql.config.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: postgresql
+          containerPort: 5432
+          protocol: TCP
+        {{- if .Values.postgresql.livenessProbe.enabled }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1
+          initialDelaySeconds: {{ .Values.postgresql.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.postgresql.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.postgresql.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.postgresql.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.postgresql.readinessProbe.enabled }}
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1
+          initialDelaySeconds: {{ .Values.postgresql.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.postgresql.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.postgresql.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.postgresql.readinessProbe.failureThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.postgresql.resources | nindent 10 }}
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+        {{- if .Values.postgresql.initdb.scripts }}
+        - name: initdb
+          mountPath: /docker-entrypoint-initdb.d
+        {{- end }}
+      volumes:
+      {{- if not .Values.postgresql.persistence.enabled }}
+      - name: data
+        emptyDir: {}
+      {{- end }}
+      {{- if .Values.postgresql.initdb.scripts }}
+      - name: initdb
+        configMap:
+          name: {{ include "klask.postgresql.fullname" . }}-initdb
+      {{- end }}
+  {{- if .Values.postgresql.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        {{- include "klask.postgresql.labels" . | nindent 8 }}
+      {{- with .Values.postgresql.persistence.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      {{- if .Values.postgresql.persistence.storageClass }}
+      storageClassName: {{ .Values.postgresql.persistence.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.postgresql.persistence.size | quote }}
+  {{- end }}
+{{- end }}

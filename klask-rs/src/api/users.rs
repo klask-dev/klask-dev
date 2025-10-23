@@ -29,6 +29,7 @@ pub struct CreateUserRequest {
 pub struct UpdateUserRequest {
     pub username: Option<String>,
     pub email: Option<String>,
+    pub password: Option<String>,
     pub role: Option<UserRole>,
     pub active: Option<bool>,
 }
@@ -48,6 +49,8 @@ pub struct UserResponse {
     pub active: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub last_login: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_activity: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl From<User> for UserResponse {
@@ -60,6 +63,8 @@ impl From<User> for UserResponse {
             active: user.active,
             created_at: user.created_at,
             updated_at: user.updated_at,
+            last_login: user.last_login,
+            last_activity: user.last_activity,
         }
     }
 }
@@ -67,9 +72,9 @@ impl From<User> for UserResponse {
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/", get(list_users).post(create_user))
-        .route("/:id", get(get_user).put(update_user).delete(delete_user))
-        .route("/:id/role", put(update_user_role))
-        .route("/:id/status", put(update_user_status))
+        .route("/{id}", get(get_user).put(update_user).delete(delete_user))
+        .route("/{id}/role", put(update_user_role))
+        .route("/{id}/status", put(update_user_status))
         .route("/stats", get(get_user_stats));
 
     Ok(router)
@@ -84,8 +89,7 @@ async fn list_users(
 
     match user_repository.list_users(query.limit, query.offset).await {
         Ok(users) => {
-            let user_responses: Vec<UserResponse> =
-                users.into_iter().map(UserResponse::from).collect();
+            let user_responses: Vec<UserResponse> = users.into_iter().map(UserResponse::from).collect();
             Ok(Json(user_responses))
         }
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -137,6 +141,8 @@ async fn create_user(
         active: payload.active.unwrap_or(true),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
+        last_login: None,
+        last_activity: None,
     };
 
     match user_repository.create_user(&new_user).await {
@@ -179,10 +185,7 @@ async fn update_user(
 
     // Update basic user info if provided
     let mut updated_user = if payload.username.is_some() || payload.email.is_some() {
-        match user_repository
-            .update_user(id, payload.username.as_deref(), payload.email.as_deref())
-            .await
-        {
+        match user_repository.update_user(id, payload.username.as_deref(), payload.email.as_deref()).await {
             Ok(user) => user,
             Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
         }
@@ -193,6 +196,18 @@ async fn update_user(
             Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
         }
     };
+
+    // Update password if provided
+    if let Some(password) = payload.password {
+        let password_hash = match hash_password(&password) {
+            Ok(hash) => hash,
+            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+        };
+        updated_user = match user_repository.update_user_password(id, &password_hash).await {
+            Ok(user) => user,
+            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+        };
+    }
 
     // Update role if provided
     if let Some(role) = payload.role {

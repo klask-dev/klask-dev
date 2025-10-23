@@ -4,11 +4,7 @@ use std::path::Path;
 
 #[tokio::test]
 async fn test_crawl_progress_initialization() -> Result<()> {
-    let progress = CrawlProgress {
-        files_processed: 0,
-        files_indexed: 0,
-        errors: Vec::new(),
-    };
+    let progress = CrawlProgress { files_processed: 0, files_indexed: 0, errors: Vec::new() };
 
     assert_eq!(progress.files_processed, 0);
     assert_eq!(progress.files_indexed, 0);
@@ -112,10 +108,7 @@ async fn test_supported_file_extensions() -> Result<()> {
             );
         } else {
             // Files without extensions that should be supported
-            let file_name = path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("");
+            let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
             let is_special_file = matches!(
                 file_name.to_lowercase().as_str(),
                 "dockerfile"
@@ -134,11 +127,7 @@ async fn test_supported_file_extensions() -> Result<()> {
                     | "news"
                     | "todo"
             );
-            assert!(
-                is_special_file,
-                "Special file {} should be supported",
-                file_name
-            );
+            assert!(is_special_file, "Special file {} should be supported", file_name);
         }
     }
 
@@ -147,9 +136,7 @@ async fn test_supported_file_extensions() -> Result<()> {
 
 #[tokio::test]
 async fn test_unsupported_file_extensions() -> Result<()> {
-    let unsupported_files = vec![
-        "test.exe", "test.dll", "test.so", "test.bin", "test.img", "test.zip",
-    ];
+    let unsupported_files = vec!["test.exe", "test.dll", "test.so", "test.bin", "test.img", "test.zip"];
 
     let supported_extensions = &[
         "rs",
@@ -238,11 +225,7 @@ async fn test_file_size_limit_constant() -> Result<()> {
 
 #[tokio::test]
 async fn test_error_accumulation() -> Result<()> {
-    let mut progress = CrawlProgress {
-        files_processed: 0,
-        files_indexed: 0,
-        errors: Vec::new(),
-    };
+    let mut progress = CrawlProgress { files_processed: 0, files_indexed: 0, errors: Vec::new() };
 
     // Simulate processing files with some errors
     progress.files_processed += 1;

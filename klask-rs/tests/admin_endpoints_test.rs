@@ -9,8 +9,7 @@ use klask_rs::{
     models::{User, UserRole},
     services::seeding::SeedingStats,
     services::{
-        crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
-        search::SearchService,
+        crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker, search::SearchService,
     },
 };
 use serde_json::Value;
@@ -35,18 +34,14 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
     // Create required services for AppState
     let progress_tracker = Arc::new(ProgressTracker::new());
     let jwt_service = JwtService::new(&config.auth).expect("Failed to create JWT service");
-    let encryption_service =
-        Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap());
+    let encryption_service = Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap());
     let crawler_service = Arc::new(
         CrawlerService::new(
             database.pool().clone(),
             Arc::new(search_service.clone()),
             progress_tracker.clone(),
             encryption_service,
-            std::env::temp_dir()
-                .join("klask-crawler-test")
-                .to_string_lossy()
-                .to_string(),
+            std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
         )
         .expect("Failed to create crawler service"),
     );
@@ -61,14 +56,10 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time: Instant::now(),
-        encryption_service: Arc::new(
-            EncryptionService::new("test-encryption-key-32bytes").unwrap(),
-        ),
+        encryption_service: Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap()),
     };
 
-    let app = klask_rs::api::create_router()
-        .await?
-        .with_state(app_state.clone());
+    let app = klask_rs::api::create_router().await?.with_state(app_state.clone());
     let server = TestServer::new(app)?;
 
     Ok((server, app_state))
@@ -76,9 +67,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
 
 async fn cleanup_test_data(pool: &PgPool) -> Result<()> {
     // Files are now only in Tantivy search index, no database table to clean
-    sqlx::query("DELETE FROM repositories")
-        .execute(pool)
-        .await?;
+    sqlx::query("DELETE FROM repositories").execute(pool).await?;
     sqlx::query("DELETE FROM users").execute(pool).await?;
     Ok(())
 }
@@ -93,12 +82,14 @@ async fn create_admin_token(app_state: &AppState) -> Result<String> {
         active: true,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
+        last_login: None,
+        last_activity: None,
     };
 
     // Insert admin user
     sqlx::query(
         "INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(admin_user.id)
     .bind(&admin_user.username)
@@ -138,12 +129,14 @@ async fn create_regular_user_token(app_state: &AppState) -> Result<String> {
         active: true,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
+        last_login: None,
+        last_activity: None,
     };
 
     // Insert regular user
     sqlx::query(
         "INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(user.id)
     .bind(&user.username)
@@ -184,18 +177,14 @@ async fn test_admin_dashboard_endpoint_requires_admin() -> Result<()> {
 
     // Test with regular user token
     let user_token = create_regular_user_token(&app_state).await?;
-    let response = server
-        .get("/api/admin/dashboard")
-        .add_header("Authorization", &format!("Bearer {}", user_token))
-        .await;
+    let response =
+        server.get("/api/admin/dashboard").add_header("Authorization", &format!("Bearer {}", user_token)).await;
     assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
 
     // Test with admin token
     let admin_token = create_admin_token(&app_state).await?;
-    let response = server
-        .get("/api/admin/dashboard")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/dashboard").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
     assert_eq!(response.status_code(), StatusCode::OK);
 
     Ok(())
@@ -207,10 +196,8 @@ async fn test_admin_dashboard_returns_complete_data() -> Result<()> {
     let (server, app_state) = setup_test_server().await?;
     let admin_token = create_admin_token(&app_state).await?;
 
-    let response = server
-        .get("/api/admin/dashboard")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/dashboard").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
@@ -220,8 +207,7 @@ async fn test_admin_dashboard_returns_complete_data() -> Result<()> {
     assert!(!dashboard_data.system.version.is_empty());
     assert!(!dashboard_data.system.environment.is_empty());
     assert!(
-        dashboard_data.system.database_status == "Connected"
-            || dashboard_data.system.database_status == "Disconnected"
+        dashboard_data.system.database_status == "Connected" || dashboard_data.system.database_status == "Disconnected"
     );
     // uptime_seconds is u64, so it's always >= 0
     let _ = dashboard_data.system.uptime_seconds;
@@ -243,10 +229,8 @@ async fn test_system_stats_endpoint() -> Result<()> {
     let (server, app_state) = setup_test_server().await?;
     let admin_token = create_admin_token(&app_state).await?;
 
-    let response = server
-        .get("/api/admin/system")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/system").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
@@ -256,10 +240,7 @@ async fn test_system_stats_endpoint() -> Result<()> {
     assert!(!system_stats.environment.is_empty());
     // uptime_seconds is u64, so it's always >= 0
     let _ = system_stats.uptime_seconds;
-    assert!(
-        system_stats.database_status == "Connected"
-            || system_stats.database_status == "Disconnected"
-    );
+    assert!(system_stats.database_status == "Connected" || system_stats.database_status == "Disconnected");
 
     Ok(())
 }
@@ -271,19 +252,15 @@ async fn test_seed_database_endpoint() -> Result<()> {
     let admin_token = create_admin_token(&app_state).await?;
 
     // Get initial stats
-    let initial_response = server
-        .get("/api/admin/seed/stats")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let initial_response =
+        server.get("/api/admin/seed/stats").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
     assert_eq!(initial_response.status_code(), StatusCode::OK);
 
     let initial_stats: SeedingStats = initial_response.json();
 
     // Seed the database
-    let seed_response = server
-        .post("/api/admin/seed")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let seed_response =
+        server.post("/api/admin/seed").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(seed_response.status_code(), StatusCode::OK);
 
@@ -307,26 +284,20 @@ async fn test_clear_seed_data_endpoint() -> Result<()> {
     let admin_token = create_admin_token(&app_state).await?;
 
     // First seed the database
-    let seed_response = server
-        .post("/api/admin/seed")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let seed_response =
+        server.post("/api/admin/seed").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
     assert_eq!(seed_response.status_code(), StatusCode::OK);
 
     // Verify data exists
-    let stats_response = server
-        .get("/api/admin/seed/stats")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let stats_response =
+        server.get("/api/admin/seed/stats").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
     let stats: SeedingStats = stats_response.json();
     assert!(stats.users_created > 0);
     assert!(stats.repositories_created > 0);
 
     // Clear seed data
-    let clear_response = server
-        .post("/api/admin/seed/clear")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let clear_response =
+        server.post("/api/admin/seed/clear").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
     assert_eq!(clear_response.status_code(), StatusCode::OK);
 
     let clear_result: SeedingStats = clear_response.json();
@@ -344,10 +315,8 @@ async fn test_seed_stats_endpoint() -> Result<()> {
     let (server, app_state) = setup_test_server().await?;
     let admin_token = create_admin_token(&app_state).await?;
 
-    let response = server
-        .get("/api/admin/seed/stats")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/seed/stats").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
@@ -366,10 +335,8 @@ async fn test_user_stats_endpoint() -> Result<()> {
     let (server, app_state) = setup_test_server().await?;
     let admin_token = create_admin_token(&app_state).await?;
 
-    let response = server
-        .get("/api/admin/users/stats")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/users/stats").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
@@ -416,10 +383,8 @@ async fn test_content_stats_endpoint() -> Result<()> {
     let (server, app_state) = setup_test_server().await?;
     let admin_token = create_admin_token(&app_state).await?;
 
-    let response = server
-        .get("/api/admin/content/stats")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/content/stats").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
@@ -440,10 +405,8 @@ async fn test_search_stats_endpoint() -> Result<()> {
     let (server, app_state) = setup_test_server().await?;
     let admin_token = create_admin_token(&app_state).await?;
 
-    let response = server
-        .get("/api/admin/search/stats")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/search/stats").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
@@ -468,10 +431,8 @@ async fn test_recent_activity_endpoint() -> Result<()> {
     let (server, app_state) = setup_test_server().await?;
     let admin_token = create_admin_token(&app_state).await?;
 
-    let response = server
-        .get("/api/admin/activity/recent")
-        .add_header("Authorization", &format!("Bearer {}", admin_token))
-        .await;
+    let response =
+        server.get("/api/admin/activity/recent").add_header("Authorization", &format!("Bearer {}", admin_token)).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
@@ -496,17 +457,11 @@ async fn test_error_handling_invalid_tokens() -> Result<()> {
     let (server, _app_state) = setup_test_server().await?;
 
     // Test with invalid token format
-    let response = server
-        .get("/api/admin/dashboard")
-        .add_header("Authorization", "Bearer invalid_token")
-        .await;
+    let response = server.get("/api/admin/dashboard").add_header("Authorization", "Bearer invalid_token").await;
     assert_eq!(response.status_code(), StatusCode::UNAUTHORIZED);
 
     // Test with malformed authorization header
-    let response = server
-        .get("/api/admin/dashboard")
-        .add_header("Authorization", "InvalidFormat")
-        .await;
+    let response = server.get("/api/admin/dashboard").add_header("Authorization", "InvalidFormat").await;
     assert_eq!(response.status_code(), StatusCode::UNAUTHORIZED);
 
     Ok(())
@@ -519,17 +474,14 @@ async fn test_concurrent_admin_requests() -> Result<()> {
     let admin_token = create_admin_token(&app_state).await?;
 
     // Make multiple concurrent requests to different endpoints
-    let dashboard_future = server
-        .get("/api/admin/dashboard")
-        .add_header("Authorization", &format!("Bearer {}", admin_token.clone()));
+    let dashboard_future =
+        server.get("/api/admin/dashboard").add_header("Authorization", &format!("Bearer {}", admin_token.clone()));
 
-    let system_future = server
-        .get("/api/admin/system")
-        .add_header("Authorization", &format!("Bearer {}", admin_token.clone()));
+    let system_future =
+        server.get("/api/admin/system").add_header("Authorization", &format!("Bearer {}", admin_token.clone()));
 
-    let stats_future = server
-        .get("/api/admin/seed/stats")
-        .add_header("Authorization", &format!("Bearer {}", admin_token));
+    let stats_future =
+        server.get("/api/admin/seed/stats").add_header("Authorization", &format!("Bearer {}", admin_token));
 
     let (dashboard_response, system_response, stats_response) =
         tokio::join!(dashboard_future, system_future, stats_future);

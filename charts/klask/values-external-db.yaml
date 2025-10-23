@@ -35,7 +35,7 @@ frontend:
     pullPolicy: Always
   
   env:
-    - name: VITE_API_URL
+    - name: VITE_API_BASE_URL
       value: "http://klask-backend:3000"
 
 # Enable ingress for external access

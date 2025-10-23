@@ -14,7 +14,7 @@ Le projet dispose déjà d'une infrastructure complète :
 
 ### Installation simple
 ```bash
-helm install klask oci://ghcr.io/klask-io/klask --version 0.1.0
+helm install klask oci://ghcr.io/klask-dev/klask --version 0.1.0
 ```
 
 ### Installation avec configuration personnalisée
@@ -49,7 +49,7 @@ frontend:
 EOF
 
 # Installer avec les valeurs personnalisées
-helm install klask oci://ghcr.io/klask-io/klask --version 0.1.0 -f my-values.yaml
+helm install klask oci://ghcr.io/klask-dev/klask --version 0.1.0 -f my-values.yaml
 ```
 
 ## 📦 Ce qui est déployé
@@ -58,7 +58,7 @@ Le chart déploie automatiquement :
 
 - **Backend Rust** (`klask-backend`) sur le port 3000
 - **Frontend React** (`klask-frontend`) sur le port 8080  
-- **PostgreSQL** (via chart Bitnami) sur le port 5432
+- **PostgreSQL** sur le port 5432
 - **Services Kubernetes** pour la communication interne
 - **Ingress** (optionnel) pour l'accès externe
 
@@ -68,8 +68,8 @@ Le chart déploie automatiquement :
 
 | Paramètre | Description | Défaut |
 |-----------|-------------|--------|
-| `backend.image.repository` | Image Docker du backend | `ghcr.io/klask-io/klask-backend` |
-| `frontend.image.repository` | Image Docker du frontend | `ghcr.io/klask-io/klask-frontend` |
+| `backend.image.repository` | Image Docker du backend | `ghcr.io/klask-dev/klask-backend` |
+| `frontend.image.repository` | Image Docker du frontend | `ghcr.io/klask-dev/klask-frontend` |
 | `postgresql.enabled` | Activer PostgreSQL intégré | `true` |
 | `ingress.enabled` | Activer l'ingress | `false` |
 
@@ -104,8 +104,8 @@ backend:
 
 ### Images Docker (via ci.yml existant)
 Les images sont publiées automatiquement :
-- `ghcr.io/klask-io/klask-backend:latest`
-- `ghcr.io/klask-io/klask-frontend:latest`
+- `ghcr.io/klask-dev/klask-backend:latest`
+- `ghcr.io/klask-dev/klask-frontend:latest`
 - Tags sémantiques pour les releases
 
 ## 📋 Commandes utiles
@@ -136,7 +136,7 @@ kubectl logs -l "app.kubernetes.io/name=postgresql" -f
 
 ### Mettre à jour le déploiement
 ```bash
-helm upgrade klask oci://ghcr.io/klask-io/klask --version 0.2.0
+helm upgrade klask oci://ghcr.io/klask-dev/klask --version 0.2.0
 ```
 
 ### Désinstaller

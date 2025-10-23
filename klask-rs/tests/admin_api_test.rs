@@ -3,10 +3,7 @@ mod admin_api_tests {
 
     use axum_test::TestServer;
     use klask_rs::{
-        api::admin::{
-            AdminDashboardData, ContentStats, RecentActivity, RepositoryStats, SearchStats,
-            SystemStats,
-        },
+        api::admin::{AdminDashboardData, ContentStats, RecentActivity, RepositoryStats, SearchStats, SystemStats},
         auth::extractors::AppState,
     };
     use serde_json::Value;
@@ -88,21 +85,9 @@ mod admin_api_tests {
             total_files: 1000,
             total_size_bytes: 5000000, // 5MB
             files_by_extension: vec![
-                klask_rs::api::admin::ExtensionStat {
-                    extension: "rs".to_string(),
-                    count: 500,
-                    total_size: 2500000,
-                },
-                klask_rs::api::admin::ExtensionStat {
-                    extension: "js".to_string(),
-                    count: 300,
-                    total_size: 1500000,
-                },
-                klask_rs::api::admin::ExtensionStat {
-                    extension: "py".to_string(),
-                    count: 200,
-                    total_size: 1000000,
-                },
+                klask_rs::api::admin::ExtensionStat { extension: "rs".to_string(), count: 500, total_size: 2500000 },
+                klask_rs::api::admin::ExtensionStat { extension: "js".to_string(), count: 300, total_size: 1500000 },
+                klask_rs::api::admin::ExtensionStat { extension: "py".to_string(), count: 200, total_size: 1000000 },
             ],
             files_by_project: vec![
                 klask_rs::api::admin::ProjectStat {
@@ -150,19 +135,11 @@ mod admin_api_tests {
             index_size_mb: 50.5,
             avg_search_time_ms: Some(25.3),
             popular_queries: vec![
-                klask_rs::api::admin::QueryStat {
-                    query: "function".to_string(),
-                    count: 150,
-                },
-                klask_rs::api::admin::QueryStat {
-                    query: "class".to_string(),
-                    count: 120,
-                },
-                klask_rs::api::admin::QueryStat {
-                    query: "main".to_string(),
-                    count: 100,
-                },
+                klask_rs::api::admin::QueryStat { query: "function".to_string(), count: 150 },
+                klask_rs::api::admin::QueryStat { query: "class".to_string(), count: 120 },
+                klask_rs::api::admin::QueryStat { query: "main".to_string(), count: 100 },
             ],
+            documents_by_repository: vec![],
         };
 
         assert_eq!(stats.total_documents, 1000);
@@ -193,13 +170,13 @@ mod admin_api_tests {
                 klask_rs::api::admin::RecentUser {
                     username: "alice".to_string(),
                     email: "alice@example.com".to_string(),
-                    created_at: now,
+                    last_seen: now,
                     role: "Admin".to_string(),
                 },
                 klask_rs::api::admin::RecentUser {
                     username: "bob".to_string(),
                     email: "bob@example.com".to_string(),
-                    created_at: now - chrono::Duration::hours(2),
+                    last_seen: now - chrono::Duration::hours(2),
                     role: "User".to_string(),
                 },
             ],
@@ -229,7 +206,7 @@ mod admin_api_tests {
 
         // Test that recent activities are ordered by time (most recent first)
         for i in 1..activity.recent_users.len() {
-            assert!(activity.recent_users[i - 1].created_at >= activity.recent_users[i].created_at);
+            assert!(activity.recent_users[i - 1].last_seen >= activity.recent_users[i].last_seen);
         }
 
         // Test serialization
@@ -251,12 +228,7 @@ mod admin_api_tests {
                 environment: "test".to_string(),
                 database_status: "Connected".to_string(),
             },
-            users: UserStats {
-                total_users: 100,
-                active_users: 85,
-                admin_users: 5,
-                recent_registrations: 10,
-            },
+            users: UserStats { total_users: 100, active_users: 85, admin_users: 5, recent_registrations: 10 },
             repositories: RepositoryStats {
                 total_repositories: 50,
                 enabled_repositories: 45,
@@ -279,6 +251,7 @@ mod admin_api_tests {
                 index_size_mb: 100.5,
                 avg_search_time_ms: Some(15.2),
                 popular_queries: vec![],
+                documents_by_repository: vec![],
             },
             recent_activity: RecentActivity {
                 recent_users: vec![],
@@ -365,8 +338,7 @@ mod admin_api_tests {
             (repo_stats.enabled_repositories as f64 / repo_stats.total_repositories as f64) * 100.0;
         assert_eq!(enabled_percentage, 85.0);
 
-        let git_percentage =
-            (repo_stats.git_repositories as f64 / repo_stats.total_repositories as f64) * 100.0;
+        let git_percentage = (repo_stats.git_repositories as f64 / repo_stats.total_repositories as f64) * 100.0;
         assert_eq!(git_percentage, 60.0);
 
         // Test size calculations
@@ -391,16 +363,8 @@ mod admin_api_tests {
 
         // Test that totals match sums
         let extension_stats = vec![
-            klask_rs::api::admin::ExtensionStat {
-                extension: "rs".to_string(),
-                count: 100,
-                total_size: 500000,
-            },
-            klask_rs::api::admin::ExtensionStat {
-                extension: "js".to_string(),
-                count: 50,
-                total_size: 250000,
-            },
+            klask_rs::api::admin::ExtensionStat { extension: "rs".to_string(), count: 100, total_size: 500000 },
+            klask_rs::api::admin::ExtensionStat { extension: "js".to_string(), count: 50, total_size: 250000 },
         ];
 
         let total_files: i64 = extension_stats.iter().map(|e| e.count).sum();
@@ -431,16 +395,8 @@ mod admin_api_tests {
             recent_additions: 20,
         };
 
-        let project_total_files: i64 = content_stats
-            .files_by_project
-            .iter()
-            .map(|p| p.file_count)
-            .sum();
-        let project_total_size: i64 = content_stats
-            .files_by_project
-            .iter()
-            .map(|p| p.total_size)
-            .sum();
+        let project_total_files: i64 = content_stats.files_by_project.iter().map(|p| p.file_count).sum();
+        let project_total_size: i64 = content_stats.files_by_project.iter().map(|p| p.total_size).sum();
 
         assert_eq!(project_total_files, content_stats.total_files);
         assert_eq!(project_total_size, content_stats.total_size_bytes);
@@ -500,6 +456,7 @@ mod admin_api_tests {
             index_size_mb: 0.0,
             avg_search_time_ms: None,
             popular_queries: vec![],
+            documents_by_repository: vec![],
         };
 
         assert_eq!(zero_stats.total_documents, 0);

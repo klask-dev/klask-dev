@@ -6,8 +6,10 @@ export interface User {
   email: string;
   role: UserRole;
   active: boolean;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
+  last_login?: string;
+  last_activity?: string;
 }
 
 export const UserRole = {
@@ -40,6 +42,10 @@ export interface Repository {
   gitlabExcludedProjects?: string;
   gitlabExcludedPatterns?: string;
   isGroup?: boolean;
+  // GitHub specific fields
+  githubNamespace?: string;
+  githubExcludedRepositories?: string;
+  githubExcludedPatterns?: string;
   // Crash resumption fields
   crawlState?: string;
   lastProcessedProject?: string;
@@ -56,6 +62,7 @@ export interface RepositoryWithStats {
 export const RepositoryType = {
   GIT: 'Git',
   GITLAB: 'GitLab',
+  GITHUB: 'GitHub',
   FILESYSTEM: 'FileSystem',
 } as const;
 
@@ -96,6 +103,7 @@ export interface SearchResult {
   extension: string;
   score: number;
   line_number?: number;
+  repository_name?: string; // Repository name from backend
 }
 
 export interface FacetValue {
@@ -103,10 +111,25 @@ export interface FacetValue {
   count: number;
 }
 
+export interface FacetResponseItem {
+  value: string;
+  count: number;
+}
+
+export interface FacetsApiResponse {
+  projects: FacetResponseItem[];
+  versions: FacetResponseItem[];
+  extensions: FacetResponseItem[];
+  repositories: FacetResponseItem[];
+  languages: FacetResponseItem[];
+}
+
 export interface SearchFacets {
   projects: FacetValue[];
   versions: FacetValue[];
   extensions: FacetValue[];
+  languages: FacetValue[];
+  repositories?: FacetValue[]; // Repository facets for filtering
 }
 
 export interface SearchResponse {
@@ -123,6 +146,7 @@ export interface SearchFilters {
   projects: string[];
   versions: string[];
   extensions: string[];
+  repositories?: string[]; // Repository filter
 }
 
 export interface FilterOption {
@@ -184,6 +208,7 @@ export interface CreateUserRequest {
 export interface UpdateUserRequest {
   username?: string;
   email?: string;
+  password?: string;
   role?: UserRole;
   active?: boolean;
 }
@@ -211,6 +236,10 @@ export interface CreateRepositoryRequest {
   maxCrawlDurationMinutes?: number;
   gitlabExcludedProjects?: string;
   gitlabExcludedPatterns?: string;
+  // GitHub specific fields
+  githubNamespace?: string;
+  githubExcludedRepositories?: string;
+  githubExcludedPatterns?: string;
 }
 
 export interface CrawlStatus {
@@ -377,6 +406,7 @@ export interface RepositoryStats {
   disabled_repositories: number;
   git_repositories: number;
   gitlab_repositories: number;
+  github_repositories: number;
   filesystem_repositories: number;
   recently_crawled: number;
   never_crawled: number;
@@ -388,6 +418,13 @@ export interface SearchStats {
   index_size_mb: number;
   avg_search_time_ms?: number;
   popular_queries: QueryStat[];
+  documents_by_repository?: RepositoryDocumentCount[];
+}
+
+export interface RepositoryDocumentCount {
+  repository_name: string;
+  document_count: number;
+  repository_type?: string;
 }
 
 export interface QueryStat {
@@ -398,7 +435,7 @@ export interface QueryStat {
 export interface RecentUser {
   username: string;
   email: string;
-  created_at: string;
+  last_seen: string;
   role: string;
 }
 

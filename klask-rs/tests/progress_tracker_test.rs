@@ -20,9 +20,7 @@ async fn test_start_crawl_creates_progress() -> Result<()> {
     let repository_id = Uuid::new_v4();
     let repository_name = "test-repo".to_string();
 
-    let progress = tracker
-        .start_crawl(repository_id, repository_name.clone())
-        .await;
+    let progress = tracker.start_crawl(repository_id, repository_name.clone()).await;
 
     assert_eq!(progress.repository_id, repository_id);
     assert_eq!(progress.repository_name, repository_name);
@@ -74,9 +72,7 @@ async fn test_update_status_to_cancelled() -> Result<()> {
 
     // Start crawl and update to processing
     tracker.start_crawl(repository_id, repository_name).await;
-    tracker
-        .update_status(repository_id, CrawlStatus::Processing)
-        .await;
+    tracker.update_status(repository_id, CrawlStatus::Processing).await;
 
     // Verify it's active
     assert!(tracker.is_crawling(repository_id).await);
@@ -84,9 +80,7 @@ async fn test_update_status_to_cancelled() -> Result<()> {
     assert_eq!(active_progress.len(), 1);
 
     // Update to cancelled
-    tracker
-        .update_status(repository_id, CrawlStatus::Cancelled)
-        .await;
+    tracker.update_status(repository_id, CrawlStatus::Cancelled).await;
 
     // Verify status changed
     let progress = tracker.get_progress(repository_id).await.unwrap();
@@ -113,32 +107,16 @@ async fn test_cancelled_status_with_completed_failed() -> Result<()> {
     let repo_active = Uuid::new_v4();
 
     // Start crawls
-    tracker
-        .start_crawl(repo_cancelled, "cancelled-repo".to_string())
-        .await;
-    tracker
-        .start_crawl(repo_completed, "completed-repo".to_string())
-        .await;
-    tracker
-        .start_crawl(repo_failed, "failed-repo".to_string())
-        .await;
-    tracker
-        .start_crawl(repo_active, "active-repo".to_string())
-        .await;
+    tracker.start_crawl(repo_cancelled, "cancelled-repo".to_string()).await;
+    tracker.start_crawl(repo_completed, "completed-repo".to_string()).await;
+    tracker.start_crawl(repo_failed, "failed-repo".to_string()).await;
+    tracker.start_crawl(repo_active, "active-repo".to_string()).await;
 
     // Set different final states
-    tracker
-        .update_status(repo_cancelled, CrawlStatus::Cancelled)
-        .await;
-    tracker
-        .update_status(repo_completed, CrawlStatus::Completed)
-        .await;
-    tracker
-        .update_status(repo_failed, CrawlStatus::Failed)
-        .await;
-    tracker
-        .update_status(repo_active, CrawlStatus::Processing)
-        .await;
+    tracker.update_status(repo_cancelled, CrawlStatus::Cancelled).await;
+    tracker.update_status(repo_completed, CrawlStatus::Completed).await;
+    tracker.update_status(repo_failed, CrawlStatus::Failed).await;
+    tracker.update_status(repo_active, CrawlStatus::Processing).await;
 
     // Verify only active repo is crawling
     assert!(!tracker.is_crawling(repo_cancelled).await);
@@ -211,9 +189,7 @@ async fn test_multiple_repositories_cancellation() -> Result<()> {
         let repo_id = Uuid::new_v4();
         repo_ids.push(repo_id);
         tracker.start_crawl(repo_id, format!("repo-{}", i)).await;
-        tracker
-            .update_status(repo_id, CrawlStatus::Processing)
-            .await;
+        tracker.update_status(repo_id, CrawlStatus::Processing).await;
     }
 
     // Verify all are active
@@ -302,10 +278,7 @@ async fn test_concurrent_cancellation() -> Result<()> {
 
     // Repository should be cancelled
     assert!(!tracker_for_assert.is_crawling(repository_id).await);
-    let progress = tracker_for_assert
-        .get_progress(repository_id)
-        .await
-        .unwrap();
+    let progress = tracker_for_assert.get_progress(repository_id).await.unwrap();
     assert!(matches!(progress.status, CrawlStatus::Cancelled));
 
     Ok(())

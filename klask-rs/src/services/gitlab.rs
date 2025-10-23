@@ -33,16 +33,15 @@ impl Default for GitLabService {
 
 impl GitLabService {
     pub fn new() -> Self {
-        let accept_invalid_certs = std::env::var("KLASK_GITLAB_ACCEPT_INVALID_CERTS")
-            .map(|v| v.to_lowercase() == "true")
-            .unwrap_or(false);
+        let accept_invalid_certs =
+            std::env::var("KLASK_GITLAB_ACCEPT_INVALID_CERTS").map(|v| v.to_lowercase() == "true").unwrap_or(false);
 
-        let mut builder = Client::builder()
-            .user_agent("klask-rs/2.0")
-            .timeout(std::time::Duration::from_secs(30));
+        let mut builder = Client::builder().user_agent("klask-rs/2.0").timeout(std::time::Duration::from_secs(30));
 
         if accept_invalid_certs {
-            tracing::warn!("GitLab client configured to accept invalid certificates (KLASK_GITLAB_ACCEPT_INVALID_CERTS=true)");
+            tracing::warn!(
+                "GitLab client configured to accept invalid certificates (KLASK_GITLAB_ACCEPT_INVALID_CERTS=true)"
+            );
             builder = builder.danger_accept_invalid_certs(true);
         }
 
@@ -74,11 +73,7 @@ impl GitLabService {
             );
         }
 
-        Self {
-            client: builder.build().unwrap_or_else(|_| Client::new()),
-            excluded_projects,
-            excluded_patterns,
-        }
+        Self { client: builder.build().unwrap_or_else(|_| Client::new()), excluded_projects, excluded_patterns }
     }
 
     /// Discover all accessible projects for a GitLab instance
@@ -123,17 +118,11 @@ impl GitLabService {
                     status,
                     error_body
                 );
-                return Err(anyhow::anyhow!(
-                    "GitLab API error: {} - {}",
-                    status,
-                    error_body
-                ));
+                return Err(anyhow::anyhow!("GitLab API error: {} - {}", status, error_body));
             }
 
-            let page_projects: Vec<GitLabProject> = response
-                .json()
-                .await
-                .context("Failed to parse GitLab projects response")?;
+            let page_projects: Vec<GitLabProject> =
+                response.json().await.context("Failed to parse GitLab projects response")?;
 
             if page_projects.is_empty() {
                 break;
@@ -141,11 +130,6 @@ impl GitLabService {
 
             projects.extend(page_projects);
             page += 1;
-
-            // GitLab has a limit, stop at reasonable number
-            if page > 10 || projects.len() > 1000 {
-                break;
-            }
         }
 
         // Filter out archived projects
@@ -191,10 +175,8 @@ impl GitLabService {
                 ));
             }
 
-            let page_projects: Vec<GitLabProject> = response
-                .json()
-                .await
-                .context("Failed to parse GitLab group projects response")?;
+            let page_projects: Vec<GitLabProject> =
+                response.json().await.context("Failed to parse GitLab group projects response")?;
 
             if page_projects.is_empty() {
                 break;
@@ -202,11 +184,6 @@ impl GitLabService {
 
             projects.extend(page_projects);
             page += 1;
-
-            // Stop at reasonable number
-            if page > 10 || projects.len() > 1000 {
-                break;
-            }
         }
 
         Ok(projects)
@@ -214,12 +191,7 @@ impl GitLabService {
 
     /// Get information about a specific project
     #[allow(dead_code)]
-    pub async fn get_project(
-        &self,
-        gitlab_url: &str,
-        access_token: &str,
-        project_id: &str,
-    ) -> Result<GitLabProject> {
+    pub async fn get_project(&self, gitlab_url: &str, access_token: &str, project_id: &str) -> Result<GitLabProject> {
         let url = format!(
             "{}/api/v4/projects/{}",
             gitlab_url.trim_end_matches('/'),
@@ -242,10 +214,7 @@ impl GitLabService {
             ));
         }
 
-        let project: GitLabProject = response
-            .json()
-            .await
-            .context("Failed to parse GitLab project response")?;
+        let project: GitLabProject = response.json().await.context("Failed to parse GitLab project response")?;
 
         Ok(project)
     }
@@ -253,11 +222,7 @@ impl GitLabService {
     /// Check if a project should be excluded from crawling
     #[allow(dead_code)]
     pub fn should_exclude_project(&self, project: &GitLabProject) -> bool {
-        self.should_exclude_project_with_config(
-            project,
-            &self.excluded_projects,
-            &self.excluded_patterns,
-        )
+        self.should_exclude_project_with_config(project, &self.excluded_projects, &self.excluded_patterns)
     }
 
     /// Check if a project should be excluded with custom exclusion config
@@ -269,10 +234,7 @@ impl GitLabService {
     ) -> bool {
         // Check exact matches
         if excluded_projects.contains(&project.path_with_namespace) {
-            tracing::info!(
-                "Excluding project (exact match): {}",
-                project.path_with_namespace
-            );
+            tracing::info!("Excluding project (exact match): {}", project.path_with_namespace);
             return true;
         }
 
@@ -340,11 +302,7 @@ impl GitLabService {
     /// Filter out excluded projects from a list
     #[allow(dead_code)]
     pub fn filter_excluded_projects(&self, projects: Vec<GitLabProject>) -> Vec<GitLabProject> {
-        self.filter_excluded_projects_with_config(
-            projects,
-            &self.excluded_projects,
-            &self.excluded_patterns,
-        )
+        self.filter_excluded_projects_with_config(projects, &self.excluded_projects, &self.excluded_patterns)
     }
 
     /// Filter out excluded projects with custom exclusion config
@@ -357,22 +315,12 @@ impl GitLabService {
         let initial_count = projects.len();
         let filtered: Vec<GitLabProject> = projects
             .into_iter()
-            .filter(|project| {
-                !self.should_exclude_project_with_config(
-                    project,
-                    excluded_projects,
-                    excluded_patterns,
-                )
-            })
+            .filter(|project| !self.should_exclude_project_with_config(project, excluded_projects, excluded_patterns))
             .collect();
 
         let excluded_count = initial_count - filtered.len();
         if excluded_count > 0 {
-            tracing::info!(
-                "Excluded {} out of {} GitLab projects",
-                excluded_count,
-                initial_count
-            );
+            tracing::info!("Excluded {} out of {} GitLab projects", excluded_count, initial_count);
         }
 
         filtered
@@ -387,21 +335,12 @@ impl GitLabService {
 
         // Test with PRIVATE-TOKEN first
         tracing::info!("Testing with PRIVATE-TOKEN header");
-        let response_private = self
-            .client
-            .get(&url)
-            .header("PRIVATE-TOKEN", access_token)
-            .send()
-            .await;
+        let response_private = self.client.get(&url).header("PRIVATE-TOKEN", access_token).send().await;
 
         // Test with Bearer token
         tracing::info!("Testing with Authorization Bearer header");
-        let response_bearer = self
-            .client
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", access_token))
-            .send()
-            .await;
+        let response_bearer =
+            self.client.get(&url).header("Authorization", format!("Bearer {}", access_token)).send().await;
 
         // Compare results
         match (response_private, response_bearer) {
@@ -428,16 +367,10 @@ impl GitLabService {
                     // Use PRIVATE-TOKEN as primary (more explicit for GitLab)
                     Ok(true)
                 } else if status_private.is_success() {
-                    tracing::warn!(
-                        "Only PRIVATE-TOKEN works, Bearer failed with: {}",
-                        status_bearer
-                    );
+                    tracing::warn!("Only PRIVATE-TOKEN works, Bearer failed with: {}", status_bearer);
                     Ok(true)
                 } else if status_bearer.is_success() {
-                    tracing::warn!(
-                        "Only Bearer works, PRIVATE-TOKEN failed with: {}",
-                        status_private
-                    );
+                    tracing::warn!("Only Bearer works, PRIVATE-TOKEN failed with: {}", status_private);
                     Ok(true)
                 } else {
                     tracing::error!(
@@ -486,11 +419,7 @@ mod tests {
 
     #[test]
     fn test_pattern_matching() {
-        let service = GitLabService {
-            client: Client::new(),
-            excluded_projects: vec![],
-            excluded_patterns: vec![],
-        };
+        let service = GitLabService { client: Client::new(), excluded_projects: vec![], excluded_patterns: vec![] };
 
         // Exact match
         assert!(service.matches_pattern("project", "project"));
@@ -525,10 +454,7 @@ mod tests {
     fn test_should_exclude_project_exact_match() {
         let service = GitLabService {
             client: Client::new(),
-            excluded_projects: vec![
-                "team/large-project".to_string(),
-                "archive/old-system".to_string(),
-            ],
+            excluded_projects: vec!["team/large-project".to_string(), "archive/old-system".to_string()],
             excluded_patterns: vec![],
         };
 
@@ -546,11 +472,7 @@ mod tests {
         let service = GitLabService {
             client: Client::new(),
             excluded_projects: vec![],
-            excluded_patterns: vec![
-                "*-archive".to_string(),
-                "test-*".to_string(),
-                "*-large-*".to_string(),
-            ],
+            excluded_patterns: vec!["*-archive".to_string(), "test-*".to_string(), "*-large-*".to_string()],
         };
 
         let project1 = create_test_project("team/project-archive", 1);
@@ -590,16 +512,9 @@ mod tests {
 
     #[test]
     fn test_empty_exclusion_config() {
-        let service = GitLabService {
-            client: Client::new(),
-            excluded_projects: vec![],
-            excluded_patterns: vec![],
-        };
+        let service = GitLabService { client: Client::new(), excluded_projects: vec![], excluded_patterns: vec![] };
 
-        let projects = vec![
-            create_test_project("team/project1", 1),
-            create_test_project("team/project2", 2),
-        ];
+        let projects = vec![create_test_project("team/project1", 1), create_test_project("team/project2", 2)];
 
         let filtered = service.filter_excluded_projects(projects.clone());
         assert_eq!(filtered.len(), projects.len());
@@ -613,10 +528,7 @@ mod tests {
             excluded_patterns: vec!["*".to_string()],
         };
 
-        let projects = vec![
-            create_test_project("team/project1", 1),
-            create_test_project("team/project2", 2),
-        ];
+        let projects = vec![create_test_project("team/project1", 1), create_test_project("team/project2", 2)];
 
         let filtered = service.filter_excluded_projects(projects);
         assert_eq!(filtered.len(), 0);

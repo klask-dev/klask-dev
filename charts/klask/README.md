@@ -33,10 +33,6 @@ docker build -t klask-frontend:latest .
 ### 2. Install the Chart
 
 ```bash
-# Add Bitnami repository for PostgreSQL dependency
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-
 # Install the chart
 helm install klask ./helm/klask
 ```

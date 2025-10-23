@@ -204,10 +204,7 @@ async fn test_concurrent_task_cleanup() -> Result<()> {
         assert!(matches!(status, "completed" | "failed" | "cancelled"));
     }
 
-    assert_eq!(
-        concurrent_tasks["cleanup_strategy"].as_str().unwrap(),
-        "sequential"
-    );
+    assert_eq!(concurrent_tasks["cleanup_strategy"].as_str().unwrap(), "sequential");
     assert!(concurrent_tasks["total_cleanup_time_ms"].as_u64().unwrap() > 0);
 
     println!("✅ Concurrent task cleanup test passed!");

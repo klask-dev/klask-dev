@@ -43,7 +43,7 @@ const SetupPage: React.FC = () => {
         const API_BASE_URL = getApiBaseUrl();
         const response = await fetch(`${API_BASE_URL}/api/auth/setup/check`);
         const data = await response.json();
-        
+
         if (!data.needs_setup) {
           navigate('/login');
         } else {
@@ -82,7 +82,7 @@ const SetupPage: React.FC = () => {
 
       const result = await response.json();
       login(result.token, result.user);
-      navigate('/search');
+      navigate('/home');
     } catch (error) {
       if (error instanceof Error) {
         setServerError(error.message);

@@ -71,4 +71,4 @@ rust-setup: rust-dev-db
 	@echo ""
 	@echo "Rust setup complete! You can now run 'make rust-dev' to start the server."
 	@echo "Database: postgres://klask:klask@localhost:5432/klask_rs"
-	@echo "pgAdmin: http://localhost:8080 (admin@klask.io / admin)"
+	@echo "pgAdmin: http://localhost:8080 (admin@klask.dev / admin)"

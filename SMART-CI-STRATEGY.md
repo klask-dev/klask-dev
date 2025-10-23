@@ -31,10 +31,10 @@ gh pr create --title "Add authentication"
 - ❌ Pas de publication Helm (seulement pour main/master)
 
 **Images créées :**
-- `ghcr.io/klask-io/klask-backend:pr-123`
-- `ghcr.io/klask-io/klask-frontend:pr-123`
-- `ghcr.io/klask-io/klask-backend:sha-abc1234`
-- `ghcr.io/klask-io/klask-frontend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-backend:pr-123`
+- `ghcr.io/klask-dev/klask-frontend:pr-123`
+- `ghcr.io/klask-dev/klask-backend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-frontend:sha-abc1234`
 
 ### ✅ **Push sur main/master** - Tout + Latest
 ```bash
@@ -47,12 +47,12 @@ git push origin main
 - ✅ Publication Helm chart
 
 **Images créées :**
-- `ghcr.io/klask-io/klask-backend:main`
-- `ghcr.io/klask-io/klask-frontend:main`
-- `ghcr.io/klask-io/klask-backend:latest` ⭐
-- `ghcr.io/klask-io/klask-frontend:latest` ⭐
-- `ghcr.io/klask-io/klask-backend:sha-abc1234`
-- `ghcr.io/klask-io/klask-frontend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-backend:main`
+- `ghcr.io/klask-dev/klask-frontend:main`
+- `ghcr.io/klask-dev/klask-backend:latest` ⭐
+- `ghcr.io/klask-dev/klask-frontend:latest` ⭐
+- `ghcr.io/klask-dev/klask-backend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-frontend:sha-abc1234`
 
 ### ✅ **Tags de version** - Release complète
 ```bash
@@ -66,14 +66,14 @@ git push origin v1.2.3
 - ❌ Pas de publication Helm (chart versionné manuellement)
 
 **Images créées :**
-- `ghcr.io/klask-io/klask-backend:v1.2.3` ⭐
-- `ghcr.io/klask-io/klask-frontend:v1.2.3` ⭐
-- `ghcr.io/klask-io/klask-backend:1.2.3`
-- `ghcr.io/klask-io/klask-frontend:1.2.3`
-- `ghcr.io/klask-io/klask-backend:1.2`
-- `ghcr.io/klask-io/klask-frontend:1.2`
-- `ghcr.io/klask-io/klask-backend:1`
-- `ghcr.io/klask-io/klask-frontend:1`
+- `ghcr.io/klask-dev/klask-backend:v1.2.3` ⭐
+- `ghcr.io/klask-dev/klask-frontend:v1.2.3` ⭐
+- `ghcr.io/klask-dev/klask-backend:1.2.3`
+- `ghcr.io/klask-dev/klask-frontend:1.2.3`
+- `ghcr.io/klask-dev/klask-backend:1.2`
+- `ghcr.io/klask-dev/klask-frontend:1.2`
+- `ghcr.io/klask-dev/klask-backend:1`
+- `ghcr.io/klask-dev/klask-frontend:1`
 
 ## 🚀 **Workflow pratique**
 
@@ -121,7 +121,7 @@ gh pr create --draft
 ### **Pull Request (images disponibles)**
 ```bash
 # Utiliser les images de la PR
-helm install test-pr oci://ghcr.io/klask-io/klask \
+helm install test-pr oci://ghcr.io/klask-dev/klask \
   --set backend.image.tag=pr-123 \
   --set frontend.image.tag=pr-123
 ```
@@ -129,13 +129,13 @@ helm install test-pr oci://ghcr.io/klask-io/klask \
 ### **Production (latest)**
 ```bash
 # Utiliser les images latest de main
-helm install klask oci://ghcr.io/klask-io/klask
+helm install klask oci://ghcr.io/klask-dev/klask
 ```
 
 ### **Release (version)**
 ```bash
 # Utiliser une version spécifique
-helm install klask oci://ghcr.io/klask-io/klask \
+helm install klask oci://ghcr.io/klask-dev/klask \
   --set backend.image.tag=v1.2.3 \
   --set frontend.image.tag=v1.2.3
 ```

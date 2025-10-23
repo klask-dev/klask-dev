@@ -28,7 +28,7 @@ const RegisterPage: React.FC = () => {
       setServerError(null);
       const response = await apiClient.auth.register(data);
       login(response.token, response.user);
-      navigate('/search');
+      navigate('/home');
     } catch (error) {
       if (error instanceof Error) {
         setServerError(error.message);
@@ -87,7 +87,7 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
               <div>
                 <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
                   Last name

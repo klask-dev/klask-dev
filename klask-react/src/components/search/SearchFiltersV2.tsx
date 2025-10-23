@@ -13,6 +13,7 @@ export interface SearchFiltersV2 {
   versions?: string[];
   extensions?: string[];
   languages?: string[];
+  repositories?: string[];
   [key: string]: string[] | undefined;
 }
 
@@ -27,6 +28,7 @@ interface AvailableFilters {
   versions: FilterOption[];
   extensions: FilterOption[];
   languages: FilterOption[];
+  repositories: FilterOption[];
 }
 
 interface SearchFiltersV2Props {
@@ -79,6 +81,12 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
     {
       title: 'Repository',
       filters: [
+        {
+          key: 'repositories' as keyof SearchFiltersV2,
+          label: 'Repositories',
+          options: availableFilters.repositories,
+          searchable: true,
+        },
         {
           key: 'projects' as keyof SearchFiltersV2,
           label: 'Projects',
@@ -149,7 +157,7 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
           {activeFilters.map(({ key, values, label }) => (
             <div key={key} className="inline-flex items-center gap-1">
               <span className="text-xs text-gray-600 font-medium">{label}:</span>
-              {values.map((value, index) => {
+              {values.map((value) => {
                 const option = availableFilters[key as keyof AvailableFilters]?.find(opt => opt.value === value);
                 return (
                   <span
@@ -237,7 +245,7 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
             <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
               {group.title}
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${group.filters.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
               {group.filters.map((filterConfig) => (
                 <MultiSelectFilter
                   key={filterConfig.key}

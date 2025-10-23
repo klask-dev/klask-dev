@@ -15,8 +15,10 @@ const mockUsers: User[] = [
     email: 'john@example.com',
     role: 'User',
     active: true,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    last_login: '2024-01-01T12:00:00Z',
+    last_activity: '2024-01-01T14:30:00Z',
   },
   {
     id: 'user-2',
@@ -24,8 +26,10 @@ const mockUsers: User[] = [
     email: 'jane@example.com',
     role: 'Admin',
     active: true,
-    createdAt: '2024-01-02T00:00:00Z',
-    updatedAt: '2024-01-02T00:00:00Z',
+    created_at: '2024-01-02T00:00:00Z',
+    updated_at: '2024-01-02T00:00:00Z',
+    last_login: '2024-01-02T10:00:00Z',
+    last_activity: '2024-01-02T11:00:00Z',
   },
   {
     id: 'user-3',
@@ -33,8 +37,8 @@ const mockUsers: User[] = [
     email: 'inactive@example.com',
     role: 'User',
     active: false,
-    createdAt: '2024-01-03T00:00:00Z',
-    updatedAt: '2024-01-03T00:00:00Z',
+    created_at: '2024-01-03T00:00:00Z',
+    updated_at: '2024-01-03T00:00:00Z',
   },
 ];
 

@@ -1,0 +1,103 @@
+# Valeurs de test pour Klask Chart
+# Usage: helm install klask . -f custom-values.yaml
+
+## Configuration de base
+replicaCount: 1
+
+global:
+  security:
+    allowInsecureImages: true
+
+# ## Sécurité - Allégée pour le développement
+# ## IMPORTANT: Renforcer en production !
+# podSecurityContext:
+#   fsGroup: 1000
+#   # Temporairement désactivé pour dev
+#   # runAsNonRoot: true
+#   # runAsUser: 1000
+#   # seccompProfile:
+#   #   type: RuntimeDefault
+
+# securityContext:
+#   allowPrivilegeEscalation: false
+#   # Temporairement désactivé pour permettre les écritures
+#   readOnlyRootFilesystem: false
+#   # runAsNonRoot: true
+#   # runAsUser: 1000
+#   capabilities:
+#     drop:
+#       - ALL
+
+## Ingress - Activer pour tester l'accès externe
+ingress:
+  enabled: true
+  className: "traefik"
+  hosts:
+    - host: klask.company.com
+      paths:
+        - path: /
+          pathType: Prefix
+  # Décommenter pour TLS:
+  # tls:
+  #   - secretName: klask-tls
+  #     hosts:
+  #       - klask.local
+
+## Backend
+backend:
+  enabled: true
+  image:
+    repository: ghcr.io/klask-dev/klask-backend
+    tag: "pr-69"
+
+  config:
+    rustLog: "error,klask=info"
+    logFormat: "text"  # Plus lisible en dev
+
+## Frontend
+frontend:
+  enabled: true
+  image:
+    repository: ghcr.io/klask-dev/klask-frontend
+    tag: "pr-69"
+  env:
+    api:
+      baseUrl: "https://klask.company.com"
+
+## PostgreSQL - Configuration production
+postgresql:
+  enabled: true
+  auth:
+    # DEV: Passwords explicites pour le test
+    # PRODUCTION: Utiliser existingSecret ou laisser vide pour auto-génération
+    postgresPassword: "dev-postgres-password"
+    password: "dev-klask-password"
+    username: "klask"
+    database: "klask"
+    # Recommandé: Utiliser un secret externe
+    # existingSecret: "klask-postgresql-credentials"
+
+  persistence:
+    enabled: true
+    # storageClass vide = utilise le StorageClass par défaut du cluster
+    # Pour forcer un SC spécifique: storageClass: "fast-ssd"
+    storageClass: ""
+    size: 2Gi  # Adapter selon vos besoins
+
+## Sécurité - Désactiver temporairement pour test si problème
+# securityContext:
+#   readOnlyRootFilesystem: false
+
+## High Availability - Désactiver pour test local
+podDisruptionBudget:
+  enabled: false
+
+## NetworkPolicy - Désactiver pour simplifier le test
+networkPolicy:
+  enabled: false
+
+## Metrics - Activer si Prometheus est installé
+metrics:
+  enabled: false
+  # serviceMonitor:
+  #   enabled: true

@@ -16,18 +16,12 @@ async fn test_cancellation_token_creation() -> Result<()> {
         "reason": "user_requested"
     });
 
-    assert_eq!(
-        cancellation_token["token_id"].as_str().unwrap(),
-        "cancel-123"
-    );
+    assert_eq!(cancellation_token["token_id"].as_str().unwrap(), "cancel-123");
     assert!(cancellation_token["repository_id"].is_string());
     assert!(cancellation_token["requested_at"].is_string());
     assert!(cancellation_token["requested_by"].is_string());
     assert_eq!(cancellation_token["status"].as_str().unwrap(), "pending");
-    assert_eq!(
-        cancellation_token["reason"].as_str().unwrap(),
-        "user_requested"
-    );
+    assert_eq!(cancellation_token["reason"].as_str().unwrap(), "user_requested");
 
     println!("✅ Cancellation token creation test passed!");
     Ok(())
@@ -102,20 +96,11 @@ async fn test_concurrent_cancel_operations() -> Result<()> {
     ];
 
     // First cancellation should be accepted
-    assert_eq!(
-        concurrent_cancels[0]["result"].as_str().unwrap(),
-        "accepted"
-    );
+    assert_eq!(concurrent_cancels[0]["result"].as_str().unwrap(), "accepted");
 
     // Subsequent cancellations should be rejected
-    assert_eq!(
-        concurrent_cancels[1]["result"].as_str().unwrap(),
-        "already_cancelling"
-    );
-    assert_eq!(
-        concurrent_cancels[2]["result"].as_str().unwrap(),
-        "already_cancelling"
-    );
+    assert_eq!(concurrent_cancels[1]["result"].as_str().unwrap(), "already_cancelling");
+    assert_eq!(concurrent_cancels[2]["result"].as_str().unwrap(), "already_cancelling");
 
     // All should target same repository
     for cancel in &concurrent_cancels {
@@ -281,12 +266,8 @@ async fn test_cancellation_response_format() -> Result<()> {
     assert!(success_response["cancellation_id"].is_string());
     assert!(success_response["repository_id"].is_string());
     assert_eq!(success_response["status"].as_str().unwrap(), "cancelling");
-    assert!(success_response["estimated_completion_seconds"]
-        .as_u64()
-        .is_some());
-    assert!(success_response["partial_results_available"]
-        .as_bool()
-        .unwrap());
+    assert!(success_response["estimated_completion_seconds"].as_u64().is_some());
+    assert!(success_response["partial_results_available"].as_bool().unwrap());
 
     println!("✅ Cancellation response format test passed!");
     Ok(())
@@ -312,20 +293,11 @@ async fn test_double_cancellation() -> Result<()> {
     });
 
     assert_eq!(first_cancel["result"].as_str().unwrap(), "accepted");
-    assert_eq!(
-        second_cancel["result"].as_str().unwrap(),
-        "already_cancelling"
-    );
+    assert_eq!(second_cancel["result"].as_str().unwrap(), "already_cancelling");
 
     // Both should target same repository but have different IDs
-    assert_eq!(
-        first_cancel["repository_id"].as_str().unwrap(),
-        repository_id
-    );
-    assert_eq!(
-        second_cancel["repository_id"].as_str().unwrap(),
-        repository_id
-    );
+    assert_eq!(first_cancel["repository_id"].as_str().unwrap(), repository_id);
+    assert_eq!(second_cancel["repository_id"].as_str().unwrap(), repository_id);
     assert_ne!(
         first_cancel["cancel_id"].as_str().unwrap(),
         second_cancel["cancel_id"].as_str().unwrap()

@@ -1,0 +1,55 @@
+{{- if .Values.backend.enabled }}
+{{- if .Values.backend.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "klask.fullname" . }}-backend-index
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  {{- with .Values.backend.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.backend.persistence.storageClass }}
+  {{- if (eq "-" .Values.backend.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.backend.persistence.storageClass }}
+  {{- end }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.persistence.size }}
+{{- end }}
+---
+{{- if .Values.backend.tmpPersistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "klask.fullname" . }}-backend-tmp
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  {{- with .Values.backend.tmpPersistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.backend.tmpPersistence.storageClass }}
+  {{- if (eq "-" .Values.backend.tmpPersistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.backend.tmpPersistence.storageClass }}
+  {{- end }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.tmpPersistence.size }}
+{{- end }}
+{{- end }}

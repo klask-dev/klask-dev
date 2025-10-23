@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { convertCronToUTC, convertCronToLocal, describeCronExpression, getBrowserTimezoneName } from '../../utils/cronTimezone';
 
 interface CronScheduleFormProps {
   autoCrawlEnabled: boolean;
@@ -45,14 +46,18 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
 }) => {
   // Determine mode from props
   const currentMode = cronSchedule && cronSchedule.trim() !== '' ? 'cron' : 'frequency';
-  
+
   // Local state only for UI interactions
-  const [localCronSchedule, setLocalCronSchedule] = useState(cronSchedule || '');
+  // Store the cron expression in LOCAL timezone for display/editing
+  const [localCronSchedule, setLocalCronSchedule] = useState(
+    cronSchedule ? convertCronToLocal(cronSchedule) : ''
+  );
   const [cronError, setCronError] = useState<string | null>(null);
-  
+
   // Reset local cron when repository changes
   useEffect(() => {
-    setLocalCronSchedule(cronSchedule || '');
+    // Convert from UTC (backend) to local timezone for display
+    setLocalCronSchedule(cronSchedule ? convertCronToLocal(cronSchedule) : '');
     setCronError(null);
   }, [repositoryId, cronSchedule]);
 
@@ -88,10 +93,14 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
   const handleScheduleModeChange = (mode: 'frequency' | 'cron') => {
     if (mode === 'cron') {
       // Switch to cron mode
+      const defaultLocalCron = '0 0 2 * * *'; // Default: 2am local time
+      const cronToUse = localCronSchedule || defaultLocalCron;
+      const utcCron = convertCronToUTC(cronToUse);
+
       onScheduleChange({
         autoCrawlEnabled,
         maxCrawlDurationMinutes: maxCrawlDurationMinutes || 60,
-        cronSchedule: localCronSchedule || '0 0 2 * * *', // Default cron
+        cronSchedule: utcCron, // Send UTC version
         crawlFrequencyHours: undefined,
       });
     } else {
@@ -131,10 +140,12 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
   const handleCronInputChange = (value: string) => {
     handleCronChange(value);
     if (!validateCronExpression(value)) {
+      // Convert from local timezone to UTC before sending to backend
+      const utcCron = convertCronToUTC(value);
       onScheduleChange({
         autoCrawlEnabled,
         maxCrawlDurationMinutes: maxCrawlDurationMinutes || 60,
-        cronSchedule: value,
+        cronSchedule: utcCron, // Send UTC version to backend
         crawlFrequencyHours: undefined,
       });
     }
@@ -145,8 +156,8 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
     onScheduleChange({
       autoCrawlEnabled: enabled,
       maxCrawlDurationMinutes: maxCrawlDurationMinutes || 60,
-      ...(currentMode === 'cron' 
-        ? { cronSchedule: localCronSchedule, crawlFrequencyHours: undefined }
+      ...(currentMode === 'cron'
+        ? { cronSchedule: convertCronToUTC(localCronSchedule), crawlFrequencyHours: undefined }
         : { crawlFrequencyHours: crawlFrequencyHours || 24, cronSchedule: undefined }
       ),
     });
@@ -158,7 +169,9 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
     if (currentMode === 'frequency' && crawlFrequencyHours) {
       return `Will run every ${crawlFrequencyHours} hour${crawlFrequencyHours !== 1 ? 's' : ''}`;
     } else if (localCronSchedule && !cronError) {
-      return 'Will run according to cron schedule';
+      const description = describeCronExpression(convertCronToUTC(localCronSchedule));
+      const timezone = getBrowserTimezoneName();
+      return `${description} (${timezone})`;
     }
 
     return null;
@@ -295,6 +308,9 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
               )}
               <p className="mt-1 text-xs text-gray-500">
                 Format: seconds minutes hours day month weekday
+              </p>
+              <p className="mt-1 text-xs text-blue-600">
+                ℹ️ Times are in your local timezone ({getBrowserTimezoneName()})
               </p>
 
               {/* Common Examples */}

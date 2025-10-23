@@ -12,8 +12,8 @@ use axum::{routing::get, Router};
 use config::AppConfig;
 use database::Database;
 use services::{
-    crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
-    scheduler::SchedulerService, SearchService,
+    crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker, scheduler::SchedulerService,
+    SearchService,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,9 +29,8 @@ async fn main() -> Result<()> {
     // Initialize tracing
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "klask_rs=debug,tower_http=debug,tantivy=error,git2=warn,sqlx=warn".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "klask_rs=debug,tower_http=debug,tantivy=error,git2=warn,sqlx=warn".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -46,8 +45,7 @@ async fn main() -> Result<()> {
     info!("Starting Klask-RS server on {}", bind_address);
 
     // Initialize database
-    let database = match Database::new(&config.database.url, config.database.max_connections).await
-    {
+    let database = match Database::new(&config.database.url, config.database.max_connections).await {
         Ok(db) => {
             info!("Database connected successfully");
             db
@@ -63,10 +61,7 @@ async fn main() -> Result<()> {
     // Initialize search service
     let search_service = match SearchService::new(&config.search.index_dir) {
         Ok(service) => {
-            info!(
-                "Search service initialized successfully at {}",
-                config.search.index_dir
-            );
+            info!("Search service initialized successfully at {}", config.search.index_dir);
             service
         }
         Err(e) => {
@@ -88,8 +83,8 @@ async fn main() -> Result<()> {
     };
 
     // Initialize encryption service
-    let encryption_key = std::env::var("ENCRYPTION_KEY")
-        .unwrap_or_else(|_| "your-secret-encryption-key-32bytes".to_string());
+    let encryption_key =
+        std::env::var("ENCRYPTION_KEY").unwrap_or_else(|_| "your-secret-encryption-key-32bytes".to_string());
     let encryption_service = match EncryptionService::new(&encryption_key) {
         Ok(service) => {
             info!("Encryption service initialized successfully");
@@ -117,18 +112,23 @@ async fn main() -> Result<()> {
         Ok(service) => {
             info!("Crawler service initialized successfully");
 
-            // Check for incomplete crawls and resume them
-            info!("Checking for incomplete crawls to resume...");
-            if let Err(e) = service.check_and_resume_incomplete_crawls().await {
-                error!("Failed to resume incomplete crawls: {}", e);
-                // Don't fail startup, just log the error
-            }
+            // Check for incomplete crawls and resume them in background
+            // This must not block server startup
+            let service_clone = service.clone();
+            tokio::spawn(async move {
+                info!("Checking for incomplete crawls to resume (in background)...");
+                if let Err(e) = service_clone.check_and_resume_incomplete_crawls().await {
+                    error!("Failed to resume incomplete crawls: {}", e);
+                }
+            });
 
-            // Clean up any abandoned crawls (older than 2 hours)
-            if let Err(e) = service.cleanup_abandoned_crawls(120).await {
-                error!("Failed to cleanup abandoned crawls: {}", e);
-                // Don't fail startup, just log the error
-            }
+            // Clean up any abandoned crawls (older than 2 hours) in background
+            let service_clone = service.clone();
+            tokio::spawn(async move {
+                if let Err(e) = service_clone.cleanup_abandoned_crawls(120).await {
+                    error!("Failed to cleanup abandoned crawls: {}", e);
+                }
+            });
 
             service
         }
@@ -140,23 +140,22 @@ async fn main() -> Result<()> {
 
     // Initialize scheduler service
     let crawler_service_arc = Arc::new(crawler_service);
-    let scheduler_service =
-        match SchedulerService::new(database.pool().clone(), crawler_service_arc.clone()).await {
-            Ok(service) => {
-                info!("Scheduler service initialized successfully");
-                // Start the scheduler
-                if let Err(e) = service.start().await {
-                    error!("Failed to start scheduler service: {}", e);
-                } else {
-                    info!("Scheduler service started successfully");
-                }
-                service
+    let scheduler_service = match SchedulerService::new(database.pool().clone(), crawler_service_arc.clone()).await {
+        Ok(service) => {
+            info!("Scheduler service initialized successfully");
+            // Start the scheduler
+            if let Err(e) = service.start().await {
+                error!("Failed to start scheduler service: {}", e);
+            } else {
+                info!("Scheduler service started successfully");
             }
-            Err(e) => {
-                error!("Failed to initialize scheduler service: {}", e);
-                return Err(e);
-            }
-        };
+            service
+        }
+        Err(e) => {
+            error!("Failed to initialize scheduler service: {}", e);
+            return Err(e);
+        }
+    };
 
     // Create application state
     let app_state = AppState {

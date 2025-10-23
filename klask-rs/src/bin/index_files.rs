@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
     let repository = Repository {
         id: Uuid::new_v4(),
         name: "klask-rs".to_string(),
-        url: "/home/jeremie/git/github/klask-io/klask-rs".to_string(),
+        url: "/home/jeremie/git/github/klask-dev/klask-rs".to_string(),
         repository_type: RepositoryType::FileSystem,
         branch: None,
         enabled: true,
@@ -33,6 +33,9 @@ async fn main() -> Result<()> {
         last_crawl_duration_seconds: None,
         gitlab_excluded_projects: None,
         gitlab_excluded_patterns: None,
+        github_namespace: None,
+        github_excluded_repositories: None,
+        github_excluded_patterns: None,
         crawl_state: None,
         last_processed_project: None,
         crawl_started_at: None,
@@ -44,11 +47,8 @@ async fn main() -> Result<()> {
         println!("No DATABASE_URL provided, proceeding without database connection");
 
         // Manually process files directly with SearchService
-        let mut progress = klask_rs::services::crawler::CrawlProgress {
-            files_processed: 0,
-            files_indexed: 0,
-            errors: Vec::new(),
-        };
+        let mut progress =
+            klask_rs::services::crawler::CrawlProgress { files_processed: 0, files_indexed: 0, errors: Vec::new() };
 
         // Use a minimal crawler setup to process files
         let repo_path = std::path::PathBuf::from(&repository.url);
@@ -58,11 +58,7 @@ async fn main() -> Result<()> {
 
         println!("Starting to index files from: {}", repository.url);
 
-        for entry in WalkDir::new(repo_path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-        {
+        for entry in WalkDir::new(repo_path).into_iter().filter_map(|e| e.ok()).filter(|e| e.file_type().is_file()) {
             let file_path = entry.path();
             let relative_path = file_path.strip_prefix(&repository.url)?;
             let relative_path_str = relative_path.to_string_lossy().to_string();
@@ -95,17 +91,9 @@ async fn main() -> Result<()> {
                         continue;
                     }
 
-                    let extension = file_path
-                        .extension()
-                        .and_then(|ext| ext.to_str())
-                        .unwrap_or("")
-                        .to_string();
+                    let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_string();
 
-                    let file_name = file_path
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("")
-                        .to_string();
+                    let file_name = file_path.file_name().and_then(|name| name.to_str()).unwrap_or("").to_string();
 
                     let file_id = Uuid::new_v4();
 
@@ -115,24 +103,21 @@ async fn main() -> Result<()> {
                             file_name: &file_name,
                             file_path: &relative_path_str,
                             content: &content,
+                            repository: &repository.name,
                             project: &repository.name,
                             version: "HEAD",
                             extension: &extension,
                         })
                         .await
                     {
-                        progress
-                            .errors
-                            .push(format!("Failed to index {}: {}", relative_path_str, e));
+                        progress.errors.push(format!("Failed to index {}: {}", relative_path_str, e));
                     } else {
                         progress.files_indexed += 1;
                         println!("Indexed: {}", relative_path_str);
                     }
                 }
                 Err(e) => {
-                    progress
-                        .errors
-                        .push(format!("Failed to read {}: {}", relative_path_str, e));
+                    progress.errors.push(format!("Failed to read {}: {}", relative_path_str, e));
                 }
             }
         }

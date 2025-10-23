@@ -11,22 +11,22 @@
 git push origin feature/auth-system
 ```
 **Images créées :**
-- `ghcr.io/klask-io/klask-backend:feature-auth-system`
-- `ghcr.io/klask-io/klask-frontend:feature-auth-system`
-- `ghcr.io/klask-io/klask-backend:sha-abc1234`
-- `ghcr.io/klask-io/klask-frontend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-backend:feature-auth-system`
+- `ghcr.io/klask-dev/klask-frontend:feature-auth-system`
+- `ghcr.io/klask-dev/klask-backend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-frontend:sha-abc1234`
 
 ### ✅ **Push sur main/master**
 ```bash
 git push origin main
 ```
 **Images créées :**
-- `ghcr.io/klask-io/klask-backend:main`
-- `ghcr.io/klask-io/klask-frontend:main`
-- `ghcr.io/klask-io/klask-backend:latest` ⭐
-- `ghcr.io/klask-io/klask-frontend:latest` ⭐
-- `ghcr.io/klask-io/klask-backend:sha-abc1234`
-- `ghcr.io/klask-io/klask-frontend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-backend:main`
+- `ghcr.io/klask-dev/klask-frontend:main`
+- `ghcr.io/klask-dev/klask-backend:latest` ⭐
+- `ghcr.io/klask-dev/klask-frontend:latest` ⭐
+- `ghcr.io/klask-dev/klask-backend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-frontend:sha-abc1234`
 
 ### ✅ **Tags de version**
 ```bash
@@ -34,14 +34,14 @@ git tag v1.2.3
 git push origin v1.2.3
 ```
 **Images créées :**
-- `ghcr.io/klask-io/klask-backend:v1.2.3` ⭐
-- `ghcr.io/klask-io/klask-frontend:v1.2.3` ⭐
-- `ghcr.io/klask-io/klask-backend:1.2.3`
-- `ghcr.io/klask-io/klask-frontend:1.2.3`
-- `ghcr.io/klask-io/klask-backend:1.2`
-- `ghcr.io/klask-io/klask-frontend:1.2`
-- `ghcr.io/klask-io/klask-backend:1`
-- `ghcr.io/klask-io/klask-frontend:1`
+- `ghcr.io/klask-dev/klask-backend:v1.2.3` ⭐
+- `ghcr.io/klask-dev/klask-frontend:v1.2.3` ⭐
+- `ghcr.io/klask-dev/klask-backend:1.2.3`
+- `ghcr.io/klask-dev/klask-frontend:1.2.3`
+- `ghcr.io/klask-dev/klask-backend:1.2`
+- `ghcr.io/klask-dev/klask-frontend:1.2`
+- `ghcr.io/klask-dev/klask-backend:1`
+- `ghcr.io/klask-dev/klask-frontend:1`
 
 ### ✅ **Pull Requests**
 ```bash
@@ -49,10 +49,10 @@ git push origin v1.2.3
 gh pr create
 ```
 **Images créées :**
-- `ghcr.io/klask-io/klask-backend:pr-123`
-- `ghcr.io/klask-io/klask-frontend:pr-123`
-- `ghcr.io/klask-io/klask-backend:sha-abc1234`
-- `ghcr.io/klask-io/klask-frontend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-backend:pr-123`
+- `ghcr.io/klask-dev/klask-frontend:pr-123`
+- `ghcr.io/klask-dev/klask-backend:sha-abc1234`
+- `ghcr.io/klask-dev/klask-frontend:sha-abc1234`
 
 ## 🔍 **Security Scan adaptatif**
 
@@ -75,7 +75,7 @@ git checkout -b feature/new-ui
 git push origin feature/new-ui
 # → Images feature-new-ui disponibles immédiatement
 
-helm install test oci://ghcr.io/klask-io/klask \
+helm install test oci://ghcr.io/klask-dev/klask \
   --set backend.image.tag=feature-new-ui \
   --set frontend.image.tag=feature-new-ui
 ```
@@ -92,7 +92,7 @@ gh pr create
 git push origin main
 # → Images latest pour production
 
-helm install klask oci://ghcr.io/klask-io/klask
+helm install klask oci://ghcr.io/klask-dev/klask
 # Utilise automatiquement latest
 ```
 
@@ -102,7 +102,7 @@ git tag v1.0.0
 git push origin v1.0.0
 # → Images v1.0.0 pour release
 
-helm install klask oci://ghcr.io/klask-io/klask \
+helm install klask oci://ghcr.io/klask-dev/klask \
   --set backend.image.tag=v1.0.0
 ```
 

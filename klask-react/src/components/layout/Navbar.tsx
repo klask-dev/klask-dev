@@ -1,32 +1,31 @@
 import React, { Fragment } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
-import { 
-  Bars3Icon, 
+import {
+  Bars3Icon,
   MagnifyingGlassIcon,
   FolderIcon,
   UserIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
-  ChevronDownIcon,
-  XMarkIcon
+  XMarkIcon,
+  UsersIcon,
+  ChevronDownIcon
 } from '@heroicons/react/24/outline';
 import { clsx } from 'clsx';
 
 import { authSelectors, useAuthStore } from '../../stores/auth-store';
-import { searchSelectors, useSearchStore } from '../../stores/search-store';
 import { IconButton } from '../ui/Button';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
   const user = authSelectors.user();
   const isAdmin = authSelectors.isAdmin();
-  const sidebarOpen = searchSelectors.sidebarOpen();
-  
+
   const logout = useAuthStore((state) => state.logout);
-  const toggleSidebar = useSearchStore((state) => state.toggleSidebar);
 
   const handleLogout = () => {
     logout();
@@ -35,13 +34,13 @@ export const Navbar: React.FC = () => {
 
   const navigation = [
     { name: 'Search', href: '/search', icon: MagnifyingGlassIcon, current: location.pathname.startsWith('/search') },
-    { name: 'Files', href: '/files', icon: FolderIcon, current: location.pathname === '/files' },
   ];
 
   const adminNavigation = [
-    { name: 'Admin Dashboard', href: '/admin' },
-    { name: 'Repositories', href: '/admin/repositories' },
-    { name: 'Users', href: '/admin/users' },
+    { name: 'Dashboard', href: '/admin', icon: Cog6ToothIcon },
+    { name: 'Repositories', href: '/admin/repositories', icon: FolderIcon },
+    { name: 'Users', href: '/admin/users', icon: UsersIcon },
+    { name: 'Index', href: '/admin/index', icon: MagnifyingGlassIcon },
   ];
 
   return (
@@ -49,28 +48,18 @@ export const Navbar: React.FC = () => {
       <div className="px-3 py-3 lg:px-5 lg:pl-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center justify-start">
-            {/* Sidebar toggle */}
+            {/* Mobile menu toggle */}
             <IconButton
               variant="ghost"
               size="md"
-              icon={sidebarOpen ? <XMarkIcon className="w-5 h-5" /> : <Bars3Icon className="w-5 h-5" />}
-              onClick={toggleSidebar}
-              aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-              className="lg:hidden mr-2"
+              icon={mobileMenuOpen ? <XMarkIcon className="w-5 h-5" /> : <Bars3Icon className="w-5 h-5" />}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              className="md:hidden mr-2"
             />
-            
-            {/* Desktop sidebar toggle */}
-            <IconButton
-              variant="ghost"
-              size="md"
-              icon={<Bars3Icon className="w-5 h-5" />}
-              onClick={toggleSidebar}
-              aria-label="Toggle sidebar"
-              className="hidden lg:block mr-2"
-            />
-            
+
             {/* Logo and brand */}
-            <Link to="/search" className="flex items-center ml-2 md:mr-24">
+            <Link to="/home" className="flex items-center ml-2 md:mr-24">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
                 <MagnifyingGlassIcon className="w-5 h-5 text-white" />
               </div>
@@ -82,7 +71,7 @@ export const Navbar: React.FC = () => {
               </span>
             </Link>
           </div>
-          
+
           {/* Navigation */}
           <div className="hidden md:flex items-center space-x-4">
             {navigation.map((item) => (
@@ -100,53 +89,34 @@ export const Navbar: React.FC = () => {
                 {item.name}
               </Link>
             ))}
+
+            {/* Admin navigation buttons */}
+            {isAdmin && adminNavigation.map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={clsx(
+                    'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    isActive
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  )}
+                >
+                  <item.icon className="w-4 h-4 mr-2" />
+                  {item.name}
+                </Link>
+              );
+            })}
           </div>
-          
+
           {/* User menu */}
           <div className="flex items-center">
             <div className="flex items-center ml-3">
               <div className="hidden md:block">
                 <div className="flex items-center">
-                  {/* Admin dropdown */}
-                  {isAdmin && (
-                    <Menu as="div" className="relative ml-3">
-                      <div>
-                        <Menu.Button className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 p-1">
-                          <span className="sr-only">Open admin menu</span>
-                          <Cog6ToothIcon className="w-5 h-5 text-gray-600" />
-                          <ChevronDownIcon className="w-4 h-4 ml-1 text-gray-600" />
-                        </Menu.Button>
-                      </div>
-                      <Transition
-                        as={Fragment}
-                        enter="transition ease-out duration-100"
-                        enterFrom="transform opacity-0 scale-95"
-                        enterTo="transform opacity-100 scale-100"
-                        leave="transition ease-in duration-75"
-                        leaveFrom="transform opacity-100 scale-100"
-                        leaveTo="transform opacity-0 scale-95"
-                      >
-                        <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                          {adminNavigation.map((item) => (
-                            <Menu.Item key={item.name}>
-                              {({ active }) => (
-                                <Link
-                                  to={item.href}
-                                  className={clsx(
-                                    active ? 'bg-gray-100' : '',
-                                    'block px-4 py-2 text-sm text-gray-700'
-                                  )}
-                                >
-                                  {item.name}
-                                </Link>
-                              )}
-                            </Menu.Item>
-                          ))}
-                        </Menu.Items>
-                      </Transition>
-                    </Menu>
-                  )}
-                  
+
                   {/* User dropdown */}
                   <Menu as="div" className="relative ml-3">
                     <div>
@@ -175,7 +145,7 @@ export const Navbar: React.FC = () => {
                           <div className="font-medium">{user?.username}</div>
                           <div className="text-gray-500">{user?.email}</div>
                         </div>
-                        
+
                         <Menu.Item>
                           {({ active }) => (
                             <Link
@@ -189,7 +159,7 @@ export const Navbar: React.FC = () => {
                             </Link>
                           )}
                         </Menu.Item>
-                        
+
                         <Menu.Item>
                           {({ active }) => (
                             <button
@@ -209,7 +179,7 @@ export const Navbar: React.FC = () => {
                   </Menu>
                 </div>
               </div>
-              
+
               {/* Mobile user menu */}
               <div className="md:hidden">
                 <IconButton
@@ -224,6 +194,61 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Navigation Menu - Outside main container */}
+      {mobileMenuOpen && (
+        <div className="absolute top-full left-0 right-0 md:hidden bg-white shadow-lg border-t border-gray-200">
+          <div className="px-3 py-3 space-y-1">
+              {navigation.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={clsx(
+                    'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    item.current
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  )}
+                >
+                  <item.icon className="w-5 h-5 mr-3" />
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+
+            {isAdmin && (
+              <>
+                <div className="border-t border-gray-200 px-3 py-3">
+                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Administration
+                  </div>
+                </div>
+                <div className="px-3 pb-3 space-y-1">
+                  {adminNavigation.map((item) => {
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={clsx(
+                          'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                          isActive
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        )}
+                      >
+                        <item.icon className="w-5 h-5 mr-3" />
+                        {item.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+        </div>
+      )}
     </nav>
   );
 };

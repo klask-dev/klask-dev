@@ -67,13 +67,7 @@ pub struct UserInfo {
 
 impl From<User> for UserInfo {
     fn from(user: User) -> Self {
-        Self {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-            active: user.active,
-        }
+        Self { id: user.id, username: user.username, email: user.email, role: user.role, active: user.active }
     }
 }
 
@@ -110,12 +104,14 @@ async fn login(
     }
 
     // Verify password
-    let is_valid = verify_password(&req.password, &user.password_hash)
-        .map_err(|_| AuthError::InvalidCredentials)?;
+    let is_valid = verify_password(&req.password, &user.password_hash).map_err(|_| AuthError::InvalidCredentials)?;
 
     if !is_valid {
         return Err(AuthError::InvalidCredentials);
     }
+
+    // Update last_login and last_activity timestamps
+    let user = user_repo.update_last_login(user.id).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
     // Generate JWT token
     let token = app_state
@@ -123,10 +119,7 @@ async fn login(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse {
-        token,
-        user: UserInfo::from(user),
-    }))
+    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
 }
 
 async fn register(
@@ -139,22 +132,12 @@ async fn register(
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
     // Check if username already exists
-    if user_repo
-        .find_by_username(&req.username)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
-        .is_some()
-    {
+    if user_repo.find_by_username(&req.username).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?.is_some() {
         return Err(AuthError::UsernameExists);
     }
 
     // Check if email already exists
-    if user_repo
-        .find_by_email(&req.email)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
-        .is_some()
-    {
+    if user_repo.find_by_email(&req.email).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?.is_some() {
         return Err(AuthError::EmailExists);
     }
 
@@ -171,12 +154,11 @@ async fn register(
         active: true,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
+        last_login: None,
+        last_activity: None,
     };
 
-    let user = user_repo
-        .create_user(&new_user)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    let user = user_repo.create_user(&new_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
     // Generate JWT token
     let token = app_state
@@ -184,29 +166,19 @@ async fn register(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse {
-        token,
-        user: UserInfo::from(user),
-    }))
+    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
 }
 
 async fn get_profile(auth_user: AuthenticatedUser) -> Result<Json<UserInfo>, AuthError> {
     Ok(Json(UserInfo::from(auth_user.user)))
 }
 
-async fn check_setup(
-    State(app_state): State<AppState>,
-) -> Result<Json<SetupCheckResponse>, AuthError> {
+async fn check_setup(State(app_state): State<AppState>) -> Result<Json<SetupCheckResponse>, AuthError> {
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
-    let user_count = user_repo
-        .count_users()
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    let user_count = user_repo.count_users().await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
-    Ok(Json(SetupCheckResponse {
-        needs_setup: user_count == 0,
-    }))
+    Ok(Json(SetupCheckResponse { needs_setup: user_count == 0 }))
 }
 
 async fn initial_setup(
@@ -219,10 +191,7 @@ async fn initial_setup(
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
     // Check if any users exist
-    let user_count = user_repo
-        .count_users()
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    let user_count = user_repo.count_users().await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
     if user_count > 0 {
         return Err(AuthError::Forbidden("Setup already completed".to_string()));
@@ -241,12 +210,11 @@ async fn initial_setup(
         active: true,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
+        last_login: None,
+        last_activity: None,
     };
 
-    let user = user_repo
-        .create_user(&admin_user)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    let user = user_repo.create_user(&admin_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
     // Generate JWT token
     let token = app_state
@@ -254,10 +222,7 @@ async fn initial_setup(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse {
-        token,
-        user: UserInfo::from(user),
-    }))
+    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
 }
 
 fn hash_password(password: &str) -> Result<String> {
@@ -271,10 +236,7 @@ fn hash_password(password: &str) -> Result<String> {
 }
 
 fn verify_password(password: &str, hash: &str) -> Result<bool> {
-    let parsed_hash = PasswordHash::new(hash)
-        .map_err(|e| anyhow::anyhow!("Password hash parsing failed: {}", e))?;
+    let parsed_hash = PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Password hash parsing failed: {}", e))?;
     let argon2 = Argon2::default();
-    Ok(argon2
-        .verify_password(password.as_bytes(), &parsed_hash)
-        .is_ok())
+    Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())
 }

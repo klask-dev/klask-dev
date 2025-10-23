@@ -33,16 +33,13 @@ export const SelectableRepositoryCard: React.FC<SelectableRepositoryCardProps> =
   className = '',
 }) => {
   return (
-    <div className={clsx('group relative', className)}>
-      {/* Selection overlay */}
-      <div
-        className={clsx(
-          'absolute inset-0 rounded-lg transition-all duration-200 pointer-events-none',
-          selected 
-            ? 'bg-blue-50 border-2 border-blue-200 shadow-lg' 
-            : 'border-2 border-transparent group-hover:border-gray-200'
-        )}
-      />
+    <div className={clsx(
+      'group relative rounded-lg',
+      selected ? 'ring-2 ring-blue-200 bg-blue-50 shadow-lg transform translate-y-0.5' : '',
+      'transition-all duration-200',
+      className
+    )}
+    style={{ isolation: 'isolate' }}>
       
       {/* Simple checkbox */}
       <div className="absolute top-3 left-3 z-20">
@@ -64,11 +61,8 @@ export const SelectableRepositoryCard: React.FC<SelectableRepositoryCardProps> =
       </div>
 
       {/* Repository card */}
-      <div 
-        className={clsx(
-          'transition-all duration-200',
-          selected && 'transform translate-y-0.5'
-        )}
+      <div
+        className="transition-all duration-200"
         onClick={(e) => {
           // Check if clicked element is interactive
           const target = e.target as HTMLElement;

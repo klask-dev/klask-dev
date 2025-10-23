@@ -12,7 +12,7 @@ Le workflow Helm génère automatiquement des versions selon le contexte.
 # PR #123 → Chart version: 0.1.0-pr123
 
 gh pr create
-# → oci://ghcr.io/klask-io/klask:0.1.0-pr123
+# → oci://ghcr.io/klask-dev/klask:0.1.0-pr123
 ```
 
 ### **Push sur main/master**
@@ -21,7 +21,7 @@ gh pr create
 # Main → Chart version: 0.1.0 (stable)
 
 git push origin main
-# → oci://ghcr.io/klask-io/klask:0.1.0
+# → oci://ghcr.io/klask-dev/klask:0.1.0
 ```
 
 ### **Tags de version**
@@ -30,13 +30,13 @@ git push origin main
 
 git tag v1.2.3
 git push origin v1.2.3
-# → oci://ghcr.io/klask-io/klask:1.2.3
+# → oci://ghcr.io/klask-dev/klask:1.2.3
 ```
 
 ### **Déclenchement manuel**
 ```bash
 # Via GitHub Actions interface
-# → oci://ghcr.io/klask-io/klask:0.1.0-dev
+# → oci://ghcr.io/klask-dev/klask:0.1.0-dev
 ```
 
 ## 🔧 **Logique de versioning**
@@ -60,19 +60,19 @@ version: 0.1.0
 ### **Tester votre PR**
 ```bash
 # Après création de PR #123
-helm install test-pr oci://ghcr.io/klask-io/klask:0.1.0-pr123
+helm install test-pr oci://ghcr.io/klask-dev/klask:0.1.0-pr123
 ```
 
 ### **Déploiement staging**
 ```bash
 # Dernière version stable de main
-helm install staging oci://ghcr.io/klask-io/klask:0.1.0
+helm install staging oci://ghcr.io/klask-dev/klask:0.1.0
 ```
 
 ### **Déploiement production**
 ```bash
 # Version release spécifique
-helm install prod oci://ghcr.io/klask-io/klask:1.2.3
+helm install prod oci://ghcr.io/klask-dev/klask:1.2.3
 ```
 
 ### **Développement local**
@@ -115,17 +115,17 @@ git push origin v0.2.0
 ```bash
 # Via GHCR API
 curl -H "Authorization: Bearer $GITHUB_TOKEN" \
-  https://ghcr.io/v2/klask-io/klask/tags/list
+  https://ghcr.io/v2/klask-dev/klask/tags/list
 ```
 
 ### **Voir les détails d'une version**
 ```bash
-helm show chart oci://ghcr.io/klask-io/klask:0.1.0-pr123
+helm show chart oci://ghcr.io/klask-dev/klask:0.1.0-pr123
 ```
 
 ### **Télécharger un chart**
 ```bash
-helm pull oci://ghcr.io/klask-io/klask:0.1.0-pr123
+helm pull oci://ghcr.io/klask-dev/klask:0.1.0-pr123
 ```
 
 ### **Déclenchement manuel du workflow Helm**
@@ -152,7 +152,7 @@ helm pull oci://ghcr.io/klask-io/klask:0.1.0-pr123
 ### **Tests de charts**
 ```bash
 # Toujours tester le chart de votre PR avant merge
-helm install test-pr oci://ghcr.io/klask-io/klask:0.1.0-pr123
+helm install test-pr oci://ghcr.io/klask-dev/klask:0.1.0-pr123
 
 # Vérifier que ça fonctionne
 kubectl get pods

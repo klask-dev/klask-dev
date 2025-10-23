@@ -41,31 +41,16 @@ impl IntoResponse for AuthError {
                 StatusCode::UNAUTHORIZED,
                 "Missing or invalid authorization header".to_string(),
             ),
-            AuthError::InvalidToken(_) | AuthError::TokenExpired => (
-                StatusCode::UNAUTHORIZED,
-                "Invalid or expired token".to_string(),
-            ),
-            AuthError::InvalidCredentials => (
-                StatusCode::UNAUTHORIZED,
-                "Invalid username or password".to_string(),
-            ),
-            AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "User not found".to_string()),
-            AuthError::UserInactive => (
-                StatusCode::UNAUTHORIZED,
-                "User account is inactive".to_string(),
-            ),
-            AuthError::InsufficientPermissions => (
-                StatusCode::FORBIDDEN,
-                "Insufficient permissions".to_string(),
-            ),
-            AuthError::UsernameExists => {
-                (StatusCode::CONFLICT, "Username already exists".to_string())
+            AuthError::InvalidToken(_) | AuthError::TokenExpired => {
+                (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string())
             }
+            AuthError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "Invalid username or password".to_string()),
+            AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "User not found".to_string()),
+            AuthError::UserInactive => (StatusCode::UNAUTHORIZED, "User account is inactive".to_string()),
+            AuthError::InsufficientPermissions => (StatusCode::FORBIDDEN, "Insufficient permissions".to_string()),
+            AuthError::UsernameExists => (StatusCode::CONFLICT, "Username already exists".to_string()),
             AuthError::EmailExists => (StatusCode::CONFLICT, "Email already exists".to_string()),
-            AuthError::DatabaseError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error".to_string(),
-            ),
+            AuthError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
             AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
         };
 

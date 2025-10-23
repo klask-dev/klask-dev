@@ -67,10 +67,6 @@ jobs:
     # Deploy with Helm
     - name: Deploy with Helm
       run: |
-        # Add Bitnami repo for PostgreSQL (or skip if using external DB)
-        helm repo add bitnami https://charts.bitnami.com/bitnami
-        helm repo update
-        
         # Deploy or upgrade
         helm upgrade --install klask ./helm/klask \
           --set backend.image.repository=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME_BACKEND }} \

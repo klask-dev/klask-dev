@@ -92,10 +92,7 @@ async fn test_search_stats_structure() -> Result<()> {
         "search_performance_ms": 25_u32
     });
 
-    assert_eq!(
-        search_stats["total_indexed_documents"].as_u64().unwrap(),
-        95
-    );
+    assert_eq!(search_stats["total_indexed_documents"].as_u64().unwrap(), 95);
     assert_eq!(search_stats["index_size_bytes"].as_u64().unwrap(), 524288);
     assert!(search_stats["last_index_update"].is_string());
     assert!(search_stats["search_performance_ms"].as_u64().is_some());
@@ -181,20 +178,13 @@ async fn test_dashboard_data_structure() -> Result<()> {
     assert!(dashboard_data["search"].is_object());
 
     // Verify system stats
-    assert!(dashboard_data["system"]["uptime_seconds"]
-        .as_u64()
-        .is_some());
+    assert!(dashboard_data["system"]["uptime_seconds"].as_u64().is_some());
 
     // Verify user stats
     assert!(dashboard_data["users"]["total_users"].as_i64().unwrap() >= 0);
 
     // Verify repository stats
-    assert!(
-        dashboard_data["repositories"]["total_repositories"]
-            .as_i64()
-            .unwrap()
-            >= 0
-    );
+    assert!(dashboard_data["repositories"]["total_repositories"].as_i64().unwrap() >= 0);
 
     println!("✅ Complete dashboard data structure test passed!");
     Ok(())
@@ -210,14 +200,8 @@ async fn test_error_response_structure() -> Result<()> {
         "timestamp": "2024-01-15T10:30:00Z"
     });
 
-    assert_eq!(
-        error_response["error"].as_str().unwrap(),
-        "Insufficient permissions"
-    );
-    assert_eq!(
-        error_response["code"].as_str().unwrap(),
-        "INSUFFICIENT_PERMISSIONS"
-    );
+    assert_eq!(error_response["error"].as_str().unwrap(), "Insufficient permissions");
+    assert_eq!(error_response["code"].as_str().unwrap(), "INSUFFICIENT_PERMISSIONS");
     assert!(error_response["message"].is_string());
     assert!(error_response["timestamp"].is_string());
 

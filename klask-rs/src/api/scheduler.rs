@@ -40,27 +40,25 @@ async fn get_scheduler_status(
     _admin_user: AdminUser, // Require admin authentication
 ) -> Result<Json<SchedulerStatusResponse>, StatusCode> {
     match &app_state.scheduler_service {
-        Some(scheduler_service) => match scheduler_service.get_status().await {
-            Ok(status) => {
-                let response = SchedulerStatusResponse {
-                    is_running: status.is_running,
-                    scheduled_repositories_count: status.scheduled_repositories_count,
-                    auto_crawl_enabled_count: status.auto_crawl_enabled_count,
-                    next_runs: status
-                        .next_runs
-                        .into_iter()
-                        .map(|run| NextScheduledRunResponse {
-                            repository_id: run.repository_id,
-                            repository_name: run.repository_name,
-                            next_run_at: run.next_run_at,
-                            schedule_expression: run.schedule_expression,
-                        })
-                        .collect(),
-                };
-                Ok(Json(response))
-            }
-            Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-        },
+        Some(scheduler_service) => {
+            let status = scheduler_service.get_status().await;
+            let response = SchedulerStatusResponse {
+                is_running: status.is_running,
+                scheduled_repositories_count: status.scheduled_repositories_count,
+                auto_crawl_enabled_count: status.auto_crawl_enabled_count,
+                next_runs: status
+                    .next_runs
+                    .into_iter()
+                    .map(|run| NextScheduledRunResponse {
+                        repository_id: run.repository_id,
+                        repository_name: run.repository_name,
+                        next_run_at: Some(run.next_run_at),
+                        schedule_expression: Some(run.schedule_expression),
+                    })
+                    .collect(),
+            };
+            Ok(Json(response))
+        }
         None => {
             // Scheduler service not available
             let response = SchedulerStatusResponse {

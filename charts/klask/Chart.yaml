@@ -1,12 +1,12 @@
 apiVersion: v2
 name: klask
-description: A Helm chart for Klask - Modern code search engine
+description: A Helm chart for Klask - Modern code search engine written in Rust
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "0.1.0"
-home: https://github.com/klask-io/klask-io
+home: https://github.com/klask-dev/klask-dev
 sources:
-  - https://github.com/klask-io/klask-io
+  - https://github.com/klask-dev/klask-dev
 maintainers:
   - name: Klask Team
 keywords:
@@ -14,8 +14,4 @@ keywords:
   - code
   - rust
   - react
-dependencies:
-  - name: postgresql
-    version: "~15.5.0"
-    repository: "https://charts.bitnami.com/bitnami"
-    condition: postgresql.enabled
+  - postgresql

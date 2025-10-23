@@ -1,4 +1,4 @@
-import { formatDistanceToNow as fnsFormatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow as fnsFormatDistanceToNow, format, parseISO } from 'date-fns';
 import {
   DocumentIcon,
   DocumentTextIcon,
@@ -27,6 +27,51 @@ export const formatDistanceToNow = (date: string | Date): string => {
     return fnsFormatDistanceToNow(new Date(date), { addSuffix: true });
   } catch {
     return 'Unknown time';
+  }
+};
+
+// Format datetime with both date and time using browser's locale
+// Backend sends UTC, browser automatically converts to local timezone
+export const formatDateTime = (
+  dateString: string | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string => {
+  if (!dateString) return '-';
+
+  try {
+    const date = parseISO(dateString);
+    const defaultOptions: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      ...options,
+    };
+    return date.toLocaleString(undefined, defaultOptions);
+  } catch {
+    return 'Invalid date';
+  }
+};
+
+// Format date only (no time) using browser's locale
+export const formatDate = (
+  dateString: string | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string => {
+  if (!dateString) return '-';
+
+  try {
+    const date = parseISO(dateString);
+    const defaultOptions: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      ...options,
+    };
+    return date.toLocaleDateString(undefined, defaultOptions);
+  } catch {
+    return 'Invalid date';
   }
 };
 

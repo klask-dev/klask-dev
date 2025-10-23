@@ -1,8 +1,7 @@
 use axum::http::StatusCode;
 use axum_test::TestServer;
 use klask_rs::services::{
-    crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
-    SearchService,
+    crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker, SearchService,
 };
 use klask_rs::{
     api,
@@ -25,28 +24,18 @@ async fn create_test_app_state() -> AppState {
 
     // Create test search service
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let search_service =
-        SearchService::new(temp_dir.path()).expect("Failed to create search service");
+    let search_service = SearchService::new(temp_dir.path()).expect("Failed to create search service");
 
     // Create test config
     let config = AppConfig {
-        server: klask_rs::config::ServerConfig {
-            host: "127.0.0.1".to_string(),
-            port: 3000,
-        },
+        server: klask_rs::config::ServerConfig { host: "127.0.0.1".to_string(), port: 3000 },
         database: klask_rs::config::DatabaseConfig {
             url: "postgres://test:test@localhost:9999/test".to_string(),
             max_connections: 1,
         },
-        search: klask_rs::config::SearchConfig {
-            index_dir: "./test_index".to_string(),
-            max_results: 1000,
-        },
+        search: klask_rs::config::SearchConfig { index_dir: "./test_index".to_string(), max_results: 1000 },
         crawler: klask_rs::config::CrawlerConfig {
-            temp_dir: std::env::temp_dir()
-                .join("klask-crawler-test")
-                .to_string_lossy()
-                .to_string(),
+            temp_dir: std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
         },
         auth: klask_rs::config::AuthConfig {
             jwt_secret: "test-secret-key-for-jwt-authentication".to_string(),
@@ -64,8 +53,7 @@ async fn create_test_app_state() -> AppState {
     let progress_tracker = Arc::new(ProgressTracker::new());
 
     // Create encryption service for tests
-    let encryption_service =
-        Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap());
+    let encryption_service = Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap());
 
     // Create crawler service
     let crawler_service = Arc::new(
@@ -74,10 +62,7 @@ async fn create_test_app_state() -> AppState {
             shared_search_service.clone(),
             progress_tracker.clone(),
             encryption_service,
-            std::env::temp_dir()
-                .join("klask-crawler-test")
-                .to_string_lossy()
-                .to_string(),
+            std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
         )
         .expect("Failed to create crawler service"),
     );
@@ -92,9 +77,7 @@ async fn create_test_app_state() -> AppState {
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time: Instant::now(),
-        encryption_service: Arc::new(
-            EncryptionService::new("test-encryption-key-32bytes").unwrap(),
-        ),
+        encryption_service: Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap()),
     }
 }
 
@@ -102,9 +85,7 @@ async fn create_test_app_state() -> AppState {
 async fn test_auth_endpoints_exist() {
     // Skip this test if database is not available
     if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(create_test_app_state())
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state())
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
@@ -132,9 +113,7 @@ async fn test_auth_endpoints_exist() {
 async fn test_register_validation() {
     // Skip this test if database is not available
     if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(create_test_app_state())
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state())
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
@@ -147,10 +126,7 @@ async fn test_register_validation() {
             "password": "123" // too short
         });
 
-        let response = server
-            .post("/api/auth/register")
-            .json(&invalid_register)
-            .await;
+        let response = server.post("/api/auth/register").json(&invalid_register).await;
 
         // Should reject invalid data
         assert!(response.status_code().is_client_error());
@@ -163,9 +139,7 @@ async fn test_register_validation() {
 async fn test_login_without_credentials() {
     // Skip this test if database is not available
     if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(create_test_app_state())
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state())
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
@@ -185,9 +159,7 @@ async fn test_login_without_credentials() {
 async fn test_protected_routes_require_auth() {
     // Skip this test if database is not available
     if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(create_test_app_state())
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state())
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
@@ -216,10 +188,8 @@ async fn test_protected_routes_require_auth() {
 #[tokio::test]
 async fn test_jwt_token_creation() {
     // Test JWT service functionality independently
-    let config = klask_rs::config::AuthConfig {
-        jwt_secret: "test-secret-key".to_string(),
-        jwt_expires_in: "1h".to_string(),
-    };
+    let config =
+        klask_rs::config::AuthConfig { jwt_secret: "test-secret-key".to_string(), jwt_expires_in: "1h".to_string() };
 
     let jwt_service = JwtService::new(&config).expect("Failed to create JWT service");
 
@@ -228,16 +198,13 @@ async fn test_jwt_token_creation() {
     let role = "User".to_string();
 
     // Test token creation
-    let token = jwt_service
-        .create_token_for_user(user_id, username.clone(), role.clone())
-        .expect("Failed to create token");
+    let token =
+        jwt_service.create_token_for_user(user_id, username.clone(), role.clone()).expect("Failed to create token");
 
     assert!(!token.is_empty());
 
     // Test token decoding
-    let decoded_claims = jwt_service
-        .decode_token(&token)
-        .expect("Failed to decode token");
+    let decoded_claims = jwt_service.decode_token(&token).expect("Failed to decode token");
 
     assert_eq!(decoded_claims.sub, user_id);
     assert_eq!(decoded_claims.username, username);
@@ -249,9 +216,7 @@ async fn test_jwt_token_creation() {
 async fn test_public_endpoints_work_without_auth() {
     // Skip this test if database is not available
     if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(create_test_app_state())
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state())
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);

@@ -3,7 +3,8 @@ use crate::database::Database;
 use crate::models::user::{User, UserRole};
 use crate::repositories::user_repository::UserRepository;
 use crate::services::{encryption::EncryptionService, progress::ProgressTracker};
-use axum::{async_trait, extract::FromRequestParts, http::request::Parts};
+use axum::extract::FromRequestParts;
+use axum::http::request::Parts;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -35,71 +36,12 @@ pub struct AuthenticatedUser {
     pub claims: TokenClaims,
 }
 
-#[async_trait]
 impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AuthError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        debug!("Extracting AuthenticatedUser from request");
-        // Extract app state
-        let app_state = state;
-
-        // Extract token from Authorization header
-        let token = match extract_token_from_header(parts) {
-            Ok(t) => {
-                debug!("Token extracted from header");
-                t
-            }
-            Err(e) => {
-                debug!("Failed to extract token: {:?}", e);
-                return Err(e);
-            }
-        };
-
-        // Decode and validate token
-        let claims = app_state.jwt_service.decode_token(&token).map_err(|e| {
-            error!("Failed to decode token: {:?}", e);
-            AuthError::InvalidToken(e.to_string())
-        })?;
-
-        debug!("Token decoded successfully for user ID: {}", claims.sub);
-
-        // Check if token is expired
-        if claims.is_expired() {
-            warn!("Token expired for user ID: {}", claims.sub);
-            return Err(AuthError::TokenExpired);
-        }
-
-        // Fetch user from database
-        let user_repo = UserRepository::new(app_state.database.pool().clone());
-        let user = user_repo
-            .get_user(claims.sub)
-            .await
-            .map_err(|e| {
-                error!("Database error while fetching user {}: {:?}", claims.sub, e);
-                AuthError::DatabaseError(e.to_string())
-            })?
-            .ok_or_else(|| {
-                warn!("User not found for ID: {}", claims.sub);
-                AuthError::UserNotFound
-            })?;
-
-        debug!("User found: {}", user.username);
-
-        // Verify user is active
-        if !user.active {
-            warn!("Inactive user attempted to authenticate: {}", user.username);
-            return Err(AuthError::UserInactive);
-        }
-
-        debug!(
-            "AuthenticatedUser extracted successfully: {}",
-            user.username
-        );
-        Ok(AuthenticatedUser { user, claims })
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        let token = extract_token_from_auth_header(&parts.headers)?;
+        extract_authenticated_user(state, &token).await
     }
 }
 
@@ -107,26 +49,14 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 #[derive(Debug, Clone)]
 pub struct AdminUser(pub AuthenticatedUser);
 
-#[async_trait]
 impl FromRequestParts<AppState> for AdminUser {
     type Rejection = AuthError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         debug!("Attempting to extract AdminUser from request");
 
-        let auth_user = match AuthenticatedUser::from_request_parts(parts, state).await {
-            Ok(user) => {
-                debug!("Authenticated user extracted: {:?}", user.user.username);
-                user
-            }
-            Err(e) => {
-                error!("Failed to extract authenticated user: {:?}", e);
-                return Err(e);
-            }
-        };
+        let token = extract_token_from_auth_header(&parts.headers)?;
+        let auth_user = extract_authenticated_user(state, &token).await?;
 
         if auth_user.user.role != UserRole::Admin {
             warn!(
@@ -136,10 +66,7 @@ impl FromRequestParts<AppState> for AdminUser {
             return Err(AuthError::InsufficientPermissions);
         }
 
-        debug!(
-            "AdminUser extracted successfully for user: {}",
-            auth_user.user.username
-        );
+        debug!("AdminUser extracted successfully for user: {}", auth_user.user.username);
         Ok(AdminUser(auth_user))
     }
 }
@@ -148,24 +75,24 @@ impl FromRequestParts<AppState> for AdminUser {
 #[allow(dead_code)]
 pub struct OptionalUser(pub Option<AuthenticatedUser>);
 
-#[async_trait]
 impl FromRequestParts<AppState> for OptionalUser {
     type Rejection = std::convert::Infallible;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        match AuthenticatedUser::from_request_parts(parts, state).await {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        let token = match extract_token_from_auth_header(&parts.headers) {
+            Ok(t) => t,
+            Err(_) => return Ok(OptionalUser(None)),
+        };
+
+        match extract_authenticated_user(state, &token).await {
             Ok(user) => Ok(OptionalUser(Some(user))),
             Err(_) => Ok(OptionalUser(None)),
         }
     }
 }
 
-fn extract_token_from_header(parts: &Parts) -> Result<String, AuthError> {
-    let auth_header = parts
-        .headers
+fn extract_token_from_auth_header(headers: &axum::http::HeaderMap) -> Result<String, AuthError> {
+    let auth_header = headers
         .get("authorization")
         .ok_or(AuthError::MissingAuthHeader)?
         .to_str()
@@ -176,4 +103,48 @@ fn extract_token_from_header(parts: &Parts) -> Result<String, AuthError> {
     } else {
         Err(AuthError::InvalidAuthHeader)
     }
+}
+
+/// Helper function to extract and validate an authenticated user from a token
+async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<AuthenticatedUser, AuthError> {
+    debug!("Extracting AuthenticatedUser from request");
+
+    // Decode and validate token
+    let claims = state.jwt_service.decode_token(token).map_err(|e| {
+        error!("Failed to decode token: {:?}", e);
+        AuthError::InvalidToken(e.to_string())
+    })?;
+
+    debug!("Token decoded successfully for user ID: {}", claims.sub);
+
+    // Check if token is expired
+    if claims.is_expired() {
+        warn!("Token expired for user ID: {}", claims.sub);
+        return Err(AuthError::TokenExpired);
+    }
+
+    // Fetch user from database
+    let user_repo = UserRepository::new(state.database.pool().clone());
+    let user = user_repo
+        .get_user(claims.sub)
+        .await
+        .map_err(|e| {
+            error!("Database error while fetching user {}: {:?}", claims.sub, e);
+            AuthError::DatabaseError(e.to_string())
+        })?
+        .ok_or_else(|| {
+            warn!("User not found for ID: {}", claims.sub);
+            AuthError::UserNotFound
+        })?;
+
+    debug!("User found: {}", user.username);
+
+    // Verify user is active
+    if !user.active {
+        warn!("Inactive user attempted to authenticate: {}", user.username);
+        return Err(AuthError::UserInactive);
+    }
+
+    debug!("AuthenticatedUser extracted successfully: {}", user.username);
+    Ok(AuthenticatedUser { user, claims })
 }

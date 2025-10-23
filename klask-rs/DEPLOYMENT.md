@@ -13,7 +13,7 @@ This guide explains how to deploy Klask using Docker for production environments
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/klask-io/klask-rs.git
+   git clone https://github.com/klask-dev/klask-rs.git
    cd klask-rs
    ```
 
@@ -174,7 +174,7 @@ docker-compose exec postgres psql -U klask -d klask_rs
 
 # Or use pgAdmin web interface
 # Navigate to http://localhost:8080
-# Login with admin@klask.io / admin
+# Login with admin@klask.dev / admin
 ```
 
 ### Backup and Restore

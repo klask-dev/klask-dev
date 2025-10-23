@@ -16,27 +16,15 @@ async fn test_crawler_service_initialization() -> Result<()> {
     });
 
     assert!(initialization_params["search_index_path"].is_string());
-    assert_eq!(
-        initialization_params["max_file_size_mb"].as_u64().unwrap(),
-        100
-    );
+    assert_eq!(initialization_params["max_file_size_mb"].as_u64().unwrap(), 100);
     assert!(initialization_params["supported_extensions"].is_array());
+    assert_eq!(initialization_params["concurrent_workers"].as_u64().unwrap(), 4);
     assert_eq!(
-        initialization_params["concurrent_workers"]
-            .as_u64()
-            .unwrap(),
-        4
-    );
-    assert_eq!(
-        initialization_params["progress_reporting_interval_ms"]
-            .as_u64()
-            .unwrap(),
+        initialization_params["progress_reporting_interval_ms"].as_u64().unwrap(),
         1000
     );
 
-    let extensions = initialization_params["supported_extensions"]
-        .as_array()
-        .unwrap();
+    let extensions = initialization_params["supported_extensions"].as_array().unwrap();
     assert!(!extensions.is_empty());
     assert!(extensions.iter().all(|ext| ext.is_string()));
 
@@ -225,10 +213,7 @@ async fn test_file_processing_and_indexing() -> Result<()> {
     assert_eq!(metrics["errors_encountered"].as_u64().unwrap(), 5);
 
     // Validate pipeline logic (each stage should have fewer or equal files than previous)
-    assert!(
-        metrics["files_filtered"].as_u64().unwrap()
-            <= metrics["files_discovered"].as_u64().unwrap()
-    );
+    assert!(metrics["files_filtered"].as_u64().unwrap() <= metrics["files_discovered"].as_u64().unwrap());
     assert!(metrics["files_read"].as_u64().unwrap() <= metrics["files_filtered"].as_u64().unwrap());
     assert!(metrics["files_indexed"].as_u64().unwrap() <= metrics["files_read"].as_u64().unwrap());
 

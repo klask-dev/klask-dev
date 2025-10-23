@@ -1,0 +1,44 @@
+{{- if .Values.backend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "klask.fullname" . }}-backend
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+data:
+  RUST_LOG: {{ .Values.backend.config.rustLog | quote }}
+  SERVER_PORT: {{ .Values.backend.service.targetPort | quote }}
+  {{- if .Values.backend.config.logFormat }}
+  LOG_FORMAT: {{ .Values.backend.config.logFormat | quote }}
+  {{- end }}
+  {{- if .Values.backend.config.gitlabAcceptInvalidCerts }}
+  KLASK_GITLAB_ACCEPT_INVALID_CERTS: {{ .Values.backend.config.gitlabAcceptInvalidCerts | quote }}
+  {{- end }}
+  {{- range $key, $value := .Values.backend.config.extra }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+
+  entrypoint-wrapper.sh: |
+    #!/bin/sh
+    set -e
+
+    echo "[wrapper] 🚀 Starting Klask backend wrapper..."
+
+    # Build DATABASE_URL from environment variables if not already set
+    if [ -z "$DATABASE_URL" ] && [ -n "$DB_PASSWORD" ]; then
+      export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      echo "[wrapper] ✅ DATABASE_URL constructed from environment variables"
+    fi
+
+    # Si on est déjà l'utilisateur klask (UID 1000), on skip le switch
+    if [ "$(id -u)" = "1000" ]; then
+      echo "[wrapper] ✅ Already running as user klask (UID 1000)"
+      # Exécuter directement le binaire backend
+      exec /app/klask-rs
+    else
+      echo "[wrapper] ⚠️  Running as root, delegating to original entrypoint"
+      # Sinon, appeler l'entrypoint original
+      exec /entrypoint.sh "$@"
+    fi
+{{- end }}

@@ -1,11 +1,11 @@
 import React from 'react';
-import { 
-  DocumentTextIcon, 
+import {
+  DocumentTextIcon,
   FolderIcon,
-  ChevronRightIcon,
   EyeIcon,
-  ArrowTopRightOnSquareIcon 
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
+import { RepositoryBadge } from '../ui/RepositoryBadge';
 import type { SearchResult as SearchResultType } from '../../types';
 
 interface SearchResultProps {
@@ -98,7 +98,14 @@ export const SearchResult: React.FC<SearchResultProps> = ({
         </div>
         
         {/* Metadata row */}
-        <div className="mt-2.5 flex items-center space-x-3 text-xs text-gray-500">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-500">
+          {result.repository_name && (
+            <RepositoryBadge
+              name={result.repository_name}
+              size="sm"
+              clickable={false}
+            />
+          )}
           <span className="inline-flex items-center">
             <span className="font-medium text-gray-600">Project:</span>
             <span className="ml-1">{result.project || 'Unknown'}</span>
@@ -124,19 +131,40 @@ export const SearchResult: React.FC<SearchResultProps> = ({
       <div className="p-4">
         <div className="relative">
           <div className="overflow-hidden rounded border border-gray-200">
-            <div 
+            <div
               className="p-3 bg-gray-50 text-sm font-mono overflow-auto"
               style={{
                 maxHeight: '200px',
                 lineHeight: '1.5',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
               dangerouslySetInnerHTML={{
-                __html: (result.content_snippet || 'No content preview available')
-                  .replace(/&/g, '&amp;')
-                  .replace(/</g, '&lt;')
-                  .replace(/>/g, '&gt;')
-                  .replace(/&lt;b&gt;/g, '<mark class="bg-yellow-200 font-semibold">')
-                  .replace(/&lt;\/b&gt;/g, '</mark>')
+                __html: (() => {
+                  // Tantivy sends HTML with entities encoded and <b> tags for highlighting
+                  // We need to:
+                  // 1. Decode HTML entities (safe because Tantivy already escaped them)
+                  // 2. Convert <b> tags to safe <mark> tags for highlighting
+                  const snippet = result.content_snippet || 'No content preview available';
+
+                  // Decode HTML entities
+                  const textarea = document.createElement('textarea');
+                  textarea.innerHTML = snippet;
+                  const decoded = textarea.value;
+
+                  // Now re-encode for safe insertion, except for our <b> tags
+                  let html = decoded
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+
+                  // Finally, convert <b> tags to safe highlight marks
+                  html = html
+                    .replace(/&lt;b&gt;/g, '<mark class="bg-yellow-200 font-semibold">')
+                    .replace(/&lt;\/b&gt;/g, '</mark>');
+
+                  return html;
+                })()
               }}
             />
           </div>

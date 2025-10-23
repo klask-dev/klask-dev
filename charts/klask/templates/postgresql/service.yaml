@@ -1,0 +1,41 @@
+{{- if .Values.postgresql.enabled }}
+---
+# Headless service for StatefulSet DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "klask.postgresql.fullname" . }}-headless
+  labels:
+    {{- include "klask.postgresql.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: postgresql
+    port: 5432
+    targetPort: postgresql
+    protocol: TCP
+  selector:
+    {{- include "klask.postgresql.selectorLabels" . | nindent 4 }}
+---
+# Client service for backend connections
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "klask.postgresql.fullname" . }}
+  labels:
+    {{- include "klask.postgresql.labels" . | nindent 4 }}
+  {{- with .Values.postgresql.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+  - name: postgresql
+    port: 5432
+    targetPort: postgresql
+    protocol: TCP
+  selector:
+    {{- include "klask.postgresql.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -1,16 +1,16 @@
-# [![klask.io](https://raw.githubusercontent.com/klask-io/klask-io/master/src/main/webapp/content/images/logo-klask.png)](https://github.com/klask-io/klask-io)
+# [![klask.dev](https://raw.githubusercontent.com/klask-dev/klask-dev/refs/heads/upgrade-v2.1/resources/images/klask-dev-clean-v2.svg)](https://github.com/klask-dev/klask-dev)
 
 | Branch  | Build  | Coverage  |
 |---|---|---|
-| master  | [![CI/CD Pipeline](https://github.com/klask-io/klask-io/actions/workflows/ci.yml/badge.svg)](https://github.com/klask-io/klask-io/actions/workflows/ci.yml)  | [![Coverage Status](https://img.shields.io/coveralls/klask-io/klask-io/master.svg?style=flat-square)](https://coveralls.io/github/klask-io/klask-io?branch=master) |
-| develop  | [![Build Status](https://img.shields.io/travis/klask-io/klask-io/develop.svg?style=flat-square)](https://travis-ci.org/klask-io/klask-io)  | [![Coverage Status](https://img.shields.io/coveralls/klask-io/klask-io/develop.svg?style=flat-square)](https://coveralls.io/github/klask-io/klask-io?branch=develop) |
+| master  | [![CI/CD Pipeline](https://github.com/klask-dev/klask-dev/actions/workflows/ci.yml/badge.svg)](https://github.com/klask-dev/klask-dev/actions/workflows/ci.yml)  | [![Coverage Status](https://img.shields.io/coveralls/klask-dev/klask-dev/master.svg?style=flat-square)](https://coveralls.io/github/klask-dev/klask-dev?branch=master) |
+| develop  | [![Build Status](https://img.shields.io/travis/klask-dev/klask-dev/develop.svg?style=flat-square)](https://travis-ci.org/klask-dev/klask-dev)  | [![Coverage Status](https://img.shields.io/coveralls/klask-dev/klask-dev/develop.svg?style=flat-square)](https://coveralls.io/github/klask-dev/klask-dev?branch=develop) |
 
 #### Docker
-[![Docker Stars](https://img.shields.io/docker/stars/klask/klask.io.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.io/) [![Docker pulls](https://img.shields.io/docker/pulls/klask/klask.io.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.io/) [![Docker build](https://img.shields.io/docker/automated/klask/klask.io.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.io/builds/)
+[![Docker Stars](https://img.shields.io/docker/stars/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/) [![Docker pulls](https://img.shields.io/docker/pulls/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/) [![Docker build](https://img.shields.io/docker/automated/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/builds/)
 
 
-## What is klask.io ?
-__klask.io__ is an open source search engine for source code. This application was generated using [JHipster](https://jhipster.github.io).
+## What is klask.dev ?
+__klask.dev__ is an open source search engine for source code. This application was generated using [JHipster](https://jhipster.github.io).
 
 ## 🦀 Modern Rust Version (rust-modernization branch)
 
@@ -40,12 +40,12 @@ git checkout rust-modernization
 - 🎨 Syntax Highlighting (planned)
 
 ### Live demo
-http://app.klask.io/
+http://app.klask.dev/
 
 ### How to run it ?
 You can run an instance easily by pulling the docker image and execute by following :
 
-    docker run klask/klask.io
+    docker run klask/klask.dev
 
 #### docker-compose
 an example of a docker-compose.yml :
@@ -54,7 +54,7 @@ an example of a docker-compose.yml :
 version: '2'
 services:
   klask-app:
-    image: klask/klask.io:latest
+    image: klask/klask.dev:latest
     ports:
       - 8080:8080
     volumes:
@@ -99,7 +99,7 @@ Add the `-h` flag on any command to see how you can use it. For example, `bower 
 
 ## Building for production
 
-To optimize the klask.io client for production, run:
+To optimize the klask.dev client for production, run:
 
     ./mvnw -Pprod clean package
 
@@ -135,9 +135,9 @@ Utiliser les fichiers docker-compose dans src/main/docker
 
 To setup this project in Jenkins, use the following configuration:
 
-* Project name: `klask.io`
+* Project name: `klask.dev`
 * Source Code Management
-    * Git Repository: `https://github.com/klask-io/klask-io.git`
+    * Git Repository: `https://github.com/klask-dev/klask-dev.git`
     * Branches to build: `*/master`
     * Additional Behaviours: `Wipe out repository & force clone`
 * Build Triggers

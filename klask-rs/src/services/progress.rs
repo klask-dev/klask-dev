@@ -77,12 +77,7 @@ impl CrawlProgressInfo {
         self.updated_at = Utc::now();
     }
 
-    pub fn update_progress(
-        &mut self,
-        files_processed: usize,
-        files_total: Option<usize>,
-        files_indexed: usize,
-    ) {
+    pub fn update_progress(&mut self, files_processed: usize, files_total: Option<usize>, files_indexed: usize) {
         self.files_processed = files_processed;
         self.files_total = files_total;
         self.files_indexed = files_indexed;
@@ -90,8 +85,7 @@ impl CrawlProgressInfo {
 
         if let Some(total) = files_total {
             if total > 0 {
-                self.progress_percentage =
-                    (files_processed as f32 / total as f32 * 100.0).min(100.0);
+                self.progress_percentage = (files_processed as f32 / total as f32 * 100.0).min(100.0);
             } else {
                 // When total is 0, percentage should be 0.0
                 self.progress_percentage = 0.0;
@@ -124,16 +118,10 @@ impl Default for ProgressTracker {
 
 impl ProgressTracker {
     pub fn new() -> Self {
-        Self {
-            progress_map: Arc::new(RwLock::new(HashMap::new())),
-        }
+        Self { progress_map: Arc::new(RwLock::new(HashMap::new())) }
     }
 
-    pub async fn start_crawl(
-        &self,
-        repository_id: Uuid,
-        repository_name: String,
-    ) -> CrawlProgressInfo {
+    pub async fn start_crawl(&self, repository_id: Uuid, repository_name: String) -> CrawlProgressInfo {
         let progress = CrawlProgressInfo::new(repository_id, repository_name);
         let mut map = self.progress_map.write().await;
         map.insert(repository_id, progress.clone());
@@ -212,9 +200,9 @@ impl ProgressTracker {
         map.retain(|_, progress| {
             // Keep active crawls and recent completed ones
             match progress.status {
-                CrawlStatus::Completed | CrawlStatus::Failed | CrawlStatus::Cancelled => progress
-                    .completed_at
-                    .is_none_or(|completed| completed > cutoff),
+                CrawlStatus::Completed | CrawlStatus::Failed | CrawlStatus::Cancelled => {
+                    progress.completed_at.is_none_or(|completed| completed > cutoff)
+                }
                 _ => true, // Keep all active crawls
             }
         });
@@ -262,11 +250,7 @@ impl ProgressTracker {
     }
 
     /// Update current GitLab project being processed
-    pub async fn set_current_gitlab_project(
-        &self,
-        repository_id: Uuid,
-        project_name: Option<String>,
-    ) {
+    pub async fn set_current_gitlab_project(&self, repository_id: Uuid, project_name: Option<String>) {
         let mut map = self.progress_map.write().await;
         if let Some(progress) = map.get_mut(&repository_id) {
             progress.current_project = project_name;

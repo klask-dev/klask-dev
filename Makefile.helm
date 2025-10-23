@@ -1,0 +1,78 @@
+# Makefile pour tester le Helm chart localement
+# Usage: make -f Makefile.helm <target>
+
+CHART_DIR = charts/klask
+RELEASE_NAME = klask-test
+NAMESPACE = default
+
+.PHONY: help lint template dry-run install uninstall package test-all
+
+help: ## Affiche cette aide
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+lint: ## Valide la syntaxe du chart
+	@echo "🔍 Validation de la syntaxe..."
+	helm lint $(CHART_DIR)
+
+template: dependencies ## Génère les templates sans installation
+	@echo "📋 Génération des templates..."
+	helm template $(RELEASE_NAME) $(CHART_DIR) --debug
+
+dry-run: dependencies ## Teste l'installation sans déployer
+	@echo "🧪 Test d'installation (dry-run)..."
+	helm install $(RELEASE_NAME) $(CHART_DIR) --dry-run --debug
+
+install: dependencies ## Installe le chart sur le cluster
+	@echo "🚀 Installation du chart..."
+	helm install $(RELEASE_NAME) $(CHART_DIR) --wait
+
+upgrade: dependencies ## Met à jour le chart installé
+	@echo "⬆️  Mise à jour du chart..."
+	helm upgrade $(RELEASE_NAME) $(CHART_DIR) --wait
+
+uninstall: ## Désinstalle le chart
+	@echo "🗑️  Désinstallation du chart..."
+	helm uninstall $(RELEASE_NAME)
+
+status: ## Affiche le statut du déploiement
+	@echo "📊 Statut du déploiement..."
+	helm status $(RELEASE_NAME)
+	kubectl get pods -l "app.kubernetes.io/instance=$(RELEASE_NAME)"
+
+logs: ## Affiche les logs des composants
+	@echo "📜 Logs backend:"
+	kubectl logs -l "app.kubernetes.io/instance=$(RELEASE_NAME),app.kubernetes.io/component=backend" --tail=20
+	@echo "📜 Logs frontend:"
+	kubectl logs -l "app.kubernetes.io/instance=$(RELEASE_NAME),app.kubernetes.io/component=frontend" --tail=20
+
+package: dependencies ## Package le chart en archive
+	@echo "📦 Packaging du chart..."
+	cd charts && helm package klask
+
+test-values: ## Teste avec différentes configurations
+	@echo "🧪 Test avec ingress activé..."
+	helm template test-ingress $(CHART_DIR) --set ingress.enabled=true --dry-run > /dev/null
+	@echo "✅ Ingress OK"
+	
+	@echo "🧪 Test avec PostgreSQL externe..."
+	helm template test-external-db $(CHART_DIR) --set postgresql.enabled=false --dry-run > /dev/null
+	@echo "✅ PostgreSQL externe OK"
+	
+	@echo "🧪 Test avec ressources personnalisées..."
+	helm template test-resources $(CHART_DIR) \
+		--set backend.resources.requests.cpu=200m \
+		--set frontend.resources.limits.memory=1Gi \
+		--dry-run > /dev/null
+	@echo "✅ Ressources personnalisées OK"
+
+test-all: lint template dry-run test-values package ## Lance tous les tests
+	@echo "🎉 Tous les tests sont passés !"
+
+# Tests avec clusters locaux
+kind-install: ## Installe sur cluster kind local
+	@echo "🐳 Installation sur kind..."
+	helm install $(RELEASE_NAME) $(CHART_DIR) --wait --timeout=10m
+
+minikube-install: ## Installe sur minikube local
+	@echo "☸️  Installation sur minikube..."
+	helm install $(RELEASE_NAME) $(CHART_DIR) --wait --timeout=10m

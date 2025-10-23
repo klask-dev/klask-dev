@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { 
-  XMarkIcon, 
-  UserIcon, 
+import {
+  XMarkIcon,
+  UserIcon,
   ShieldCheckIcon,
   EyeIcon,
-  EyeSlashIcon 
+  EyeSlashIcon
 } from '@heroicons/react/24/outline';
 import type { User, CreateUserRequest, UpdateUserRequest, UserRole } from '../../types';
 import { createUserSchema, updateUserFormSchema, type CreateUserForm, type UpdateUserFormData } from '../../lib/validations';
@@ -86,12 +86,12 @@ export const UserForm: React.FC<UserFormProps> = ({
       username: data.username?.trim(),
       email: data.email?.trim(),
     };
-    
+
     // Remove empty password for edit mode
     if (isEditing && 'password' in cleanedData && !cleanedData.password?.trim()) {
       delete cleanedData.password;
     }
-    
+
     onSubmit(cleanedData);
   };
 

@@ -1,8 +1,7 @@
 import React from 'react';
-import { 
-  ChartBarIcon, 
-  ServerIcon, 
-  UsersIcon, 
+import {
+  ServerIcon,
+  UsersIcon,
   FolderIcon,
   MagnifyingGlassIcon,
   DocumentDuplicateIcon,
@@ -11,7 +10,9 @@ import {
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { MetricCard } from '../../components/admin/MetricCard';
+import { RepositoryBadge } from '../../components/ui/RepositoryBadge';
 import { useAdminDashboard } from '../../hooks/useAdmin';
+import { formatDateTime } from '../../lib/utils';
 
 const AdminDashboard: React.FC = () => {
   const { data: dashboardData, isLoading, error, refetch } = useAdminDashboard();
@@ -26,13 +27,6 @@ const AdminDashboard: React.FC = () => {
       </div>
     );
   }
-
-  const formatBytes = (bytes: number) => {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Bytes';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-  };
 
   const formatUptime = (seconds: number) => {
     const days = Math.floor(seconds / (24 * 60 * 60));
@@ -163,14 +157,14 @@ const AdminDashboard: React.FC = () => {
                 description="Standard Git repositories"
                 color="green"
               />
-              
+
               <MetricCard
                 title="GitLab Repositories"
                 value={dashboardData?.repositories?.gitlab_repositories || 0}
                 description="GitLab hosted repositories"
                 color="blue"
               />
-              
+
               <MetricCard
                 title="File System"
                 value={dashboardData?.repositories?.filesystem_repositories || 0}
@@ -179,6 +173,78 @@ const AdminDashboard: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Search Index Metrics by Repository */}
+          {dashboardData?.search?.documents_by_repository && dashboardData.search.documents_by_repository.length > 0 && (
+            <div>
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Documents by Repository</h2>
+              <div className="bg-white shadow rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Repository
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Documents
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Percentage
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {dashboardData.search.documents_by_repository
+                        .sort((a, b) => b.document_count - a.document_count)
+                        .slice(0, 10)
+                        .map((repo, index) => {
+                          const percentage = dashboardData.search.total_documents > 0
+                            ? ((repo.document_count / dashboardData.search.total_documents) * 100).toFixed(1)
+                            : '0.0';
+                          return (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <RepositoryBadge
+                                  name={repo.repository_name}
+                                  type={repo.repository_type as 'Git' | 'GitLab' | 'GitHub' | 'FileSystem' | undefined}
+                                  size="sm"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {repo.repository_type || 'Unknown'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                                {repo.document_count.toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="w-20 bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className="bg-blue-600 h-2 rounded-full"
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                  <span className="w-12 text-right">{percentage}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+                {dashboardData.search.documents_by_repository.length > 10 && (
+                  <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-500 text-center">
+                    Showing top 10 of {dashboardData.search.documents_by_repository.length} repositories
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Recent Activity */}
           {dashboardData?.recent_activity && (
@@ -195,7 +261,9 @@ const AdminDashboard: React.FC = () => {
                           <p className="text-xs text-gray-500">{user.role}</p>
                         </div>
                         <div className="text-xs text-gray-400">
-                          {new Date(user.created_at).toLocaleDateString()}
+                          <time dateTime={user.last_seen}>
+                            {formatDateTime(user.last_seen)}
+                          </time>
                         </div>
                       </div>
                     ))
@@ -217,7 +285,9 @@ const AdminDashboard: React.FC = () => {
                           <p className="text-xs text-gray-500">{repo.repository_type}</p>
                         </div>
                         <div className="text-xs text-gray-400">
-                          {new Date(repo.created_at).toLocaleDateString()}
+                          <time dateTime={repo.created_at}>
+                            {formatDateTime(repo.created_at)}
+                          </time>
                         </div>
                       </div>
                     ))
@@ -239,7 +309,13 @@ const AdminDashboard: React.FC = () => {
                           <p className="text-xs text-gray-500">{crawl.status}</p>
                         </div>
                         <div className="text-xs text-gray-400">
-                          {crawl.last_crawled ? new Date(crawl.last_crawled).toLocaleDateString() : 'Never'}
+                          {crawl.last_crawled ? (
+                            <time dateTime={crawl.last_crawled}>
+                              {formatDateTime(crawl.last_crawled)}
+                            </time>
+                          ) : (
+                            'Never'
+                          )}
                         </div>
                       </div>
                     ))

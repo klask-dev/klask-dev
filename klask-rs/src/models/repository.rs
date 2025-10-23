@@ -43,6 +43,13 @@ pub struct Repository {
     pub gitlab_excluded_projects: Option<String>,
     #[serde(rename = "gitlabExcludedPatterns")]
     pub gitlab_excluded_patterns: Option<String>,
+    // GitHub fields
+    #[serde(rename = "githubNamespace")]
+    pub github_namespace: Option<String>,
+    #[serde(rename = "githubExcludedRepositories")]
+    pub github_excluded_repositories: Option<String>,
+    #[serde(rename = "githubExcludedPatterns")]
+    pub github_excluded_patterns: Option<String>,
     // Crash resumption fields
     #[serde(rename = "crawlState")]
     pub crawl_state: Option<String>, // "idle", "in_progress", "failed"
@@ -58,5 +65,6 @@ pub struct Repository {
 pub enum RepositoryType {
     Git,
     GitLab,
+    GitHub,
     FileSystem,
 }

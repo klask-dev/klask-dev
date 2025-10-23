@@ -1,0 +1,168 @@
+{{- if .Values.networkPolicy.enabled }}
+---
+# Backend NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "klask.fullname" . }}-backend
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "klask.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from frontend
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "klask.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: frontend
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.service.targetPort }}
+    {{- if .Values.ingress.enabled }}
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.namespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingress.podSelector }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.service.targetPort }}
+    {{- end }}
+  egress:
+    # Allow to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    {{- if .Values.networkPolicy.backend.allowExternal }}
+    # Allow external egress (for external APIs, etc.)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    {{- end }}
+---
+# Frontend NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "klask.fullname" . }}-frontend
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "klask.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- if .Values.ingress.enabled }}
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.namespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingress.podSelector }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.targetPort }}
+    {{- else }}
+    # Allow from all if no ingress (for development)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.targetPort }}
+    {{- end }}
+  egress:
+    # Allow to backend
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "klask.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: backend
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.service.targetPort }}
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+{{- if .Values.postgresql.enabled }}
+---
+# PostgreSQL NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "klask.fullname" . }}-postgresql
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from backend only
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "klask.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: backend
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+{{- end }}
+{{- end }}

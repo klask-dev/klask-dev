@@ -14,13 +14,7 @@ pub struct TokenClaims {
 impl TokenClaims {
     pub fn new(user_id: Uuid, username: String, role: String, expires_in: Duration) -> Self {
         let now = Utc::now();
-        Self {
-            sub: user_id,
-            username,
-            role,
-            exp: (now + expires_in).timestamp(),
-            iat: now.timestamp(),
-        }
+        Self { sub: user_id, username, role, exp: (now + expires_in).timestamp(), iat: now.timestamp() }
     }
 
     pub fn is_expired(&self) -> bool {

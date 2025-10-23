@@ -34,9 +34,7 @@ mod crawl_prevention_tests {
         let repo_name = "test-repo".to_string();
 
         tracker.start_crawl(repo_id, repo_name).await;
-        tracker
-            .update_status(repo_id, CrawlStatus::Processing)
-            .await;
+        tracker.update_status(repo_id, CrawlStatus::Processing).await;
 
         let is_crawling = tracker.is_crawling(repo_id).await;
         assert!(is_crawling);
@@ -155,8 +153,7 @@ mod crawl_prevention_tests {
         for _ in 0..10 {
             let tracker_clone = Arc::clone(&tracker);
             let repo_id_clone = repo_id;
-            let handle =
-                tokio::spawn(async move { tracker_clone.is_crawling(repo_id_clone).await });
+            let handle = tokio::spawn(async move { tracker_clone.is_crawling(repo_id_clone).await });
             handles.push(handle);
         }
 
@@ -164,11 +161,7 @@ mod crawl_prevention_tests {
         tracker.start_crawl(repo_id, repo_name).await;
 
         // Wait for all checks to complete
-        let _results: Vec<bool> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let _results: Vec<bool> = futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // Some checks might return false (if they ran before start_crawl)
         // But the final state should be that it's crawling
@@ -203,11 +196,7 @@ mod crawl_prevention_tests {
         }
 
         // Wait for all updates to complete
-        let results: Vec<bool> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let results: Vec<bool> = futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // All should return true since we're only updating to active statuses
         assert!(results.iter().all(|&x| x));
@@ -277,9 +266,7 @@ mod crawl_prevention_tests {
         tracker.update_status(repo_id, CrawlStatus::Cloning).await;
         assert!(tracker.is_crawling(repo_id).await);
 
-        tracker
-            .update_status(repo_id, CrawlStatus::Processing)
-            .await;
+        tracker.update_status(repo_id, CrawlStatus::Processing).await;
         assert!(tracker.is_crawling(repo_id).await);
 
         tracker.update_status(repo_id, CrawlStatus::Indexing).await;
@@ -307,9 +294,7 @@ mod crawl_prevention_tests {
             let handle = tokio::spawn(async move {
                 // Mix of operations to test memory safety
                 if i % 3 == 0 {
-                    tracker_clone
-                        .start_crawl(repo_id_clone, format!("repo-{}", i))
-                        .await;
+                    tracker_clone.start_crawl(repo_id_clone, format!("repo-{}", i)).await;
                 }
 
                 let is_crawling = tracker_clone.is_crawling(repo_id_clone).await;
@@ -324,11 +309,7 @@ mod crawl_prevention_tests {
         }
 
         // Wait for all tasks to complete without panicking
-        let _results: Vec<bool> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let _results: Vec<bool> = futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // If we reach here without panicking, memory safety is maintained
         // Test passed if no panic occurred
@@ -371,9 +352,7 @@ mod trigger_crawl_conflict_tests {
         }
 
         // Simulate starting the crawl
-        progress_tracker
-            .start_crawl(repository.id, repository.name.clone())
-            .await;
+        progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
 
         Ok("Crawl started in background".to_string())
     }
@@ -381,11 +360,7 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_success_when_not_crawling() {
         let progress_tracker = ProgressTracker::new();
-        let repository = MockRepository {
-            id: Uuid::new_v4(),
-            name: "test-repo".to_string(),
-            enabled: true,
-        };
+        let repository = MockRepository { id: Uuid::new_v4(), name: "test-repo".to_string(), enabled: true };
 
         let result = simulate_trigger_crawl(&progress_tracker, &repository).await;
 
@@ -397,16 +372,10 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_conflict_when_already_crawling() {
         let progress_tracker = ProgressTracker::new();
-        let repository = MockRepository {
-            id: Uuid::new_v4(),
-            name: "test-repo".to_string(),
-            enabled: true,
-        };
+        let repository = MockRepository { id: Uuid::new_v4(), name: "test-repo".to_string(), enabled: true };
 
         // Start initial crawl
-        progress_tracker
-            .start_crawl(repository.id, repository.name.clone())
-            .await;
+        progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
 
         // Try to trigger another crawl
         let result = simulate_trigger_crawl(&progress_tracker, &repository).await;
@@ -418,19 +387,11 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_conflict_when_processing() {
         let progress_tracker = ProgressTracker::new();
-        let repository = MockRepository {
-            id: Uuid::new_v4(),
-            name: "test-repo".to_string(),
-            enabled: true,
-        };
+        let repository = MockRepository { id: Uuid::new_v4(), name: "test-repo".to_string(), enabled: true };
 
         // Start and update to processing
-        progress_tracker
-            .start_crawl(repository.id, repository.name.clone())
-            .await;
-        progress_tracker
-            .update_status(repository.id, CrawlStatus::Processing)
-            .await;
+        progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
+        progress_tracker.update_status(repository.id, CrawlStatus::Processing).await;
 
         let result = simulate_trigger_crawl(&progress_tracker, &repository).await;
 
@@ -441,16 +402,10 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_success_after_completion() {
         let progress_tracker = ProgressTracker::new();
-        let repository = MockRepository {
-            id: Uuid::new_v4(),
-            name: "test-repo".to_string(),
-            enabled: true,
-        };
+        let repository = MockRepository { id: Uuid::new_v4(), name: "test-repo".to_string(), enabled: true };
 
         // Start and complete a crawl
-        progress_tracker
-            .start_crawl(repository.id, repository.name.clone())
-            .await;
+        progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
         progress_tracker.complete_crawl(repository.id).await;
 
         // Should be able to trigger a new crawl
@@ -463,19 +418,11 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_success_after_failure() {
         let progress_tracker = ProgressTracker::new();
-        let repository = MockRepository {
-            id: Uuid::new_v4(),
-            name: "test-repo".to_string(),
-            enabled: true,
-        };
+        let repository = MockRepository { id: Uuid::new_v4(), name: "test-repo".to_string(), enabled: true };
 
         // Start and fail a crawl
-        progress_tracker
-            .start_crawl(repository.id, repository.name.clone())
-            .await;
-        progress_tracker
-            .set_error(repository.id, "Test error".to_string())
-            .await;
+        progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
+        progress_tracker.set_error(repository.id, "Test error".to_string()).await;
 
         // Should be able to trigger a new crawl
         let result = simulate_trigger_crawl(&progress_tracker, &repository).await;
@@ -487,16 +434,10 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_success_after_cancellation() {
         let progress_tracker = ProgressTracker::new();
-        let repository = MockRepository {
-            id: Uuid::new_v4(),
-            name: "test-repo".to_string(),
-            enabled: true,
-        };
+        let repository = MockRepository { id: Uuid::new_v4(), name: "test-repo".to_string(), enabled: true };
 
         // Start and cancel a crawl
-        progress_tracker
-            .start_crawl(repository.id, repository.name.clone())
-            .await;
+        progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
         progress_tracker.cancel_crawl(repository.id).await;
 
         // Should be able to trigger a new crawl
@@ -525,11 +466,8 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_race_condition_protection() {
         let progress_tracker = Arc::new(ProgressTracker::new());
-        let repository = Arc::new(MockRepository {
-            id: Uuid::new_v4(),
-            name: "race-test-repo".to_string(),
-            enabled: true,
-        });
+        let repository =
+            Arc::new(MockRepository { id: Uuid::new_v4(), name: "race-test-repo".to_string(), enabled: true });
 
         // Spawn multiple concurrent trigger attempts
         let mut handles = vec![];
@@ -537,25 +475,19 @@ mod trigger_crawl_conflict_tests {
         for _ in 0..10 {
             let progress_tracker_clone = Arc::clone(&progress_tracker);
             let repository_clone = Arc::clone(&repository);
-            let handle = tokio::spawn(async move {
-                simulate_trigger_crawl(&progress_tracker_clone, &repository_clone).await
-            });
+            let handle =
+                tokio::spawn(async move { simulate_trigger_crawl(&progress_tracker_clone, &repository_clone).await });
             handles.push(handle);
         }
 
         // Wait for all attempts to complete
-        let results: Vec<Result<String, StatusCode>> = futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .map(|r| r.unwrap())
-            .collect();
+        let results: Vec<Result<String, StatusCode>> =
+            futures::future::join_all(handles).await.into_iter().map(|r| r.unwrap()).collect();
 
         // Only one should succeed, others should get CONFLICT
         let successful = results.iter().filter(|r| r.is_ok()).count();
-        let conflicts = results
-            .iter()
-            .filter(|r| r.is_err() && r.as_ref().unwrap_err() == &StatusCode::CONFLICT)
-            .count();
+        let conflicts =
+            results.iter().filter(|r| r.is_err() && r.as_ref().unwrap_err() == &StatusCode::CONFLICT).count();
 
         assert_eq!(successful, 1, "Exactly one crawl should succeed");
         assert_eq!(conflicts, 9, "Nine attempts should get CONFLICT");
@@ -565,16 +497,8 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_multiple_repositories_no_interference() {
         let progress_tracker = ProgressTracker::new();
-        let repo1 = MockRepository {
-            id: Uuid::new_v4(),
-            name: "repo1".to_string(),
-            enabled: true,
-        };
-        let repo2 = MockRepository {
-            id: Uuid::new_v4(),
-            name: "repo2".to_string(),
-            enabled: true,
-        };
+        let repo1 = MockRepository { id: Uuid::new_v4(), name: "repo1".to_string(), enabled: true };
+        let repo2 = MockRepository { id: Uuid::new_v4(), name: "repo2".to_string(), enabled: true };
 
         // Start crawl for repo1
         let result1 = simulate_trigger_crawl(&progress_tracker, &repo1).await;
@@ -597,11 +521,7 @@ mod trigger_crawl_conflict_tests {
     #[tokio::test]
     async fn test_trigger_crawl_rapid_successive_attempts() {
         let progress_tracker = ProgressTracker::new();
-        let repository = MockRepository {
-            id: Uuid::new_v4(),
-            name: "rapid-test-repo".to_string(),
-            enabled: true,
-        };
+        let repository = MockRepository { id: Uuid::new_v4(), name: "rapid-test-repo".to_string(), enabled: true };
 
         // First attempt should succeed
         let result1 = simulate_trigger_crawl(&progress_tracker, &repository).await;

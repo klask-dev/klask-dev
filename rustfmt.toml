@@ -1,0 +1,20 @@
+# Rustfmt configuration for klask-dev
+# See https://rust-lang.github.io/rustfmt/ for all stable options
+
+# Increase maximum line width from default 100 to 120
+max_width = 120
+
+# Don't wrap function parameters as aggressively
+fn_params_layout = "Tall"
+
+# Keep chains on single line when possible
+chain_width = 120
+
+# Keep array formatting more compact
+array_width = 120
+
+# Keep struct literals more compact
+struct_lit_width = 120
+
+# More aggressive single line if statement formatting
+single_line_if_else_max_width = 80

@@ -22,6 +22,7 @@ import {
   useBulkUserOperations,
 } from '../../hooks/useUsers';
 import { getErrorMessage } from '../../lib/api';
+import { formatDateTime } from '../../lib/utils';
 import type { User, CreateUserRequest, UpdateUserRequest, UserRole } from '../../types';
 
 type FilterType = 'all' | 'active' | 'inactive' | 'admins' | 'users';
@@ -370,6 +371,12 @@ const UserManagement: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Last Login
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Last Activity
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -416,7 +423,27 @@ const UserManagement: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.createdAt).toLocaleDateString()}
+                    <time dateTime={user.created_at}>
+                      {formatDateTime(user.created_at)}
+                    </time>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.last_login ? (
+                      <time dateTime={user.last_login}>
+                        {formatDateTime(user.last_login)}
+                      </time>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.last_activity ? (
+                      <time dateTime={user.last_activity}>
+                        {formatDateTime(user.last_activity)}
+                      </time>
+                    ) : (
+                      '-'
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                     <button

@@ -79,27 +79,25 @@ mod tests {
         let db2 = create_test_database().await.unwrap();
 
         // Insert data in db1
-        sqlx::query("INSERT INTO users (id, username, email, password_hash) VALUES ('1', 'user1', 'user1@test.com', 'hash1')")
-            .execute(&db1)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO users (id, username, email, password_hash) VALUES ('1', 'user1', 'user1@test.com', 'hash1')",
+        )
+        .execute(&db1)
+        .await
+        .unwrap();
 
         // Insert different data in db2
-        sqlx::query("INSERT INTO users (id, username, email, password_hash) VALUES ('2', 'user2', 'user2@test.com', 'hash2')")
-            .execute(&db2)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO users (id, username, email, password_hash) VALUES ('2', 'user2', 'user2@test.com', 'hash2')",
+        )
+        .execute(&db2)
+        .await
+        .unwrap();
 
         // Verify isolation
-        let count1: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
-            .fetch_one(&db1)
-            .await
-            .unwrap();
+        let count1: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&db1).await.unwrap();
 
-        let count2: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
-            .fetch_one(&db2)
-            .await
-            .unwrap();
+        let count2: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users").fetch_one(&db2).await.unwrap();
 
         assert_eq!(count1, 1);
         assert_eq!(count2, 1);

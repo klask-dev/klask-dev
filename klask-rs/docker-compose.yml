@@ -77,7 +77,7 @@ services:
     image: dpage/pgadmin4:latest
     container_name: klask-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@klask.io
+      PGADMIN_DEFAULT_EMAIL: admin@klask.dev
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:

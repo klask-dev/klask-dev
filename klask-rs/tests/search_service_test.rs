@@ -9,8 +9,7 @@ mod search_service_tests {
     // Global mutex to ensure tests don't interfere with each other
     static TEST_MUTEX: LazyLock<AsyncMutex<()>> = LazyLock::new(|| AsyncMutex::new(()));
 
-    async fn create_test_search_service(
-    ) -> (SearchService, TempDir, tokio::sync::MutexGuard<'static, ()>) {
+    async fn create_test_search_service() -> (SearchService, TempDir, tokio::sync::MutexGuard<'static, ()>) {
         let _guard = TEST_MUTEX.lock().await;
         let temp_dir = TempDir::new().unwrap();
         let test_id = uuid::Uuid::new_v4().to_string()[..8].to_string();
@@ -35,6 +34,7 @@ mod search_service_tests {
             file_name: "main.rs",
             file_path: "src/main.rs",
             content: "fn main() { println!(\"Hello, world!\"); }",
+            repository: "test-project",
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
@@ -65,6 +65,7 @@ mod search_service_tests {
             file_name: "main.rs",
             file_path: "src/main.rs",
             content: "fn main() { println!(\"Hello, world!\"); }",
+            repository: "test-project",
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
@@ -79,6 +80,7 @@ mod search_service_tests {
             file_name: "main.rs",
             file_path: "src/main.rs",
             content: "fn main() { println!(\"Hello, Rust!\"); }",
+            repository: "test-project",
             project: "test-project",
             version: "1.0.1",
             extension: "rs",
@@ -97,6 +99,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             offset: 0,
             limit: 10,
             include_facets: false,
@@ -143,6 +146,7 @@ mod search_service_tests {
                 file_name: name,
                 file_path: path,
                 content,
+                repository: "test-project",
                 project: "test-project",
                 version: "1.0.0",
                 extension: ext,
@@ -158,6 +162,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -225,6 +230,7 @@ mod search_service_tests {
                 file_name: name,
                 file_path: path,
                 content,
+                repository: project,
                 project,
                 version,
                 extension: ext,
@@ -244,6 +250,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -260,6 +267,7 @@ mod search_service_tests {
             project_filter: Some("project-a".to_string()),
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -274,6 +282,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: Some("rs".to_string()),
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -288,6 +297,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: Some("1.0.0".to_string()),
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -313,6 +323,7 @@ mod search_service_tests {
                 file_name: &file_name,
                 file_path: &file_path,
                 content: &content,
+                repository: "test-project",
                 project: "test-project",
                 version: "1.0.0",
                 extension: "rs",
@@ -328,6 +339,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -344,6 +356,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 10,
             include_facets: false,
@@ -358,6 +371,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 20,
             include_facets: false,
@@ -377,6 +391,7 @@ mod search_service_tests {
             file_name: "test.rs",
             file_path: "src/test.rs",
             content: "fn test() { println!(\"Test function\"); }",
+            repository: "test-project",
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
@@ -391,6 +406,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 1,
             offset: 0,
             include_facets: false,
@@ -423,6 +439,7 @@ mod search_service_tests {
             file_name: "example.rs",
             file_path: "src/example.rs",
             content,
+            repository: "test-project",
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
@@ -441,6 +458,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             offset: 0,
             limit: 10,
             include_facets: false,
@@ -461,6 +479,7 @@ mod search_service_tests {
             file_name: "delete_me.rs",
             file_path: "src/delete_me.rs",
             content: "fn to_be_deleted() { }",
+            repository: "test-project",
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
@@ -471,10 +490,7 @@ mod search_service_tests {
 
         // Verify file exists by checking document count
         let doc_count_before = service.get_document_count().unwrap();
-        assert_eq!(
-            doc_count_before, 1,
-            "Should have one document before deletion"
-        );
+        assert_eq!(doc_count_before, 1, "Should have one document before deletion");
 
         // Delete the file
         service.delete_file(file_id).await.unwrap();
@@ -500,6 +516,7 @@ mod search_service_tests {
                 file_name: &file_name,
                 file_path: &file_path,
                 content: &content,
+                repository: "test-project",
                 project: "test-project",
                 version: "1.0.0",
                 extension: "rs",
@@ -539,6 +556,7 @@ mod search_service_tests {
             file_name: "special.rs",
             file_path: "src/special.rs",
             content,
+            repository: "test-project",
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
@@ -548,15 +566,7 @@ mod search_service_tests {
         service.commit().await.unwrap();
 
         // Test searching for special characters
-        let test_queries = vec![
-            "special_chars",
-            "symbols",
-            "café",
-            "naïve",
-            "résumé",
-            "return",
-            "true",
-        ];
+        let test_queries = vec!["special_chars", "symbols", "café", "naïve", "résumé", "return", "true"];
 
         for query_text in test_queries {
             let query = SearchQuery {
@@ -564,17 +574,14 @@ mod search_service_tests {
                 project_filter: None,
                 version_filter: None,
                 extension_filter: None,
+                repository_filter: None,
                 limit: 10,
                 offset: 0,
                 include_facets: false,
             };
 
             let results = service.search(query).await.unwrap();
-            assert!(
-                results.total > 0,
-                "Should find results for query: {}",
-                query_text
-            );
+            assert!(results.total > 0, "Should find results for query: {}", query_text);
             assert!(
                 !results.results.is_empty(),
                 "Should have at least one result for: {}",
@@ -594,6 +601,7 @@ mod search_service_tests {
             file_name: "test.rs",
             file_path: "src/test.rs",
             content: "fn test() { }",
+            repository: "test-project",
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
@@ -607,6 +615,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -622,6 +631,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -653,6 +663,7 @@ mod search_service_tests {
                 file_name,
                 file_path,
                 content: &content,
+                repository: "test-project",
                 project: "test-project",
                 version: &version,
                 extension: "rs",
@@ -669,6 +680,7 @@ mod search_service_tests {
             project_filter: None,
             version_filter: None,
             extension_filter: None,
+            repository_filter: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -677,23 +689,14 @@ mod search_service_tests {
         let results = service.search(search_query).await.unwrap();
 
         // Find results for our file_id
-        let matching_results: Vec<&SearchResult> = results
-            .results
-            .iter()
-            .filter(|r| r.file_id == file_id)
-            .collect();
+        let matching_results: Vec<&SearchResult> = results.results.iter().filter(|r| r.file_id == file_id).collect();
 
         // During crawling, multiple versions might be indexed temporarily
         // This is expected behavior and doesn't harm functionality
-        assert!(
-            !matching_results.is_empty(),
-            "Should find at least one result"
-        );
+        assert!(!matching_results.is_empty(), "Should find at least one result");
 
         // Verify we can find content from the indexing process
-        let has_version_content = matching_results
-            .iter()
-            .any(|r| r.content_snippet.contains("Version"));
+        let has_version_content = matching_results.iter().any(|r| r.content_snippet.contains("Version"));
         assert!(has_version_content, "Should contain version content");
 
         // The search service should be functional regardless of duplicate handling

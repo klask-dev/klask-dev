@@ -60,37 +60,11 @@ export const useUpdateRepository = () => {
     onSuccess: (updatedRepo) => {
       console.log('Update success - updatedRepo:', updatedRepo);
       console.log('updatedRepo.id:', updatedRepo?.id);
-      // Update the specific repository in cache
-      queryClient.setQueryData(['repositories', updatedRepo.id], updatedRepo);
-      
-      // Update the repository in the list
-      queryClient.setQueryData(['repositories'], (old: RepositoryWithStats[] | undefined) => {
-        if (!old) return [{ repository: updatedRepo, diskSizeMb: undefined, fileCount: undefined }];
-        return old.map(repoWithStats => {
-          // Handle case where cache contains Repository directly instead of RepositoryWithStats
-          if (!repoWithStats) {
-            return repoWithStats;
-          }
 
-          // If it's a direct Repository object (legacy data structure)
-          if ('id' in repoWithStats && !('repository' in repoWithStats)) {
-            const directRepo = repoWithStats as any as Repository;
-            return directRepo.id === updatedRepo.id
-              ? { repository: updatedRepo, diskSizeMb: undefined, fileCount: undefined }
-              : { repository: directRepo, diskSizeMb: undefined, fileCount: undefined };
-          }
-
-          // Standard RepositoryWithStats structure
-          if (repoWithStats.repository) {
-            return repoWithStats.repository.id === updatedRepo.id
-              ? { ...repoWithStats, repository: updatedRepo }
-              : repoWithStats;
-          }
-
-          console.warn('Unexpected repoWithStats structure:', repoWithStats);
-          return repoWithStats;
-        });
-      });
+      // Invalidate queries to force refetch from backend
+      // This ensures we get the latest calculated fields like next_crawl_at
+      queryClient.invalidateQueries({ queryKey: ['repositories'] });
+      queryClient.invalidateQueries({ queryKey: ['repositories', updatedRepo.id] });
     },
     onError: (error) => {
       console.error('Failed to update repository:', getErrorMessage(error));
@@ -108,11 +82,16 @@ export const useDeleteRepository = () => {
       // Remove from repositories list
       queryClient.setQueryData(['repositories'], (old: RepositoryWithStats[] | undefined) => {
         if (!old) return [];
-        return old.filter(repoWithStats => repoWithStats.repository.id !== deletedId);
+        return old.filter(repoWithStats =>
+          repoWithStats?.repository?.id && repoWithStats.repository.id !== deletedId
+        );
       });
-      
+
       // Remove individual repository cache
       queryClient.removeQueries({ queryKey: ['repositories', deletedId] });
+
+      // Also invalidate to refetch fresh data
+      queryClient.invalidateQueries({ queryKey: ['repositories'] });
     },
     onError: (error) => {
       console.error('Failed to delete repository:', getErrorMessage(error));
@@ -183,8 +162,9 @@ export const useRepositoryStats = () => {
     const crawled = validRepos.filter(repoWithStats => repoWithStats.repository.lastCrawled).length;
     const gitRepos = validRepos.filter(repoWithStats => repoWithStats.repository.repositoryType === 'Git').length;
     const gitlabRepos = validRepos.filter(repoWithStats => repoWithStats.repository.repositoryType === 'GitLab').length;
+    const githubRepos = validRepos.filter(repoWithStats => repoWithStats.repository.repositoryType === 'GitHub').length;
     const filesystemRepos = validRepos.filter(repoWithStats => repoWithStats.repository.repositoryType === 'FileSystem').length;
-    
+
     return {
       total,
       enabled,
@@ -194,6 +174,7 @@ export const useRepositoryStats = () => {
       byType: {
         git: gitRepos,
         gitlab: gitlabRepos,
+        github: githubRepos,
         filesystem: filesystemRepos,
       },
     };

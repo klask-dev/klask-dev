@@ -1,0 +1,22 @@
+{{- if and .Values.istio.enabled .Values.istio.egress.enabled .Values.istio.egress.gitlab.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "klask.fullname" . }}-gitlab-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+spec:
+  hosts:
+    - {{ .Values.istio.egress.gitlab.host }}
+  tls:
+    - match:
+        - port: {{ .Values.istio.egress.gitlab.port }}
+          sniHosts:
+            - {{ .Values.istio.egress.gitlab.host }}
+      route:
+        - destination:
+            host: {{ .Values.istio.egress.gitlab.host }}
+            port:
+              number: {{ .Values.istio.egress.gitlab.port }}
+{{- end }}

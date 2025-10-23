@@ -1,4 +1,4 @@
-use crate::auth::extractors::AppState;
+use crate::auth::extractors::{AppState, AuthenticatedUser};
 use anyhow::Result;
 use axum::{
     extract::{Path, State},
@@ -23,14 +23,13 @@ pub struct FileResponse {
 }
 
 pub async fn create_router() -> Result<Router<AppState>> {
-    let router = Router::new()
-        .route("/:id", get(get_file))
-        .route("/doc/:doc_address", get(get_file_by_doc_address));
+    let router = Router::new().route("/{id}", get(get_file)).route("/doc/{doc_address}", get(get_file_by_doc_address));
 
     Ok(router)
 }
 
 async fn get_file(
+    _auth: AuthenticatedUser,
     State(app_state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<FileResponse>, StatusCode> {
@@ -69,17 +68,14 @@ async fn get_file(
 }
 
 async fn get_file_by_doc_address(
+    _auth: AuthenticatedUser,
     State(app_state): State<AppState>,
     Path(doc_address): Path<String>,
 ) -> Result<Json<FileResponse>, StatusCode> {
     tracing::debug!("Getting file by doc_address: {}", doc_address);
 
     // Get file directly from Tantivy using DocAddress
-    match app_state
-        .search_service
-        .get_file_by_doc_address(&doc_address)
-        .await
-    {
+    match app_state.search_service.get_file_by_doc_address(&doc_address).await {
         Ok(Some(search_result)) => {
             tracing::debug!(
                 "Found file at doc_address: {} (content size: {})",
@@ -104,10 +100,7 @@ async fn get_file_by_doc_address(
             Err(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            tracing::error!(
-                "Search service error when fetching file by doc_address: {}",
-                e
-            );
+            tracing::error!("Search service error when fetching file by doc_address: {}", e);
             Err(StatusCode::BAD_REQUEST)
         }
     }

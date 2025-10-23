@@ -1,0 +1,46 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+---
+# Backend PodDisruptionBudget
+{{- if .Values.backend.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "klask.fullname" . }}-backend
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  {{- if .Values.podDisruptionBudget.backend.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.backend.minAvailable }}
+  {{- end }}
+  {{- if .Values.podDisruptionBudget.backend.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.backend.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "klask.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+{{- end }}
+---
+# Frontend PodDisruptionBudget
+{{- if .Values.frontend.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "klask.fullname" . }}-frontend
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  {{- if .Values.podDisruptionBudget.frontend.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.frontend.minAvailable }}
+  {{- end }}
+  {{- if .Values.podDisruptionBudget.frontend.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.frontend.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "klask.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+{{- end }}
+{{- end }}

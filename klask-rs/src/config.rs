@@ -48,10 +48,7 @@ impl AppConfig {
         let config = Self {
             server: ServerConfig {
                 host: std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
-                port: std::env::var("PORT")
-                    .unwrap_or_else(|_| "3000".to_string())
-                    .parse()
-                    .unwrap_or(3000),
+                port: std::env::var("PORT").unwrap_or_else(|_| "3000".to_string()).parse().unwrap_or(3000),
             },
             database: DatabaseConfig {
                 url: std::env::var("DATABASE_URL")
@@ -62,26 +59,19 @@ impl AppConfig {
                     .unwrap_or(10),
             },
             search: SearchConfig {
-                index_dir: std::env::var("SEARCH_INDEX_DIR")
-                    .unwrap_or_else(|_| "./index".to_string()),
+                index_dir: std::env::var("SEARCH_INDEX_DIR").unwrap_or_else(|_| "./index".to_string()),
                 max_results: std::env::var("SEARCH_MAX_RESULTS")
                     .unwrap_or_else(|_| "10000".to_string())
                     .parse()
                     .unwrap_or(10000),
             },
             crawler: CrawlerConfig {
-                temp_dir: std::env::var("CRAWLER_TEMP_DIR").unwrap_or_else(|_| {
-                    std::env::temp_dir()
-                        .join("klask-crawler")
-                        .to_string_lossy()
-                        .to_string()
-                }),
+                temp_dir: std::env::var("CRAWLER_TEMP_DIR")
+                    .unwrap_or_else(|_| std::env::temp_dir().join("klask-crawler").to_string_lossy().to_string()),
             },
             auth: AuthConfig {
-                jwt_secret: std::env::var("JWT_SECRET")
-                    .unwrap_or_else(|_| "your-secret-key".to_string()),
-                jwt_expires_in: std::env::var("JWT_EXPIRES_IN")
-                    .unwrap_or_else(|_| "24h".to_string()),
+                jwt_secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string()),
+                jwt_expires_in: std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "24h".to_string()),
             },
         };
 

@@ -1,8 +1,10 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use croner::Cron;
 use sqlx::PgPool;
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio_cron_scheduler::{Job, JobScheduler};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -11,68 +13,51 @@ use crate::{
     services::crawler::CrawlerService,
 };
 
+/// Scheduled job handle for a repository
+struct ScheduledJob {
+    cron_expression: String,
+    task_handle: JoinHandle<()>,
+}
+
 pub struct SchedulerService {
-    scheduler: JobScheduler,
     pool: PgPool,
     crawler_service: Arc<CrawlerService>,
-    job_ids: Arc<tokio::sync::RwLock<HashMap<Uuid, Uuid>>>, // repository_id -> job_id
+    // Map of repository_id -> ScheduledJob
+    jobs: Arc<RwLock<HashMap<Uuid, ScheduledJob>>>,
 }
 
 impl SchedulerService {
     pub async fn new(pool: PgPool, crawler_service: Arc<CrawlerService>) -> Result<Self> {
-        let scheduler = JobScheduler::new().await?;
-
-        Ok(Self {
-            scheduler,
-            pool,
-            crawler_service,
-            job_ids: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
-        })
+        Ok(Self { pool, crawler_service, jobs: Arc::new(RwLock::new(HashMap::new())) })
     }
 
     /// Start the scheduler and load all scheduled repositories
     pub async fn start(&self) -> Result<()> {
         info!("Starting repository scheduler service");
 
-        // Start the scheduler
-        self.scheduler.start().await?;
-
-        // Spawn a background task to keep the scheduler running
-        let mut scheduler_clone = self.scheduler.clone();
-        tokio::spawn(async move {
-            loop {
-                // This is required to keep the scheduler running
-                // The scheduler needs to check for jobs periodically
-                if let Ok(duration) = scheduler_clone.time_till_next_job().await {
-                    if let Some(duration) = duration {
-                        debug!("Next job in {:?}", duration);
-                        tokio::time::sleep(duration).await;
-                    } else {
-                        // No jobs scheduled, wait a bit
-                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                    }
-                } else {
-                    // Error getting next job time, wait a bit
-                    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                }
-            }
-        });
-
         // Load all repositories with scheduling enabled
         self.reload_scheduled_repositories().await?;
 
-        // Schedule a periodic task to reload repository schedules (every 5 minutes)
-        self.schedule_periodic_reload().await?;
+        // TEMPORARILY DISABLED: Schedule a periodic task to reload repository schedules (every 5 minutes)
+        // This was causing performance issues by spawning too many tasks
+        // TODO: Fix the reload logic to properly clean up old tasks before creating new ones
+        // self.schedule_periodic_reload().await?;
 
-        info!("Repository scheduler service started successfully");
+        info!("Repository scheduler service started successfully (periodic reload disabled)");
         Ok(())
     }
 
     /// Stop the scheduler service
     #[allow(dead_code)]
-    pub async fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&self) -> Result<()> {
         info!("Stopping repository scheduler service");
-        self.scheduler.shutdown().await?;
+
+        let mut jobs = self.jobs.write().await;
+        for (repo_id, job) in jobs.drain() {
+            debug!("Cancelling scheduled job for repository {}", repo_id);
+            job.task_handle.abort();
+        }
+
         info!("Repository scheduler service stopped");
         Ok(())
     }
@@ -87,395 +72,320 @@ impl SchedulerService {
         // Remove existing schedule if any
         self.unschedule_repository(repository.id).await?;
 
-        let schedule_expr = if let Some(ref cron_schedule) = repository.cron_schedule {
-            // Convert 5-field cron to 6-field if needed (tokio-cron-scheduler uses 6 fields with seconds)
-            let parts: Vec<&str> = cron_schedule.split_whitespace().collect();
-            if parts.len() == 5 {
-                // Add "0" at the beginning for seconds
-                format!("0 {}", cron_schedule)
-            } else {
-                cron_schedule.clone()
-            }
+        // Get cron expression (either from cron_schedule or convert from frequency)
+        let cron_expr = if let Some(ref cron_schedule) = repository.cron_schedule {
+            cron_schedule.clone()
         } else if let Some(frequency_hours) = repository.crawl_frequency_hours {
-            // Convert hours to cron expression (run every X hours)
-            // tokio-cron-scheduler uses seconds-based cron (6 fields)
-            // Format: sec min hour day month weekday
-            if frequency_hours == 1 {
-                // Every hour at minute 0
-                "0 0 * * * *".to_string()
-            } else if frequency_hours < 24 {
-                // Every N hours at minute 0
-                format!("0 0 */{} * * *", frequency_hours)
-            } else {
-                // Daily at midnight
-                "0 0 0 * * *".to_string()
-            }
+            // Convert hours to cron expression: "0 0 */X * * *" (every X hours)
+            format!("0 0 */{} * * *", frequency_hours)
         } else {
-            // Default to every minute for testing (change back to daily in production)
-            warn!("Repository {} has auto-crawl enabled but no schedule defined, defaulting to every minute for testing", repository.id);
-            "0 * * * * *".to_string() // Every minute for testing
+            warn!(
+                "Repository {} has auto-crawl enabled but no schedule defined",
+                repository.id
+            );
+            return Ok(());
         };
 
-        // Skip validation here as tokio-cron-scheduler will validate itself
-        // The cron crate uses 5-field format while tokio-cron-scheduler uses 6-field
-        debug!("Will schedule with expression: {}", schedule_expr);
+        // Parse and validate the cron expression (with 6-field format: seconds minutes hours day month weekday)
+        // croner 3.0 uses parse() directly - validate by attempting to parse
+        let _cron: croner::Cron =
+            cron_expr.parse().with_context(|| format!("Failed to parse cron expression: {}", cron_expr))?;
 
-        let repository_id = repository.id;
-        let max_duration = repository.max_crawl_duration_minutes.unwrap_or(60) as u64;
-        let repository_name = repository.name.clone();
+        info!(
+            "Scheduling repository {} ({}) with cron: {}",
+            repository.name, repository.id, cron_expr
+        );
 
+        // Spawn the scheduling task
+        let repo_id = repository.id;
+        let repo_name = repository.name.clone();
+        let crawler = self.crawler_service.clone();
         let pool = self.pool.clone();
-        let crawler_service = self.crawler_service.clone();
+        let cron_expr_clone = cron_expr.clone();
 
-        // Log the schedule being created
-        info!(
-            "Creating schedule for repository {} ({}) with expression: {}",
-            repository_name, repository_id, schedule_expr
-        );
+        let task_handle = tokio::spawn(async move {
+            loop {
+                // Calculate next run time
+                // IMPORTANT: Always get the NEXT occurrence after now, not including current time
+                let now = Utc::now();
 
-        // Create the job
-        let job = Job::new_cron_job_async(schedule_expr.as_str(), move |job_uuid, _job_lock| {
-            let pool = pool.clone();
-            let crawler_service = crawler_service.clone();
-            let repository_name = repository_name.clone();
+                // Parse cron expression (we need to do this in the loop since cron is not Clone)
+                let cron_result: Result<Cron, _> = cron_expr_clone.parse();
 
-            info!(
-                "📅 Job created with UUID: {:?} for repository: {} ({})",
-                job_uuid, repository_name, repository_id
-            );
-
-            Box::pin(async move {
-                info!(
-                    "🚀 SCHEDULED CRAWL TRIGGERED for repository: {} ({})",
-                    repository_name, repository_id
-                );
-
-                // Check if repository is already being crawled
-                if crawler_service.is_crawling(repository_id).await {
-                    info!(
-                        "⏭️  Skipping scheduled crawl for repository {} ({}) - already in progress",
-                        repository_name, repository_id
-                    );
-                    return;
-                }
-
-                // Set up timeout for the crawl operation
-                let crawl_timeout = Duration::from_secs(max_duration * 60);
-
-                let crawl_result = tokio::time::timeout(crawl_timeout, async {
-                    // Update next_crawl_at timestamp
-                    if let Err(e) = update_next_crawl_time(&pool, repository_id).await {
+                let cron = match cron_result {
+                    Ok(c) => c,
+                    Err(e) => {
                         error!(
-                            "Failed to update next_crawl_at for repository {}: {}",
-                            repository_id, e
+                            "Failed to parse cron expression '{}' for repository {}: {}",
+                            cron_expr_clone, repo_id, e
                         );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                        continue;
                     }
+                };
 
-                    // Fetch repository details
-                    let repository_repo = RepositoryRepository::new(pool);
-                    let repository_result = repository_repo.get_repository(repository_id).await;
+                match cron.find_next_occurrence(&now, false) {
+                    Ok(next_run) => {
+                        // Update next_crawl_at in database
+                        if let Err(e) = Self::update_next_crawl_time_static(&pool, repo_id, Some(next_run)).await {
+                            error!("Failed to update next_crawl_at for repository {}: {}", repo_id, e);
+                        }
 
-                    let result = match repository_result {
-                        Ok(Some(repo)) => {
-                            // Perform the crawl
-                            crawler_service.crawl_repository(&repo).await
-                        }
-                        Ok(None) => {
-                            error!("Repository {} not found", repository_id);
-                            Err(anyhow::anyhow!("Repository not found"))
-                        }
-                        Err(e) => {
-                            error!("Failed to fetch repository {}: {}", repository_id, e);
-                            Err(e)
-                        }
-                    };
+                        // Calculate duration to sleep
+                        let duration = (next_run - now).to_std().unwrap_or(std::time::Duration::from_secs(0));
 
-                    // Log results
-                    match &result {
-                        Ok(_) => {
-                            info!(
-                                "Scheduled crawl completed successfully for repository: {} ({})",
-                                repository_name, repository_id
-                            );
-                        }
-                        Err(e) => {
-                            error!(
-                                "Scheduled crawl failed for repository {} ({}): {}",
-                                repository_name, repository_id, e
-                            );
-                        }
-                    }
-
-                    result
-                })
-                .await;
-
-                match crawl_result {
-                    Ok(Ok(_)) => {
-                        info!(
-                            "Scheduled crawl for repository {} completed within timeout",
-                            repository_id
+                        debug!(
+                            "Repository {} ({}) scheduled to run at {} (in {:?})",
+                            repo_name, repo_id, next_run, duration
                         );
-                    }
-                    Ok(Err(e)) => {
-                        error!(
-                            "Scheduled crawl for repository {} failed: {}",
-                            repository_id, e
-                        );
-                    }
-                    Err(_) => {
-                        error!(
-                            "Scheduled crawl for repository {} timed out after {} minutes",
-                            repository_id, max_duration
-                        );
-                    }
-                }
-            })
-        })?;
 
-        // Add the job to scheduler
-        let job_id = self.scheduler.add(job).await?;
+                        // Sleep until next run
+                        tokio::time::sleep(duration).await;
 
-        // Store job ID for later removal
-        {
-            let mut job_ids = self.job_ids.write().await;
-            job_ids.insert(repository_id, job_id);
-        }
+                        // Execute the crawl
+                        info!("Executing scheduled crawl for repository {} ({})", repo_name, repo_id);
 
-        info!(
-            "Scheduled repository {} ({}) with cron expression: {}",
-            repository.name, repository_id, schedule_expr
-        );
-        Ok(())
-    }
+                        // Load repository from database to check if auto_crawl is still enabled
+                        let repo_repository = RepositoryRepository::new(pool.clone());
+                        match repo_repository.find_by_id(repo_id).await {
+                            Ok(Some(repository)) => {
+                                // Check if auto_crawl is still enabled
+                                if !repository.auto_crawl_enabled {
+                                    info!(
+                                        "Auto-crawl disabled for repository {} ({}), stopping scheduler task",
+                                        repo_name, repo_id
+                                    );
+                                    break; // Exit the loop to stop this scheduler task
+                                }
 
-    /// Remove scheduling for a repository
-    pub async fn unschedule_repository(&self, repository_id: Uuid) -> Result<()> {
-        let mut job_ids = self.job_ids.write().await;
-
-        if let Some(job_id) = job_ids.remove(&repository_id) {
-            if let Err(e) = self.scheduler.remove(&job_id).await {
-                error!(
-                    "Failed to remove scheduled job for repository {}: {}",
-                    repository_id, e
-                );
-                return Err(e.into());
-            }
-            info!("Unscheduled repository {}", repository_id);
-        }
-
-        Ok(())
-    }
-
-    /// Update schedule for a repository
-    #[allow(dead_code)]
-    pub async fn update_repository_schedule(&self, repository: &Repository) -> Result<()> {
-        if repository.auto_crawl_enabled {
-            self.schedule_repository(repository).await?;
-        } else {
-            self.unschedule_repository(repository.id).await?;
-        }
-        Ok(())
-    }
-
-    /// Get next scheduled run time for a repository
-    #[allow(dead_code)]
-    pub async fn get_next_run_time(&self, _repository_id: Uuid) -> Option<DateTime<Utc>> {
-        // TODO: Implement proper next run time retrieval with tokio_cron_scheduler
-        None
-    }
-
-    /// Reload all scheduled repositories from database
-    pub async fn reload_scheduled_repositories(&self) -> Result<()> {
-        info!("Reloading scheduled repositories from database");
-
-        let repository_repo = RepositoryRepository::new(self.pool.clone());
-        let repositories = repository_repo.find_all().await?;
-
-        let mut scheduled_count = 0;
-        let mut error_count = 0;
-
-        for repository in repositories {
-            if repository.auto_crawl_enabled {
-                match self.schedule_repository(&repository).await {
-                    Ok(_) => {
-                        scheduled_count += 1;
-
-                        // Update next_crawl_at in database if not set
-                        if repository.next_crawl_at.is_none() {
-                            if let Err(e) = update_next_crawl_time(&self.pool, repository.id).await
-                            {
-                                warn!(
-                                    "Failed to update next_crawl_at for repository {}: {}",
-                                    repository.id, e
-                                );
+                                // Execute the crawl
+                                match crawler.crawl_repository(&repository).await {
+                                    Ok(_) => {
+                                        info!("Scheduled crawl completed successfully for repository {}", repo_id);
+                                    }
+                                    Err(e) => {
+                                        error!("Scheduled crawl failed for repository {}: {}", repo_id, e);
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                error!("Repository {} not found in database, stopping scheduler task", repo_id);
+                                break; // Exit if repository was deleted
+                            }
+                            Err(e) => {
+                                error!("Failed to load repository {} from database: {}", repo_id, e);
+                                // Don't break here, just skip this iteration and try again next time
                             }
                         }
                     }
                     Err(e) => {
                         error!(
-                            "Failed to schedule repository {} ({}): {}",
-                            repository.name, repository.id, e
+                            "Failed to calculate next occurrence for repository {} with cron '{}': {}",
+                            repo_id, cron_expr_clone, e
                         );
-                        error_count += 1;
+                        // Wait a bit before retrying
+                        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
                     }
+                }
+            }
+        });
+
+        // Store the job handle
+        let job = ScheduledJob { cron_expression: cron_expr.clone(), task_handle };
+
+        self.jobs.write().await.insert(repo_id, job);
+
+        // Update next_crawl_at immediately
+        self.update_next_crawl_time(repository.id, &cron_expr).await?;
+
+        info!("Successfully scheduled repository {} with cron: {}", repo_id, cron_expr);
+
+        Ok(())
+    }
+
+    /// Unschedule a repository from automatic crawling
+    pub async fn unschedule_repository(&self, repository_id: Uuid) -> Result<()> {
+        let mut jobs = self.jobs.write().await;
+
+        if let Some(job) = jobs.remove(&repository_id) {
+            debug!("Unscheduling repository {}", repository_id);
+            job.task_handle.abort();
+
+            // Clear next_crawl_at in database
+            Self::update_next_crawl_time_static(&self.pool, repository_id, None).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Get the next scheduled run time for a repository
+    #[allow(dead_code)]
+    pub async fn get_next_run_time(&self, repository_id: Uuid) -> Option<DateTime<Utc>> {
+        let jobs = self.jobs.read().await;
+
+        if let Some(job) = jobs.get(&repository_id) {
+            // Parse the cron and get next occurrence
+            if let Ok(cron) = job.cron_expression.parse::<Cron>() {
+                if let Ok(next) = cron.find_next_occurrence(&Utc::now(), false) {
+                    return Some(next);
                 }
             }
         }
 
-        info!(
-            "Reloaded {} scheduled repositories ({} errors)",
-            scheduled_count, error_count
-        );
+        None
+    }
+
+    /// Update the next crawl time for a repository in the database
+    async fn update_next_crawl_time(&self, repository_id: Uuid, cron_expr: &str) -> Result<()> {
+        let cron: Cron =
+            cron_expr.parse().with_context(|| format!("Failed to parse cron expression: {}", cron_expr))?;
+
+        let next_run = cron.find_next_occurrence(&Utc::now(), false).context("Failed to calculate next occurrence")?;
+
+        Self::update_next_crawl_time_static(&self.pool, repository_id, Some(next_run)).await
+    }
+
+    /// Static helper to update next_crawl_at in database
+    async fn update_next_crawl_time_static(
+        pool: &PgPool,
+        repository_id: Uuid,
+        next_crawl_at: Option<DateTime<Utc>>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE repositories
+            SET next_crawl_at = $1,
+                updated_at = NOW()
+            WHERE id = $2
+            "#,
+        )
+        .bind(next_crawl_at)
+        .bind(repository_id)
+        .execute(pool)
+        .await
+        .context("Failed to update next_crawl_at")?;
+
         Ok(())
     }
 
-    /// Get scheduler status and statistics
-    pub async fn get_status(&self) -> Result<SchedulerStatus> {
-        let job_ids = self.job_ids.read().await;
-        let scheduled_count = job_ids.len();
+    /// Reload all scheduled repositories from the database
+    pub async fn reload_scheduled_repositories(&self) -> Result<()> {
+        info!("Reloading scheduled repositories");
 
-        let repository_repo = RepositoryRepository::new(self.pool.clone());
-        let all_repositories = repository_repo.find_all().await?;
-        let auto_crawl_enabled_count = all_repositories
-            .iter()
-            .filter(|r| r.auto_crawl_enabled)
-            .count();
+        let repo_repository = RepositoryRepository::new(self.pool.clone());
+        let repositories = repo_repository.find_all().await.context("Failed to load repositories")?;
 
-        // TODO: Get next runs for all scheduled repositories
-        let mut next_runs = Vec::new();
+        let scheduled_count = repositories.iter().filter(|r| r.auto_crawl_enabled).count();
 
-        // Sort by next run time
-        next_runs.sort_by(|a: &NextScheduledRun, b| a.next_run_at.cmp(&b.next_run_at));
+        info!(
+            "Found {} repositories with auto-crawl enabled out of {}",
+            scheduled_count,
+            repositories.len()
+        );
 
-        Ok(SchedulerStatus {
-            is_running: true,
-            scheduled_repositories_count: scheduled_count,
-            auto_crawl_enabled_count,
-            next_runs,
-        })
+        for repository in repositories.iter().filter(|r| r.auto_crawl_enabled) {
+            if let Err(e) = self.schedule_repository(repository).await {
+                error!(
+                    "Failed to schedule repository {} ({}): {}",
+                    repository.name, repository.id, e
+                );
+            }
+        }
+
+        info!("Finished reloading scheduled repositories");
+        Ok(())
     }
 
     /// Schedule a periodic task to reload repository schedules
+    #[allow(dead_code)]
     async fn schedule_periodic_reload(&self) -> Result<()> {
-        let pool = self.pool.clone();
-        let _scheduler_service = Arc::new(self);
+        let self_clone = Arc::new(self.clone_for_reload());
 
-        let job = Job::new_cron_job_async("0 */5 * * * *", move |_uuid, _l| {
-            // Every 5 minutes
-            let pool = pool.clone();
+        tokio::spawn(async move {
+            let reload_interval = tokio::time::Duration::from_secs(5 * 60); // 5 minutes
 
-            Box::pin(async move {
-                debug!("Running periodic repository schedule reload");
+            loop {
+                tokio::time::sleep(reload_interval).await;
 
-                // Create a new scheduler service instance for the reload
-                // This is a simplified approach - in production you might want to use a different pattern
-                let repository_repo = RepositoryRepository::new(pool);
-                if let Ok(repositories) = repository_repo.find_all().await {
-                    let mut changes_detected = 0;
+                info!("Performing periodic reload of scheduled repositories");
 
-                    // Check for repositories that need schedule updates
-                    // This is a basic implementation - you could make it more sophisticated
-                    for repository in repositories {
-                        if repository.auto_crawl_enabled {
-                            // In a full implementation, you'd track which repositories have changed
-                            // and only update those. For now, we'll just log.
-                            changes_detected += 1;
-                        }
-                    }
-
-                    if changes_detected > 0 {
-                        debug!(
-                            "Detected {} repositories with auto-crawl enabled",
-                            changes_detected
-                        );
-                    }
+                if let Err(e) = self_clone.reload_scheduled_repositories().await {
+                    error!("Periodic reload failed: {}", e);
                 }
-            })
-        })?;
+            }
+        });
 
-        self.scheduler.add(job).await?;
-        debug!("Scheduled periodic repository reload task");
         Ok(())
     }
-}
 
-/// Update the next_crawl_at timestamp for a repository based on its schedule
-async fn update_next_crawl_time(pool: &PgPool, repository_id: Uuid) -> Result<()> {
-    // Get repository to check its schedule
-    let repository_repo = RepositoryRepository::new(pool.clone());
-    let repository = repository_repo
-        .find_by_id(repository_id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Repository not found"))?;
-
-    let next_crawl_at = if let Some(ref cron_schedule) = repository.cron_schedule {
-        // Parse cron schedule and calculate next run using the cron library
-        // The cron library expects 5-field expressions (no seconds)
-        let parts: Vec<&str> = cron_schedule.split_whitespace().collect();
-        let five_field_cron = if parts.len() == 6 {
-            // Remove seconds field if present (skip first field)
-            parts[1..].join(" ")
-        } else {
-            cron_schedule.clone()
-        };
-
-        // Use the cron library to parse and calculate next occurrence
-        match five_field_cron.parse::<cron::Schedule>() {
-            Ok(schedule) => {
-                // Get the next occurrence after now
-                schedule.upcoming(chrono::Utc).take(1).next()
-            }
-            Err(e) => {
-                error!("Invalid cron expression '{}': {}", cron_schedule, e);
-                None
-            }
-        }
-    } else {
-        repository
-            .crawl_frequency_hours
-            .map(|frequency_hours| Utc::now() + chrono::Duration::hours(frequency_hours as i64))
-    };
-
-    if let Some(next_time) = next_crawl_at {
-        sqlx::query("UPDATE repositories SET next_crawl_at = $1 WHERE id = $2")
-            .bind(next_time)
-            .bind(repository_id)
-            .execute(pool)
-            .await?;
-
-        debug!(
-            "Updated next_crawl_at for repository {} to {}",
-            repository_id, next_time
-        );
+    /// Helper to clone necessary fields for periodic reload
+    #[allow(dead_code)]
+    fn clone_for_reload(&self) -> Self {
+        Self { pool: self.pool.clone(), crawler_service: self.crawler_service.clone(), jobs: self.jobs.clone() }
     }
 
-    Ok(())
+    /// Get the current scheduler status
+    pub async fn get_status(&self) -> SchedulerStatus {
+        let jobs = self.jobs.read().await;
+
+        // Get all repository info from database
+        let repo_repository = RepositoryRepository::new(self.pool.clone());
+        let all_repos = repo_repository.find_all().await.unwrap_or_default();
+
+        // Count repos with auto_crawl enabled
+        let auto_crawl_enabled_count = all_repos.iter().filter(|r| r.auto_crawl_enabled).count();
+
+        let mut next_runs = Vec::new();
+        for (repo_id, job) in jobs.iter() {
+            // Find repository name from database
+            let repo_name = all_repos
+                .iter()
+                .find(|r| r.id == *repo_id)
+                .map(|r| r.name.clone())
+                .unwrap_or_else(|| format!("Unknown ({})", repo_id));
+
+            if let Ok(cron) = job.cron_expression.parse::<Cron>() {
+                if let Ok(next_run) = cron.find_next_occurrence(&Utc::now(), false) {
+                    next_runs.push(NextRun {
+                        repository_id: *repo_id,
+                        repository_name: repo_name,
+                        next_run_at: next_run,
+                        cron_expression: job.cron_expression.clone(),
+                        schedule_expression: job.cron_expression.clone(),
+                    });
+                }
+            }
+        }
+
+        // Sort by next run time
+        next_runs.sort_by(|a, b| a.next_run_at.cmp(&b.next_run_at));
+
+        let scheduled_count = jobs.len();
+
+        SchedulerStatus {
+            is_running: true,
+            scheduled_jobs_count: scheduled_count,
+            scheduled_repositories_count: scheduled_count,
+            auto_crawl_enabled_count,
+            next_runs,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct SchedulerStatus {
     pub is_running: bool,
-    pub scheduled_repositories_count: usize,
+    pub scheduled_jobs_count: usize,
+    pub scheduled_repositories_count: usize, // Same as scheduled_jobs_count for compatibility
     pub auto_crawl_enabled_count: usize,
-    pub next_runs: Vec<NextScheduledRun>,
+    pub next_runs: Vec<NextRun>,
 }
 
-#[derive(Debug)]
-pub struct NextScheduledRun {
+#[derive(Debug, serde::Serialize)]
+pub struct NextRun {
     pub repository_id: Uuid,
     pub repository_name: String,
-    pub next_run_at: Option<DateTime<Utc>>,
-    pub schedule_expression: Option<String>,
-}
-
-impl Clone for SchedulerService {
-    fn clone(&self) -> Self {
-        Self {
-            scheduler: self.scheduler.clone(),
-            pool: self.pool.clone(),
-            crawler_service: self.crawler_service.clone(),
-            job_ids: self.job_ids.clone(),
-        }
-    }
+    pub next_run_at: DateTime<Utc>,
+    pub cron_expression: String,
+    pub schedule_expression: String, // Same as cron_expression for compatibility
 }

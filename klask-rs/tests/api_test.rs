@@ -61,10 +61,7 @@ async fn test_repository_data_structure() {
     assert!(test_repo_data.is_object());
     assert_eq!(test_repo_data["name"].as_str().unwrap(), "test-repo");
     assert_eq!(test_repo_data["repositoryType"].as_str().unwrap(), "GitLab");
-    assert_eq!(
-        test_repo_data["gitlabNamespace"].as_str().unwrap(),
-        "test-user"
-    );
+    assert_eq!(test_repo_data["gitlabNamespace"].as_str().unwrap(), "test-user");
     assert!(!test_repo_data["isGroup"].as_bool().unwrap());
 
     // Test that all expected fields are present
@@ -111,8 +108,5 @@ async fn test_no_database_timeouts() {
         elapsed
     );
 
-    println!(
-        "✅ No database timeout test passed! Completed in: {:?}",
-        elapsed
-    );
+    println!("✅ No database timeout test passed! Completed in: {:?}", elapsed);
 }

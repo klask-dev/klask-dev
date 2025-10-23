@@ -30,7 +30,7 @@ const LoginPage: React.FC = () => {
         const API_BASE_URL = getApiBaseUrl();
         const response = await fetch(`${API_BASE_URL}/api/auth/setup/check`);
         const data = await response.json();
-        
+
         if (data.needs_setup) {
           navigate('/setup');
         } else {
@@ -50,7 +50,7 @@ const LoginPage: React.FC = () => {
       setServerError(null);
       const response = await apiClient.auth.login(data);
       login(response.token, response.user);
-      navigate('/search');
+      navigate('/home');
     } catch (error) {
       if (error instanceof Error) {
         setServerError(error.message);

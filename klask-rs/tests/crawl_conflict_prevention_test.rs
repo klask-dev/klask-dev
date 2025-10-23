@@ -95,10 +95,7 @@ async fn test_concurrent_crawl_detection() -> Result<()> {
 
     // All requests should target the same repository
     for request in &concurrent_requests {
-        assert_eq!(
-            request["repository_id"].as_str().unwrap(),
-            repository_id.to_string()
-        );
+        assert_eq!(request["repository_id"].as_str().unwrap(), repository_id.to_string());
         assert!(request["request_id"].is_string());
         assert!(request["timestamp"].is_string());
     }
@@ -107,10 +104,7 @@ async fn test_concurrent_crawl_detection() -> Result<()> {
     let mut request_ids = std::collections::HashSet::new();
     for request in &concurrent_requests {
         let request_id = request["request_id"].as_str().unwrap();
-        assert!(
-            request_ids.insert(request_id),
-            "Request ID should be unique"
-        );
+        assert!(request_ids.insert(request_id), "Request ID should be unique");
     }
 
     println!("✅ Concurrent crawl detection test passed!");
@@ -199,10 +193,7 @@ async fn test_repository_state_validation() -> Result<()> {
             assert!(!can_crawl, "Disabled repositories should not allow crawl");
         }
         if status == "running" {
-            assert!(
-                !can_crawl,
-                "Running repositories should not allow new crawl"
-            );
+            assert!(!can_crawl, "Running repositories should not allow new crawl");
         }
     }
 
@@ -227,10 +218,7 @@ async fn test_crawl_conflict_responses() -> Result<()> {
     });
 
     assert!(!conflict_response["success"].as_bool().unwrap());
-    assert_eq!(
-        conflict_response["code"].as_str().unwrap(),
-        "CRAWL_IN_PROGRESS"
-    );
+    assert_eq!(conflict_response["code"].as_str().unwrap(), "CRAWL_IN_PROGRESS");
     assert_eq!(conflict_response["status_code"].as_u64().unwrap(), 409);
     assert!(conflict_response["details"].is_object());
 
@@ -271,14 +259,8 @@ async fn test_rapid_crawl_attempt_handling() -> Result<()> {
 
     // Verify first attempt starts, subsequent attempts are rejected
     assert_eq!(rapid_attempts[0]["result"].as_str().unwrap(), "started");
-    assert_eq!(
-        rapid_attempts[1]["result"].as_str().unwrap(),
-        "rejected_conflict"
-    );
-    assert_eq!(
-        rapid_attempts[2]["result"].as_str().unwrap(),
-        "rejected_conflict"
-    );
+    assert_eq!(rapid_attempts[1]["result"].as_str().unwrap(), "rejected_conflict");
+    assert_eq!(rapid_attempts[2]["result"].as_str().unwrap(), "rejected_conflict");
 
     // All attempts should be for the same repository
     for attempt in &rapid_attempts {
@@ -400,10 +382,7 @@ async fn test_crawl_metrics_conflict_tracking() -> Result<()> {
 
     let conflicts = conflict_metrics["conflicts"].as_array().unwrap();
     assert_eq!(conflicts.len(), 1);
-    assert_eq!(
-        conflicts[0]["reason"].as_str().unwrap(),
-        "crawl_in_progress"
-    );
+    assert_eq!(conflicts[0]["reason"].as_str().unwrap(), "crawl_in_progress");
 
     println!("✅ Crawl metrics conflict tracking test passed!");
     Ok(())

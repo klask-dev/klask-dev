@@ -40,12 +40,20 @@ pub struct SearchStats {
     pub index_size_mb: f64,
     pub avg_search_time_ms: Option<f64>,
     pub popular_queries: Vec<QueryStat>,
+    pub documents_by_repository: Vec<RepositoryDocumentCount>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryStat {
     pub query: String,
     pub count: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RepositoryDocumentCount {
+    pub repository_name: String,
+    pub document_count: i64,
+    pub repository_type: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -83,7 +91,7 @@ pub struct RecentActivity {
 pub struct RecentUser {
     pub username: String,
     pub email: String,
-    pub created_at: DateTime<Utc>,
+    pub last_seen: DateTime<Utc>,
     pub role: String,
 }
 
@@ -137,9 +145,7 @@ pub async fn create_router() -> Result<Router<AppState>> {
     Ok(router)
 }
 
-async fn get_dashboard_data(
-    State(app_state): State<AppState>,
-) -> Result<Json<AdminDashboardData>, StatusCode> {
+async fn get_dashboard_data(State(app_state): State<AppState>) -> Result<Json<AdminDashboardData>, StatusCode> {
     debug!("Getting dashboard data for admin user");
     let pool = app_state.database.pool().clone();
 
@@ -178,22 +184,13 @@ async fn get_dashboard_data(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let dashboard_data = AdminDashboardData {
-        system,
-        users,
-        repositories,
-        content,
-        search,
-        recent_activity,
-    };
+    let dashboard_data = AdminDashboardData { system, users, repositories, content, search, recent_activity };
 
     info!("Successfully generated dashboard data");
     Ok(Json(dashboard_data))
 }
 
-async fn get_system_stats(
-    State(app_state): State<AppState>,
-) -> Result<Json<SystemStats>, StatusCode> {
+async fn get_system_stats(State(app_state): State<AppState>) -> Result<Json<SystemStats>, StatusCode> {
     match get_system_stats_impl(&app_state).await {
         Ok(stats) => Ok(Json(stats)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -208,9 +205,7 @@ async fn get_user_stats(State(app_state): State<AppState>) -> Result<Json<UserSt
     }
 }
 
-async fn get_repository_stats(
-    State(app_state): State<AppState>,
-) -> Result<Json<RepositoryStats>, StatusCode> {
+async fn get_repository_stats(State(app_state): State<AppState>) -> Result<Json<RepositoryStats>, StatusCode> {
     let pool = app_state.database.pool().clone();
     match get_repository_stats_impl(&pool).await {
         Ok(stats) => Ok(Json(stats)),
@@ -218,18 +213,14 @@ async fn get_repository_stats(
     }
 }
 
-async fn get_search_stats(
-    State(app_state): State<AppState>,
-) -> Result<Json<SearchStats>, StatusCode> {
+async fn get_search_stats(State(app_state): State<AppState>) -> Result<Json<SearchStats>, StatusCode> {
     match get_search_stats_impl(&app_state).await {
         Ok(stats) => Ok(Json(stats)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
-async fn get_content_stats(
-    State(app_state): State<AppState>,
-) -> Result<Json<ContentStats>, StatusCode> {
+async fn get_content_stats(State(app_state): State<AppState>) -> Result<Json<ContentStats>, StatusCode> {
     let pool = app_state.database.pool().clone();
     match get_content_stats_impl(&pool).await {
         Ok(stats) => Ok(Json(stats)),
@@ -237,9 +228,7 @@ async fn get_content_stats(
     }
 }
 
-async fn get_recent_activity(
-    State(app_state): State<AppState>,
-) -> Result<Json<RecentActivity>, StatusCode> {
+async fn get_recent_activity(State(app_state): State<AppState>) -> Result<Json<RecentActivity>, StatusCode> {
     let pool = app_state.database.pool().clone();
     match get_recent_activity_impl(&pool).await {
         Ok(activity) => Ok(Json(activity)),
@@ -272,46 +261,37 @@ async fn get_user_stats_impl(pool: &PgPool) -> Result<UserStats> {
 }
 
 async fn get_repository_stats_impl(pool: &PgPool) -> Result<RepositoryStats> {
-    let total_repositories = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories")
-        .fetch_one(pool)
-        .await?;
+    let total_repositories = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories").fetch_one(pool).await?;
 
     let enabled_repositories =
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories WHERE enabled = true")
-            .fetch_one(pool)
-            .await?;
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories WHERE enabled = true").fetch_one(pool).await?;
 
     let disabled_repositories = total_repositories - enabled_repositories;
 
-    let git_repositories = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM repositories WHERE repository_type = 'Git'",
-    )
-    .fetch_one(pool)
-    .await?;
+    let git_repositories =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories WHERE repository_type = 'Git'")
+            .fetch_one(pool)
+            .await?;
 
-    let gitlab_repositories = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM repositories WHERE repository_type = 'GitLab'",
-    )
-    .fetch_one(pool)
-    .await?;
+    let gitlab_repositories =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories WHERE repository_type = 'GitLab'")
+            .fetch_one(pool)
+            .await?;
 
-    let filesystem_repositories = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM repositories WHERE repository_type = 'FileSystem'",
-    )
-    .fetch_one(pool)
-    .await?;
+    let filesystem_repositories =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories WHERE repository_type = 'FileSystem'")
+            .fetch_one(pool)
+            .await?;
 
     let recently_crawled = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM repositories WHERE last_crawled > CURRENT_TIMESTAMP - INTERVAL '24 hours'"
+        "SELECT COUNT(*) FROM repositories WHERE last_crawled > CURRENT_TIMESTAMP - INTERVAL '24 hours'",
     )
     .fetch_one(pool)
     .await?;
 
-    let never_crawled = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM repositories WHERE last_crawled IS NULL",
-    )
-    .fetch_one(pool)
-    .await?;
+    let never_crawled = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repositories WHERE last_crawled IS NULL")
+        .fetch_one(pool)
+        .await?;
 
     Ok(RepositoryStats {
         total_repositories,
@@ -335,6 +315,41 @@ async fn get_search_stats_impl(app_state: &AppState) -> Result<SearchStats> {
     // Get actual index size in MB
     let index_size_mb = app_state.search_service.get_index_size_mb();
 
+    // Get documents by repository from advanced metrics
+    let documents_by_repository = match app_state.search_service.get_advanced_metrics() {
+        Ok(metrics) => {
+            let pool = app_state.database.pool().clone();
+            let repo_names: Vec<String> = metrics.documents_by_repository.keys().cloned().collect();
+
+            // Single query to get all repository types (avoid N+1 problem)
+            let repo_types: std::collections::HashMap<String, String> = if !repo_names.is_empty() {
+                sqlx::query_as::<_, (String, String)>(
+                    "SELECT name, repository_type::TEXT FROM repositories WHERE name = ANY($1)",
+                )
+                .bind(&repo_names)
+                .fetch_all(&pool)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .collect()
+            } else {
+                std::collections::HashMap::new()
+            };
+
+            // Build the result
+            metrics
+                .documents_by_repository
+                .into_iter()
+                .map(|(repo_name, doc_count)| RepositoryDocumentCount {
+                    repository_name: repo_name.clone(),
+                    document_count: doc_count as i64,
+                    repository_type: repo_types.get(&repo_name).cloned(),
+                })
+                .collect()
+        }
+        Err(_) => vec![],
+    };
+
     // TODO: Implement actual search metrics tracking
     // For now, return basic stats with real index size
     Ok(SearchStats {
@@ -342,6 +357,7 @@ async fn get_search_stats_impl(app_state: &AppState) -> Result<SearchStats> {
         index_size_mb,
         avg_search_time_ms: None, // TODO: Track search performance
         popular_queries: vec![],  // TODO: Track popular queries
+        documents_by_repository,
     })
 }
 
@@ -360,12 +376,14 @@ async fn get_content_stats_impl(_pool: &PgPool) -> Result<ContentStats> {
 }
 
 async fn get_recent_activity_impl(pool: &PgPool) -> Result<RecentActivity> {
-    // Recent users (last 7 days)
+    // Recent users based on activity (last login or last activity)
     let recent_users_rows = sqlx::query(
-        "SELECT username, email, created_at, role::TEXT as role
+        "SELECT username, email,
+                COALESCE(last_activity, last_login, created_at) as last_seen,
+                role::TEXT as role
          FROM users
-         WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'
-         ORDER BY created_at DESC
+         WHERE last_login IS NOT NULL OR last_activity IS NOT NULL
+         ORDER BY COALESCE(last_activity, last_login, created_at) DESC
          LIMIT 5",
     )
     .fetch_all(pool)
@@ -376,10 +394,8 @@ async fn get_recent_activity_impl(pool: &PgPool) -> Result<RecentActivity> {
         .map(|row| RecentUser {
             username: row.get("username"),
             email: row.get("email"),
-            created_at: row.get("created_at"),
-            role: row
-                .get::<Option<String>, _>("role")
-                .unwrap_or_else(|| "User".to_string()),
+            last_seen: row.get("last_seen"),
+            role: row.get::<Option<String>, _>("role").unwrap_or_else(|| "User".to_string()),
         })
         .collect();
 
@@ -399,9 +415,7 @@ async fn get_recent_activity_impl(pool: &PgPool) -> Result<RecentActivity> {
         .map(|row| RecentRepository {
             name: row.get("name"),
             url: row.get("url"),
-            repository_type: row
-                .get::<Option<String>, _>("repository_type")
-                .unwrap_or_else(|| "Unknown".to_string()),
+            repository_type: row.get::<Option<String>, _>("repository_type").unwrap_or_else(|| "Unknown".to_string()),
             created_at: row.get("created_at"),
         })
         .collect();
@@ -426,18 +440,12 @@ async fn get_recent_activity_impl(pool: &PgPool) -> Result<RecentActivity> {
         })
         .collect();
 
-    Ok(RecentActivity {
-        recent_users,
-        recent_repositories,
-        recent_crawls,
-    })
+    Ok(RecentActivity { recent_users, recent_repositories, recent_crawls })
 }
 
 // Seeding endpoints
 
-async fn seed_database(
-    State(app_state): State<AppState>,
-) -> Result<Json<SeedingStats>, StatusCode> {
+async fn seed_database(State(app_state): State<AppState>) -> Result<Json<SeedingStats>, StatusCode> {
     info!("Admin user requested database seeding");
     let pool = app_state.database.pool().clone();
     let seeding_service = SeedingService::new(pool);
@@ -456,9 +464,7 @@ async fn seed_database(
     Ok(Json(stats))
 }
 
-async fn clear_seed_data(
-    State(app_state): State<AppState>,
-) -> Result<Json<SeedingStats>, StatusCode> {
+async fn clear_seed_data(State(app_state): State<AppState>) -> Result<Json<SeedingStats>, StatusCode> {
     info!("Admin user requested seed data clearing");
     let pool = app_state.database.pool().clone();
     let seeding_service = SeedingService::new(pool);
@@ -477,9 +483,7 @@ async fn clear_seed_data(
     Ok(Json(stats))
 }
 
-async fn get_seed_stats(
-    State(app_state): State<AppState>,
-) -> Result<Json<SeedingStats>, StatusCode> {
+async fn get_seed_stats(State(app_state): State<AppState>) -> Result<Json<SeedingStats>, StatusCode> {
     debug!("Getting seeding stats for admin user");
     let pool = app_state.database.pool().clone();
     let seeding_service = SeedingService::new(pool);

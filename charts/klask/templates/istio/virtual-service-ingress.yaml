@@ -1,0 +1,37 @@
+{{- if .Values.istio.enabled -}}
+{{- $fullName := include "klask.fullname" . -}}
+{{- $frontendSvcPort := .Values.frontend.service.port -}}
+{{- $backendSvcPort := .Values.backend.service.port -}}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ .Values.istio.virtualService.name }}
+  namespace: {{ .Values.istio.virtualService.namespace }}
+spec:
+  hosts:
+    {{- range .Values.istio.virtualService.hosts }}
+    - {{ . }}
+    {{- end }}
+  gateways:
+    {{- range .Values.istio.virtualService.gateways }}
+    - {{ . }}
+    {{- end }}
+  http:
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: {{ include "klask.fullname" . }}-backend.{{ .Values.istio.virtualService.namespace }}.svc.cluster.local
+            port:
+              number: {{ $backendSvcPort }}
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "klask.fullname" . }}-frontend.{{ .Values.istio.virtualService.namespace }}.svc.cluster.local
+            port:
+              number: {{ $frontendSvcPort }}
+
+{{- end }}

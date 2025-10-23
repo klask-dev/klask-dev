@@ -1,6 +1,7 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "klask.fullname" . -}}
-{{- $svcPort := .Values.frontend.service.port -}}
+{{- $frontendSvcPort := .Values.frontend.service.port -}}
+{{- $backendSvcPort := .Values.backend.service.port -}}
 {{- if and .Values.ingress.className (not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class")) }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
 {{- end }}
@@ -39,6 +40,25 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
+          {{/* Backend API paths */}}
+          {{- if $.Values.backend.enabled }}
+          - path: /api
+            {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion }}
+            pathType: Prefix
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}-backend
+                port:
+                  number: {{ $backendSvcPort }}
+              {{- else }}
+              serviceName: {{ $fullName }}-backend
+              servicePort: {{ $backendSvcPort }}
+              {{- end }}
+          {{- end }}
+          
+          {{/* Paths existants pour le frontend */}}
           {{- range .paths }}
           - path: {{ .path }}
             {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
@@ -49,10 +69,10 @@ spec:
               service:
                 name: {{ $fullName }}-frontend
                 port:
-                  number: {{ $svcPort }}
+                  number: {{ $frontendSvcPort }}
               {{- else }}
               serviceName: {{ $fullName }}-frontend
-              servicePort: {{ $svcPort }}
+              servicePort: {{ $frontendSvcPort }}
               {{- end }}
           {{- end }}
     {{- end }}

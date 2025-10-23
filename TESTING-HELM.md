@@ -32,14 +32,7 @@ cd charts/klask
 helm lint .
 ```
 
-### 2. Mise à jour des dépendances
-```bash
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-helm dependency update
-```
-
-### 3. Génération des templates (sans déploiement)
+### 2. Génération des templates (sans déploiement)
 ```bash
 # Template de base
 helm template klask-test . --debug
@@ -51,7 +44,7 @@ helm template klask-test . --set ingress.enabled=true
 helm template klask-test . --set postgresql.enabled=false
 ```
 
-### 4. Test d'installation (dry-run)
+### 3. Test d'installation (dry-run)
 ```bash
 # Test complet sans déployer
 helm install klask-test . --dry-run --debug
@@ -138,8 +131,8 @@ helm template test3 charts/klask \
 # Test 4: Configuration production
 helm template test4 charts/klask \
   --set ingress.enabled=true \
-  --set postgresql.primary.persistence.enabled=true \
-  --set postgresql.primary.persistence.size=20Gi
+  --set postgresql.persistence.enabled=true \
+  --set postgresql.persistence.size=20Gi
 ```
 
 ### Validation avec kubeval (optionnel)

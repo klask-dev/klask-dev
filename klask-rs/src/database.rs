@@ -97,7 +97,9 @@ async fn setup_test_schema(pool: &Pool<Sqlite>) -> Result<()> {
             role TEXT NOT NULL DEFAULT 'User',
             active BOOLEAN NOT NULL DEFAULT true,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_login DATETIME,
+            last_activity DATETIME
         );
         "#,
     )
@@ -140,14 +142,8 @@ pub trait Repository {
     type CreateData;
     type UpdateData;
 
-    fn create(
-        &self,
-        data: Self::CreateData,
-    ) -> impl std::future::Future<Output = Result<Self::Entity>> + Send;
-    fn find_by_id(
-        &self,
-        id: uuid::Uuid,
-    ) -> impl std::future::Future<Output = Result<Option<Self::Entity>>> + Send;
+    fn create(&self, data: Self::CreateData) -> impl std::future::Future<Output = Result<Self::Entity>> + Send;
+    fn find_by_id(&self, id: uuid::Uuid) -> impl std::future::Future<Output = Result<Option<Self::Entity>>> + Send;
     fn update(
         &self,
         id: uuid::Uuid,

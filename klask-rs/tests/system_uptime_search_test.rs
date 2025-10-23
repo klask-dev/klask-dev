@@ -10,18 +10,12 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn test_system_uptime_tracking() -> Result<()> {
     // Test system uptime calculation logic
-    let startup_time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let startup_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
 
     // Simulate some uptime
     tokio::time::sleep(Duration::from_millis(10)).await;
 
-    let current_time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
 
     let uptime_seconds = current_time - startup_time;
 
@@ -37,10 +31,7 @@ async fn test_system_uptime_tracking() -> Result<()> {
     });
 
     assert!(uptime_data["startup_timestamp"].as_u64().unwrap() > 0);
-    assert!(
-        uptime_data["current_timestamp"].as_u64().unwrap()
-            >= uptime_data["startup_timestamp"].as_u64().unwrap()
-    );
+    assert!(uptime_data["current_timestamp"].as_u64().unwrap() >= uptime_data["startup_timestamp"].as_u64().unwrap());
     assert!(uptime_data["uptime_seconds"].as_u64().is_some());
     assert!(uptime_data["uptime_formatted"].is_string());
 
@@ -332,18 +323,13 @@ async fn test_search_index_size_calculation() -> Result<()> {
 
     let documents = index_metrics["documents"].as_u64().unwrap();
     let estimated_size = index_metrics["estimated_size_bytes"].as_u64().unwrap();
-    let avg_doc_size = index_metrics["average_document_size_bytes"]
-        .as_u64()
-        .unwrap();
+    let avg_doc_size = index_metrics["average_document_size_bytes"].as_u64().unwrap();
     let compression_ratio = index_metrics["compression_ratio"].as_f64().unwrap();
     let actual_size = index_metrics["actual_disk_usage_bytes"].as_u64().unwrap();
 
     // Validate calculations
     assert_eq!(estimated_size, documents * avg_doc_size);
-    assert_eq!(
-        actual_size,
-        (estimated_size as f64 * compression_ratio) as u64
-    );
+    assert_eq!(actual_size, (estimated_size as f64 * compression_ratio) as u64);
     assert!(compression_ratio > 0.0 && compression_ratio <= 1.0);
 
     let metadata = &index_metrics["metadata"];
@@ -370,22 +356,10 @@ async fn test_search_index_persistence() -> Result<()> {
         }
     });
 
-    assert_eq!(
-        persistence_config["auto_save_interval_minutes"]
-            .as_u64()
-            .unwrap(),
-        5
-    );
-    assert_eq!(
-        persistence_config["backup_retention_days"]
-            .as_u64()
-            .unwrap(),
-        7
-    );
+    assert_eq!(persistence_config["auto_save_interval_minutes"].as_u64().unwrap(), 5);
+    assert_eq!(persistence_config["backup_retention_days"].as_u64().unwrap(), 7);
     assert!(persistence_config["compression_enabled"].as_bool().unwrap());
-    assert!(persistence_config["checksum_verification"]
-        .as_bool()
-        .unwrap());
+    assert!(persistence_config["checksum_verification"].as_bool().unwrap());
 
     let recovery = &persistence_config["recovery_options"];
     assert!(recovery["auto_recovery"].as_bool().unwrap());
@@ -491,11 +465,7 @@ async fn test_concurrent_search_operations() -> Result<()> {
     let mut operation_ids = std::collections::HashSet::new();
     for operation in &concurrent_operations {
         let op_id = operation["operation_id"].as_str().unwrap();
-        assert!(
-            operation_ids.insert(op_id),
-            "Operation ID should be unique: {}",
-            op_id
-        );
+        assert!(operation_ids.insert(op_id), "Operation ID should be unique: {}", op_id);
     }
 
     println!("✅ Concurrent search operations test passed!");
@@ -550,17 +520,12 @@ async fn test_search_index_size_with_large_content() -> Result<()> {
         total_time += time;
     }
 
-    assert_eq!(
-        total_size,
-        large_content_metrics["total_size_bytes"].as_u64().unwrap()
-    );
+    assert_eq!(total_size, large_content_metrics["total_size_bytes"].as_u64().unwrap());
 
     let avg_time = total_time / documents.len() as u64;
     assert_eq!(
         avg_time,
-        large_content_metrics["average_indexing_time_ms"]
-            .as_u64()
-            .unwrap()
+        large_content_metrics["average_indexing_time_ms"].as_u64().unwrap()
     );
 
     println!("✅ Search index size with large content test passed!");

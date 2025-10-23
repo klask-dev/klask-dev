@@ -1,0 +1,13 @@
+{{- if and .Values.postgresql.enabled .Values.postgresql.initdb.scripts }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "klask.postgresql.fullname" . }}-initdb
+  labels:
+    {{- include "klask.postgresql.labels" . | nindent 4 }}
+data:
+  {{- range $name, $script := .Values.postgresql.initdb.scripts }}
+  {{ $name }}: |
+{{ $script | indent 4 }}
+  {{- end }}
+{{- end }}

@@ -1,6 +1,6 @@
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Key, Nonce,
+    Aes256Gcm,
 };
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
@@ -23,8 +23,9 @@ impl EncryptionService {
             hasher.finalize().to_vec()
         };
 
-        let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
-        let cipher = Aes256Gcm::new(key);
+        // Create key from slice
+        let cipher = Aes256Gcm::new_from_slice(&key_bytes)
+            .map_err(|_| anyhow::anyhow!("Invalid key length - must be 32 bytes"))?;
 
         Ok(Self { cipher })
     }
@@ -61,16 +62,16 @@ impl EncryptionService {
         }
 
         let (nonce_bytes, ciphertext) = combined.split_at(12);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        // Create nonce from slice using try_into - aes_gcm's Nonce can be created from [u8; 12]
+        let nonce_array: [u8; 12] = nonce_bytes.try_into().map_err(|_| anyhow::anyhow!("Invalid nonce length"))?;
 
         // Decrypt
         let plaintext = self
             .cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt((&nonce_array).into(), ciphertext)
             .map_err(|e| anyhow::anyhow!("Decryption failed: {:?}", e))?;
 
-        String::from_utf8(plaintext)
-            .map_err(|e| anyhow::anyhow!("Failed to convert decrypted data to string: {:?}", e))
+        String::from_utf8(plaintext).map_err(|e| anyhow::anyhow!("Failed to convert decrypted data to string: {:?}", e))
     }
 }
 

@@ -1,0 +1,19 @@
+{{- if and .Values.istio.enabled .Values.istio.egress.enabled .Values.istio.egress.gitlab.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "klask.fullname" . }}-gitlab-external
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+spec:
+  host: {{ .Values.istio.egress.gitlab.host }}
+  trafficPolicy:
+    tls:
+      mode: {{ .Values.istio.egress.gitlab.tls.mode }}
+      {{- if .Values.istio.egress.gitlab.tls.sni }}
+      sni: {{ .Values.istio.egress.gitlab.tls.sni }}
+      {{- else }}
+      sni: {{ .Values.istio.egress.gitlab.host }}
+      {{- end }}
+{{- end }}
