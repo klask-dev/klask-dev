@@ -2,13 +2,13 @@
 description: Complete workflow for implementing new features with parallel agents execution
 ---
 
-# =€ Explore-Plan-Code-Test Workflow
+# ğŸ“‹ Explore-Plan-Code-Test Workflow
 
 This command orchestrates the complete development workflow for implementing new features in Klask, using specialized AI agents in parallel for maximum efficiency.
 
-## =Ë Workflow Steps
+## ğŸ”„ Workflow Steps
 
-### 1. **Explore** =
+### 1. **Explore** ğŸ”
 Analyze the codebase to understand existing patterns and architecture.
 
 **Tasks:**
@@ -17,7 +17,7 @@ Analyze the codebase to understand existing patterns and architecture.
 - Review similar existing features
 - Identify dependencies and affected components
 
-### 2. **Plan** =İ
+### 2. **Plan** ğŸ“
 Create a detailed implementation plan.
 
 **Tasks:**
@@ -26,7 +26,7 @@ Create a detailed implementation plan.
 - Plan test coverage (unit + integration)
 - Identify potential challenges
 
-### 3. **Code** =» **(PARALLEL EXECUTION)**
+### 3. **Code** ğŸ’» **(PARALLEL EXECUTION)**
 Implement the feature using specialized agents running in parallel.
 
 **Backend (rust-backend-expert):**
@@ -46,7 +46,7 @@ Implement the feature using specialized agents running in parallel.
 Launch rust-backend-expert and react-frontend-expert agents IN PARALLEL using a single message with multiple Task tool calls.
 ```
 
-### 4. **Test** >ê **(PARALLEL EXECUTION)**
+### 4. **Test** ğŸ§ª **(PARALLEL EXECUTION)**
 Write comprehensive tests using test-specialist.
 
 **Backend Tests (test-specialist):**
@@ -64,7 +64,7 @@ Write comprehensive tests using test-specialist.
 Launch two test-specialist agents IN PARALLEL - one for backend, one for frontend.
 ```
 
-### 5. **Debug** =
+### 5. **Debug** ğŸ›
 Fix any failing tests or build errors.
 
 **Tasks:**
@@ -73,7 +73,7 @@ Fix any failing tests or build errors.
 - Fix issues systematically
 - Re-run tests until all pass
 
-### 6. **Review** =A
+### 6. **Review** ğŸ‘ï¸
 Comprehensive code review for quality, security, and performance.
 
 **Tasks:**
@@ -83,7 +83,7 @@ Comprehensive code review for quality, security, and performance.
 - Verify best practices
 - Ensure code quality standards
 
-### 7. **Verify** 
+### 7. **Verify** âœ…
 Final verification before committing.
 
 **Tasks:**
@@ -93,16 +93,16 @@ Final verification before committing.
 - Verify formatting: `cargo fmt --check` and formatting passes
 - Ensure build succeeds: `cargo build` and `npm run build`
 
-### 8. **Commit** =æ
+### 8. **Commit** ğŸ“¦
 Create commit with conventional commit message.
 
 **Tasks:**
 - Stage all changes
-- Create commit with format: `feat: description` or `fix: description`
+- Create commit with conventional commits, ex: `feat: description` or `fix: description`
 - **DO NOT** add "Generated with Claude Code"
 - **DO NOT** add co-author
 
-### 9. **Push & CI Check** =€
+### 9. **Push & CI Check** ğŸš€
 Push to GitHub and verify CI passes.
 
 **Tasks:**
@@ -113,13 +113,13 @@ Push to GitHub and verify CI passes.
 
 ---
 
-## =Ö Usage Example
+## ğŸ“– Usage Example
 
 ```
 /explore-plan-code-test Add language filter to search with dropdown in UI
 ```
 
-## <¯ Implementation Instructions
+## ğŸ¯ Implementation Instructions
 
 When this command is invoked, execute the following:
 
@@ -203,7 +203,7 @@ gh run watch
 
 ---
 
-## ¡ Key Requirements
+## âš¡ Key Requirements
 
 1. **Parallel Execution**: ALWAYS run multiple agents in parallel when possible
    - Step 3 (Code): Backend + Frontend agents simultaneously
@@ -229,53 +229,53 @@ gh run watch
 
 ---
 
-## <¨ Output Format
+## ğŸ¨ Output Format
 
 Provide updates at each step:
 
 ```
-## = Step 1: Explore
+## ğŸ” Step 1: Explore
 Analyzing codebase...
 Found relevant files:
 - Backend: klask-rs/src/services/search.rs
 - Frontend: klask-react/src/features/search/SearchPageV3.tsx
 
-## =İ Step 2: Plan
+## ğŸ“ Step 2: Plan
 [Implementation plan markdown]
 
-## =» Step 3: Code (Launching parallel agents)
+## ğŸ’» Step 3: Code (Launching parallel agents)
 Launching rust-backend-expert and react-frontend-expert in parallel...
 [Agent execution status]
 
-## >ê Step 4: Test (Launching parallel agents)
+## ğŸ§ª Step 4: Test (Launching parallel agents)
 Launching test-specialist agents for backend and frontend...
 [Test results]
 
-## = Step 5: Debug
-All tests passing 
+## ğŸ› Step 5: Debug
+All tests passing âœ…
 
-## =A Step 6: Review
+## ğŸ‘ï¸ Step 6: Review
 Launching code-reviewer...
 [Review summary]
 
-##  Step 7: Verify
+## âœ… Step 7: Verify
 Running final checks...
- Backend tests: PASSED
- Frontend tests: PASSED
- Linting: PASSED
- Build: PASSED
+âœ… Backend tests: PASSED
+âœ… Frontend tests: PASSED
+âœ… Linting: PASSED
+âœ… Build: PASSED
 
-## =æ Step 8: Commit
+## ğŸ“¦ Step 8: Commit
 Created commit: feat: add language filter to search
 
-## =€ Step 9: Push & CI Check
+## ğŸš€ Step 9: Push & CI Check
 Pushed to: feature/language-filter
-CI Status:  All checks passed
+CI Status: âœ… All checks passed
 ```
 
 ---
 
-## =« Common Pitfalls to Avoid
+## ğŸš« Common Pitfalls to Avoid
 
 1. **Sequential vs Parallel**: Don't launch agents sequentially when they can run in parallel
 2. **Incomplete Testing**: Don't skip writing tests for edge cases
@@ -285,7 +285,7 @@ CI Status:  All checks passed
 
 ---
 
-## =¡ Tips
+## ğŸ’¡ Tips
 
 - If feature is complex, break it into smaller sub-features
 - Use existing similar features as reference
