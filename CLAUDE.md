@@ -402,6 +402,49 @@ User: /explore-plan-code-test Add language filter to search
 9. [CI] Checking GitHub Actions... ✅ All checks passed
 ```
 
+### The `/devops` Command
+
+This command handles **all DevOps operations** - deployment, monitoring, troubleshooting, and infrastructure management.
+
+#### What it does:
+1. **Deploy** - Deploy Klask to Kubernetes (test/production)
+2. **Status** - Check health and status of all components
+3. **Logs** - View and analyze application logs
+4. **Troubleshoot** - Debug deployment and runtime issues
+5. **Build** - Build and push Docker images
+6. **CI/CD** - Check and manage GitHub Actions pipelines
+7. **Database** - Manage PostgreSQL in Kubernetes
+8. **Rollback** - Revert to previous deployment
+
+#### Usage Examples:
+```bash
+# Deploy to test environment
+/devops deploy test
+
+# Check application status
+/devops status
+
+# View backend logs with errors
+/devops logs backend --errors --tail 100
+
+# Troubleshoot failing pod
+/devops troubleshoot pod klask-backend-xxx
+
+# Build and push images
+/devops build all --push --tag v2.3.0
+
+# Check CI/CD pipeline
+/devops ci status
+
+# Database backup
+/devops database backup
+
+# Rollback deployment
+/devops rollback
+```
+
+See `.claude/commands/devops.md` for complete documentation.
+
 ---
 
 ## 🔗 GitHub Integration
