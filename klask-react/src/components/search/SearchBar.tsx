@@ -76,7 +76,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           type="text"
           value={localValue}
           onChange={(e) => setLocalValue(e.target.value)}
-          className="block w-full pl-10 pr-12 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+          className="block w-full pl-10 pr-12 py-3 text-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
@@ -87,9 +87,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <button
             type="button"
             onClick={handleClear}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600"
+            className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 dark:hover:text-gray-300"
           >
-            <XMarkIcon className="h-5 w-5 text-gray-400" />
+            <XMarkIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
           </button>
         )}
       </div>
