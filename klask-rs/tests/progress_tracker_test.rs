@@ -124,10 +124,21 @@ async fn test_cancelled_status_with_completed_failed() -> Result<()> {
     assert!(!tracker.is_crawling(repo_failed).await);
     assert!(tracker.is_crawling(repo_active).await);
 
-    // Verify only active repo in active progress
+    // Verify only active repo and failed repo in active progress
+    // Failed crawls are kept visible for 60 seconds to allow error display
     let active_progress = tracker.get_all_active_progress().await;
-    assert_eq!(active_progress.len(), 1);
-    assert_eq!(active_progress[0].repository_id, repo_active);
+    assert_eq!(active_progress.len(), 2);
+
+    // Should have active and failed, but not cancelled or completed
+    let has_active = active_progress.iter().any(|p| p.repository_id == repo_active);
+    let has_failed = active_progress.iter().any(|p| p.repository_id == repo_failed);
+    let has_cancelled = active_progress.iter().any(|p| p.repository_id == repo_cancelled);
+    let has_completed = active_progress.iter().any(|p| p.repository_id == repo_completed);
+
+    assert!(has_active, "Should have active repo");
+    assert!(has_failed, "Should have failed repo (kept visible for error display)");
+    assert!(!has_cancelled, "Should not have cancelled repo");
+    assert!(!has_completed, "Should not have completed repo");
 
     Ok(())
 }

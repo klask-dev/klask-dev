@@ -178,10 +178,17 @@ mod progress_tests {
 
         let active_progress = tracker.get_all_active_progress().await;
 
-        // Should only have the processing one
-        assert_eq!(active_progress.len(), 1);
-        assert_eq!(active_progress[0].repository_id, repo_id1);
-        assert!(matches!(active_progress[0].status, CrawlStatus::Processing));
+        // Should have the processing one and the failed one (kept visible for error display)
+        // Failed crawls are kept for 60 seconds to allow error display in UI
+        assert_eq!(active_progress.len(), 2);
+
+        // Verify we have both processing and failed
+        let has_processing =
+            active_progress.iter().any(|p| p.repository_id == repo_id1 && matches!(p.status, CrawlStatus::Processing));
+        let has_failed =
+            active_progress.iter().any(|p| p.repository_id == repo_id3 && matches!(p.status, CrawlStatus::Failed));
+        assert!(has_processing, "Should have processing status");
+        assert!(has_failed, "Should have failed status (kept visible for error display)");
     }
 
     #[tokio::test]
@@ -272,9 +279,10 @@ mod progress_tests {
         let progress4 = tracker.get_progress(repo_ids[4]).await.unwrap();
         assert!(matches!(progress4.status, CrawlStatus::Failed));
 
-        // Check active progress only includes non-completed/failed
+        // Check active progress includes non-completed repos and recently failed ones (kept for error display)
+        // Failed crawls are kept for 60 seconds to allow error display in UI
         let active = tracker.get_all_active_progress().await;
-        assert_eq!(active.len(), 3);
+        assert_eq!(active.len(), 4); // processing, indexing, failed, and pending (initial state)
     }
 
     #[tokio::test]
