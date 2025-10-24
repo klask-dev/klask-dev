@@ -32,6 +32,8 @@ pub enum AuthError {
     DatabaseError(String),
     #[error("Forbidden: {0}")]
     Forbidden(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl IntoResponse for AuthError {
@@ -52,6 +54,7 @@ impl IntoResponse for AuthError {
             AuthError::EmailExists => (StatusCode::CONFLICT, "Email already exists".to_string()),
             AuthError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
             AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
+            AuthError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
         };
 
         let body = Json(json!({

@@ -75,7 +75,7 @@ impl IndexMetricsCollector {
             total_documents,
             total_size_mb: index_size_mb,
             total_size_bytes,
-            segment_count,
+            segment_count: segment_count as usize,
             segments,
             space_usage,
             cache_stats,

@@ -143,6 +143,13 @@ async fn create_user(
         updated_at: chrono::Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: None,
+        phone: None,
+        timezone: Some("UTC".to_string()),
+        preferences: None,
+        login_count: 0,
     };
 
     match user_repository.create_user(&new_user).await {

@@ -10,6 +10,13 @@ export interface User {
   updated_at: string;
   last_login?: string;
   last_activity?: string;
+  avatar_url?: string;
+  bio?: string;
+  full_name?: string;
+  phone?: string;
+  timezone?: string;
+  preferences?: UserPreferences;
+  login_count?: number;
 }
 
 export const UserRole = {
@@ -18,6 +25,50 @@ export const UserRole = {
 } as const;
 
 export type UserRole = typeof UserRole[keyof typeof UserRole];
+
+// User Preferences
+export interface UserPreferences {
+  theme: 'light' | 'dark' | 'auto';
+  language: 'en' | 'fr' | 'es' | 'de';
+  notifications_email: boolean;
+  show_activity: boolean;
+}
+
+// Profile Update Request
+export interface UpdateProfileRequest {
+  full_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  phone?: string;
+  timezone?: string;
+  preferences?: UserPreferences;
+}
+
+// Password Management
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}
+
+// User Activity
+export interface UserActivity {
+  last_login?: string;
+  login_count: number;
+  last_activity?: string;
+  created_at: string;
+  devices: ActiveDevice[];
+  total_devices?: number;
+  current_page?: number;
+  page_size?: number;
+}
+
+export interface ActiveDevice {
+  ip: string;
+  user_agent: string;
+  last_seen: string;
+  device_name?: string;
+}
 
 export interface Repository {
   id: string;

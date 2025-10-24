@@ -27,6 +27,8 @@ pub struct AppState {
     #[allow(dead_code)]
     pub crawl_tasks: Arc<RwLock<HashMap<Uuid, tokio::task::JoinHandle<()>>>>,
     pub startup_time: Instant,
+    /// Rate limiter for delete account attempts (user_id -> (attempts, last_reset_time))
+    pub delete_account_rate_limiter: Arc<RwLock<HashMap<Uuid, (u32, std::time::SystemTime)>>>,
 }
 
 #[derive(Debug, Clone)]
