@@ -33,7 +33,7 @@ The PostgreSQL database runs in a Docker container named `klask-postgres-dev`.
 
 #### Start the database
 ```bash
-docker start klask-postgres-dev
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 #### Stop the database
@@ -43,7 +43,7 @@ docker stop klask-postgres-dev
 
 #### Access PostgreSQL CLI
 ```bash
-docker exec -it klask-postgres-dev psql -U klask -d klask
+docker exec -it klask-postgres-dev psql -U klask_user -d klask_dev
 ```
 
 #### Common PostgreSQL commands
@@ -82,7 +82,7 @@ SELECT name, last_crawled, last_crawl_duration_seconds FROM repositories;
 docker exec klask-postgres-dev pg_dump -U klask klask > backup.sql
 
 # Restore
-docker exec -i klask-postgres-dev psql -U klask klask < backup.sql
+docker exec -i klask-postgres-dev psql -U klask_user klask < backup.sql
 ```
 
 ---
@@ -573,7 +573,7 @@ npm run build -- --sourcemap
 ### Database Debugging
 ```bash
 # Watch queries in real-time
-docker exec -it klask-postgres-dev psql -U klask -d klask -c "ALTER SYSTEM SET log_statement = 'all';"
+docker exec -it klask-postgres-dev psql -U klask_user -d klask_dev -c "ALTER SYSTEM SET log_statement = 'all';"
 docker restart klask-postgres-dev
 docker logs -f klask-postgres-dev
 ```

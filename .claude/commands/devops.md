@@ -444,7 +444,7 @@ Restarts: 0
   - (Tantivy index stored separately)
 
 💡 To connect:
-  kubectl exec -it klask-postgres-0 --kubeconfig ~/.kube/test -- psql -U klask -d klask
+  kubectl exec -it klask-postgres-0 --kubeconfig ~/.kube/test -- psql -U klask_user -d klask_dev
 
 🔗 Connection String (from within cluster):
   postgresql://klask:klask@klask-postgres:5432/klask

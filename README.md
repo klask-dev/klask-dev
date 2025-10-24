@@ -1,10 +1,8 @@
-# [![klask.dev](https://raw.githubusercontent.com/klask-dev/klask-dev/refs/heads/upgrade-v2.1/resources/images/klask-dev-clean-v2.svg)](https://github.com/klask-dev/klask-dev)
+# [![klask.dev](https://raw.githubusercontent.com/klask-dev/klask-dev/refs/heads/master/resources/images/klask-dev-clean-v2.svg)](https://github.com/klask-dev/klask-dev)
 
 | Branch  | Build  | Coverage  |
 |---|---|---|
 | master  | [![CI/CD Pipeline](https://github.com/klask-dev/klask-dev/actions/workflows/ci.yml/badge.svg)](https://github.com/klask-dev/klask-dev/actions/workflows/ci.yml)  | [![Coverage Status](https://img.shields.io/coveralls/klask-dev/klask-dev/master.svg?style=flat-square)](https://coveralls.io/github/klask-dev/klask-dev?branch=master) |
-| develop  | [![Build Status](https://img.shields.io/travis/klask-dev/klask-dev/develop.svg?style=flat-square)](https://travis-ci.org/klask-dev/klask-dev)  | [![Coverage Status](https://img.shields.io/coveralls/klask-dev/klask-dev/develop.svg?style=flat-square)](https://coveralls.io/github/klask-dev/klask-dev?branch=develop) |
-
 #### Docker
 [![Docker Stars](https://img.shields.io/docker/stars/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/) [![Docker pulls](https://img.shields.io/docker/pulls/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/) [![Docker build](https://img.shields.io/docker/automated/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/builds/)
 

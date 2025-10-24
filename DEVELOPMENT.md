@@ -21,17 +21,7 @@ This guide will help you set up and test both the Rust backend and React fronten
 #### Option A: Using Docker Compose (Recommended)
 ```bash
 # Start PostgreSQL with Docker
-cd klask-rs
-docker-compose up -d db
-```
-
-#### Option B: Local PostgreSQL Installation
-1. Install PostgreSQL locally
-2. Create database and user:
-```sql
-CREATE DATABASE klask_dev;
-CREATE USER klask_user WITH PASSWORD 'klask_password';
-GRANT ALL PRIVILEGES ON DATABASE klask_dev TO klask_user;
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 ### 2. Rust Backend Setup

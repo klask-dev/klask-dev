@@ -109,7 +109,7 @@ helm upgrade klask . \
 
 # 5. Restaurer les données
 kubectl exec -i -n klask klask-postgresql-0 -- \
-  psql -U klask klask < backup-$(date +%Y%m%d).sql
+  psql -U klask_user klask < backup-$(date +%Y%m%d).sql
 ```
 
 ---

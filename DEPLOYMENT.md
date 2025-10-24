@@ -170,7 +170,7 @@ Access the database directly:
 
 ```bash
 # Connect to PostgreSQL
-docker-compose exec postgres psql -U klask -d klask_rs
+docker-compose exec postgres psql -U klask_user -d klask_dev
 
 # Or use pgAdmin web interface
 # Navigate to http://localhost:8080
@@ -187,7 +187,7 @@ docker-compose exec postgres pg_dump -U klask klask_rs > backup.sql
 docker run --rm -v klask-rs_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz /data
 
 # Restore database
-docker-compose exec -T postgres psql -U klask klask_rs < backup.sql
+docker-compose exec -T postgres psql -U klask_user klask_rs < backup.sql
 ```
 
 ### Scaling
