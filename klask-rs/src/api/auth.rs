@@ -79,6 +79,7 @@ pub async fn create_router() -> Result<Router<AppState>> {
         .route("/register", post(register))
         .route("/profile", get(get_profile).put(update_profile))
         .route("/password", put(change_password))
+        .route("/avatar", post(upload_avatar))
         .route("/activity", get(get_user_activity))
         .route("/account", delete(delete_account))
         .route("/setup/check", get(check_setup))
@@ -349,6 +350,24 @@ async fn change_password(
         "success": true,
         "message": "Password changed successfully"
     })))
+}
+
+/// Upload avatar image for user
+#[derive(Debug, Serialize)]
+pub struct AvatarUploadResponse {
+    pub avatar_url: String,
+}
+
+async fn upload_avatar(_auth_user: AuthenticatedUser) -> Result<Json<AvatarUploadResponse>, AuthError> {
+    // For now, we accept the avatar as a data URI from the frontend
+    // In production, you would store this in cloud storage (S3, etc)
+    // and return a proper URL
+
+    // For this MVP, we'll just acknowledge receipt and let the frontend
+    // handle storing it in the profile via the /api/auth/profile endpoint
+    Ok(Json(AvatarUploadResponse {
+        avatar_url: "avatar_processed".to_string(),
+    }))
 }
 
 /// Get user activity information
