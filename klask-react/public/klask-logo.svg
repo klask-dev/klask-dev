@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="359.53537"
+   height="73.711426"
+   viewBox="0 0 359.53537 73.711426"
+   version="1.1"
+   id="svg377"
+   sodipodi:docname="klask-dev-clean-v2.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview379"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="3.6109586"
+     inkscape:cx="141.23673"
+     inkscape:cy="-19.246967"
+     inkscape:window-width="2494"
+     inkscape:window-height="1403"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g374" />
+  <defs
+     id="defs362">
+    <linearGradient
+       id="linearGradient1647"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="0">
+      <stop
+         offset="0"
+         style="stop-color:#8998c5;stop-opacity:1;"
+         id="stop1643" />
+      <stop
+         offset="1"
+         style="stop-color:#4d5e61;stop-opacity:1;"
+         id="stop1645" />
+    </linearGradient>
+    <linearGradient
+       id="mainGradient"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="0">
+      <stop
+         offset="0%"
+         style="stop-color:#3b82f6"
+         id="stop1153" />
+      <stop
+         offset="100%"
+         style="stop-color:#06b6d4"
+         id="stop1155" />
+    </linearGradient>
+    <!-- Gradient principal -->
+    <linearGradient
+       id="mainGradient-1"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="0">
+      <stop
+         offset="0"
+         style="stop-color:#999999;stop-opacity:1;"
+         id="stop357" />
+      <stop
+         offset="0.00991724"
+         style="stop-color:#7991b6;stop-opacity:1;"
+         id="stop1158" />
+      <stop
+         offset="1"
+         style="stop-color:#5c6f7e;stop-opacity:1;"
+         id="stop359" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#mainGradient"
+       id="linearGradient383"
+       x1="13.238261"
+       y1="58.441994"
+       x2="110.27403"
+       y2="58.441994"
+       gradientTransform="matrix(1.9198431,0,0,0.52087589,46,0)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#mainGradient-1"
+       id="linearGradient385"
+       x1="-31"
+       y1="-31"
+       x2="31"
+       y2="-31"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient1647"
+       id="linearGradient387"
+       x1="17"
+       y1="17"
+       x2="41"
+       y2="17"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <!-- Groupe principal -->
+  <g
+     id="logo"
+     transform="translate(-54.8196,-30.441026)">
+    <!-- Texte klask -->
+    <text
+       x="66"
+       y="80"
+       font-family="'Fira Code', monospace"
+       font-size="64px"
+       font-weight="600"
+       fill="url(#mainGradient)"
+       letter-spacing="-1"
+       id="text364"
+       style="fill:url(#linearGradient383)">klask</text>
+    <!-- .dev en gris -->
+    <text
+       x="260"
+       y="80"
+       font-family="'Fira Code', monospace"
+       font-size="64px"
+       font-weight="500"
+       fill="#64748b"
+       letter-spacing="0"
+       id="text366">.dev</text>
+    <!-- Loupe simple et propre -->
+    <g
+       transform="translate(359.8196,63.152455)"
+       id="g374">
+      <!-- Cercle de la loupe -->
+      <!-- Manche de la loupe -->
+      <g
+         id="g1651"
+         transform="translate(-274)">
+        <circle
+           cx="0"
+           cy="0"
+           r="28"
+           fill="none"
+           stroke="url(#mainGradient)"
+           stroke-width="6"
+           id="circle368"
+           style="stroke:url(#linearGradient385)" />
+        <line
+           x1="20"
+           y1="20"
+           x2="38"
+           y2="38"
+           stroke="url(#mainGradient)"
+           stroke-width="6"
+           stroke-linecap="round"
+           id="line370"
+           style="stroke:url(#linearGradient387)" />
+      </g>
+      <!-- Highlight pour effet 3D -->
+      <circle
+         cx="-280"
+         cy="-8"
+         r="8"
+         fill="#ffffff"
+         opacity="0.4"
+         id="circle372" />
+    </g>
+  </g>
+</svg>

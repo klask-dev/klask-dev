@@ -60,14 +60,20 @@ export const Navbar: React.FC = () => {
             />
 
             {/* Logo and brand */}
-            <Link to="/home" className="flex items-center ml-2 md:mr-24">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                <MagnifyingGlassIcon className="w-5 h-5 text-white" />
-              </div>
-              <span className="self-center text-xl font-semibold sm:text-2xl whitespace-nowrap text-gray-900 dark:text-white">
-                Klask
-              </span>
-              <span className="ml-2 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
+            <Link to="/home" className="flex items-center ml-2 md:mr-24 hover:opacity-80 transition-opacity">
+              {/* Square logo for mobile/tablet */}
+              <img
+                src="/klask-logo-square.svg"
+                alt="Klask Logo"
+                className="w-8 h-8 mr-2 md:hidden"
+              />
+              {/* Full logo for desktop */}
+              <img
+                src="/klask-logo.svg"
+                alt="Klask Logo"
+                className="hidden md:block h-10 mr-3"
+              />
+              <span className="ml-1 md:ml-0 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full hidden sm:inline-block">
                 v2.0
               </span>
             </Link>
