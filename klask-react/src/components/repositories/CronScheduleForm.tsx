@@ -64,7 +64,7 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
 
   const validateCronExpression = (cron: string): string | null => {
     if (!cron.trim()) return null;
-    
+
     // Basic cron validation (should have 6 parts for seconds-based cron)
     const parts = cron.trim().split(/\s+/);
     if (parts.length !== 6) {
@@ -124,12 +124,12 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
     });
   };
 
-  // Handle duration changes  
+  // Handle duration changes
   const handleDurationChange = (value: number) => {
     onScheduleChange({
       autoCrawlEnabled,
       maxCrawlDurationMinutes: value,
-      ...(currentMode === 'cron' 
+      ...(currentMode === 'cron'
         ? { cronSchedule: localCronSchedule, crawlFrequencyHours: undefined }
         : { crawlFrequencyHours: crawlFrequencyHours || 24, cronSchedule: undefined }
       ),
@@ -193,9 +193,9 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
           id="autoCrawlEnabled"
           checked={autoCrawlEnabled}
           onChange={(e) => handleAutoCrawlToggle(e.target.checked)}
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded"
         />
-        <label htmlFor="autoCrawlEnabled" className="text-sm font-medium text-gray-900">
+        <label htmlFor="autoCrawlEnabled" className="text-sm font-medium text-gray-900 dark:text-gray-300">
           Enable automatic crawling
         </label>
       </div>
@@ -204,14 +204,14 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
         <>
           {/* Schedule Mode Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               Schedule Type
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
                 currentMode === 'frequency'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
               }`}>
                 <input
                   type="radio"
@@ -225,15 +225,15 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
                   className="sr-only"
                 />
                 <div className="flex flex-col items-center space-y-1">
-                  <ClockIcon className="h-5 w-5" />
-                  <span className="text-xs font-medium">Simple Frequency</span>
+                  <ClockIcon className={`h-5 w-5 ${currentMode === 'frequency' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
+                  <span className={`text-xs font-medium ${currentMode === 'frequency' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>Simple Frequency</span>
                 </div>
               </label>
 
               <label className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
                 currentMode === 'cron'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
               }`}>
                 <input
                   type="radio"
@@ -247,8 +247,8 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
                   className="sr-only"
                 />
                 <div className="flex flex-col items-center space-y-1">
-                  <ClockIcon className="h-5 w-5" />
-                  <span className="text-xs font-medium">Cron Expression</span>
+                  <ClockIcon className={`h-5 w-5 ${currentMode === 'cron' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
+                  <span className={`text-xs font-medium ${currentMode === 'cron' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>Cron Expression</span>
                 </div>
               </label>
             </div>
@@ -257,14 +257,14 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
           {/* Frequency Configuration */}
           {currentMode === 'frequency' && (
             <div>
-              <label htmlFor="frequency" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="frequency" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Crawl Frequency
               </label>
               <select
                 id="frequency"
                 value={crawlFrequencyHours || 24}
                 onChange={(e) => handleFrequencyChange(Number(e.target.value))}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-300"
               >
                 {FREQUENCY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -272,7 +272,7 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 How often should this repository be crawled automatically?
               </p>
             </div>
@@ -281,7 +281,7 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
           {/* Cron Configuration */}
           {currentMode === 'cron' && (
             <div>
-              <label htmlFor="cronSchedule" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="cronSchedule" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Cron Expression
               </label>
               <input
@@ -289,43 +289,43 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
                 id="cronSchedule"
                 value={localCronSchedule}
                 onChange={(e) => handleCronInputChange(e.target.value)}
-                className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                  cronError ? 'border-red-300' : 'border-gray-300'
+                className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-300 ${
+                  cronError ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 placeholder="0 0 2 * * * (daily at 2:00 AM)"
               />
               {cronError && (
-                <div className="mt-1 flex items-center space-x-1 text-sm text-red-600">
+                <div className="mt-1 flex items-center space-x-1 text-sm text-red-600 dark:text-red-400">
                   <ExclamationTriangleIcon className="h-4 w-4" />
                   <span>{cronError}</span>
                 </div>
               )}
               {!cronError && localCronSchedule && (
-                <div className="mt-1 flex items-center space-x-1 text-sm text-green-600">
+                <div className="mt-1 flex items-center space-x-1 text-sm text-green-600 dark:text-green-400">
                   <CheckCircleIcon className="h-4 w-4" />
                   <span>Valid cron expression</span>
                 </div>
               )}
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Format: seconds minutes hours day month weekday
               </p>
-              <p className="mt-1 text-xs text-blue-600">
+              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
                 ℹ️ Times are in your local timezone ({getBrowserTimezoneName()})
               </p>
 
               {/* Common Examples */}
               <div className="mt-3">
-                <p className="text-xs font-medium text-gray-700 mb-2">Common Examples:</p>
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Common Examples:</p>
                 <div className="grid grid-cols-1 gap-1">
                   {getCommonCronExamples().map((example, index) => (
                     <button
                       key={index}
                       type="button"
                       onClick={() => handleCronInputChange(example.expression)}
-                      className="text-left px-2 py-1 text-xs bg-gray-50 hover:bg-gray-100 rounded border-l-2 border-blue-500"
+                      className="text-left px-2 py-1 text-xs bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded border-l-2 border-blue-500"
                     >
-                      <code className="font-mono text-blue-600">{example.expression}</code>
-                      <span className="ml-2 text-gray-600">- {example.description}</span>
+                      <code className="font-mono text-blue-600 dark:text-blue-400">{example.expression}</code>
+                      <span className="ml-2 text-gray-600 dark:text-gray-400">- {example.description}</span>
                     </button>
                   ))}
                 </div>
@@ -335,14 +335,14 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
 
           {/* Max Duration */}
           <div>
-            <label htmlFor="maxDuration" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="maxDuration" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Maximum Crawl Duration
             </label>
             <select
               id="maxDuration"
               value={maxCrawlDurationMinutes || 60}
               onChange={(e) => handleDurationChange(Number(e.target.value))}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-300"
             >
               {DURATION_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -350,17 +350,17 @@ export const CronScheduleForm: React.FC<CronScheduleFormProps> = ({
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Crawl will be terminated if it exceeds this duration
             </p>
           </div>
 
           {/* Next Run Info */}
           {getNextRunDescription() && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="p-3 bg-blue-50 dark:bg-blue-800/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
               <div className="flex items-center space-x-2">
-                <ClockIcon className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-blue-800">{getNextRunDescription()}</span>
+                <ClockIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm text-blue-800 dark:text-blue-300">{getNextRunDescription()}</span>
               </div>
             </div>
           )}

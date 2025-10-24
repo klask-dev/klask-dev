@@ -114,15 +114,15 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         onClick={() => handleChange(key, option.value, !isSelected)}
         className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors text-sm w-full text-left ${
           isSelected
-            ? 'bg-blue-50 text-blue-700'
-            : 'hover:bg-gray-50 text-gray-700'
+            ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+            : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
         }`}
         aria-pressed={isSelected}
       >
         <span className="truncate text-xs min-w-0 flex-1" title={option.label}>
           {option.label}
         </span>
-        <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded ml-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded ml-2">
           {option.count}
         </span>
       </button>
@@ -163,13 +163,13 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
-            <Icon className="h-4 w-4 text-gray-500" />
-            <h4 className="text-xs font-medium text-gray-900 uppercase tracking-wide">{title}</h4>
+            <Icon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <h4 className="text-xs font-medium text-gray-900 dark:text-white uppercase tracking-wide">{title}</h4>
           </div>
           {selectedValues.length > 0 && (
             <button
               onClick={() => clearFilter(filterKey)}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               title="Clear filter"
             >
               <XMarkIcon className="h-3 w-3" />
@@ -185,7 +185,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={`Search ${title.toLowerCase()}...`}
-              className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
         )}
@@ -193,7 +193,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         {/* Options list */}
         <div className="space-y-1 max-h-48 overflow-y-auto">
           {sortedOptions.length === 0 ? (
-            <div className="text-xs text-gray-400 px-2 py-1">No matches</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1">No matches</div>
           ) : (
             sortedOptions.map((option) => {
               const isSelected = selectedValues.includes(option.value);
@@ -220,13 +220,13 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wide">
+        <div className="text-xs font-semibold leading-6 text-gray-400 dark:text-gray-500 uppercase tracking-wide">
           Search Filters
         </div>
         {hasActiveFilters && (
           <button
             onClick={clearAllFilters}
-            className="text-xs text-blue-600 hover:text-blue-800"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             Clear all
           </button>
@@ -243,7 +243,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   {values.map((value) => (
                     <div
                       key={`${key}-${value}`}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded mr-1 mb-1"
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded mr-1 mb-1"
                     >
                       <span className="capitalize">{key}:</span>
                       <span className="font-medium truncate max-w-20" title={value}>{value}</span>
@@ -256,7 +256,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                             [key]: newValues.length > 0 ? newValues : undefined,
                           });
                         }}
-                        className="hover:text-blue-600"
+                        className="hover:text-blue-600 dark:hover:text-blue-300"
                       >
                         <XMarkIcon className="h-3 w-3" />
                       </button>
@@ -271,7 +271,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
 
       {/* Loading state */}
       {isLoading ? (
-        <div className="text-xs text-gray-500 mb-4">Loading filters...</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">Loading filters...</div>
       ) : (
         <>
           {/* Filter Sections */}

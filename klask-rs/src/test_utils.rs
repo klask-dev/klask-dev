@@ -33,7 +33,16 @@ async fn setup_test_schema(pool: &Pool<Sqlite>) -> Result<()> {
             role TEXT NOT NULL DEFAULT 'User',
             active BOOLEAN NOT NULL DEFAULT true,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_login DATETIME,
+            last_activity DATETIME,
+            avatar_url TEXT,
+            bio TEXT,
+            full_name TEXT,
+            phone TEXT,
+            timezone TEXT,
+            preferences TEXT,
+            login_count INTEGER NOT NULL DEFAULT 0
         );
         "#,
     )

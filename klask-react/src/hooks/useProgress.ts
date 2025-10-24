@@ -110,20 +110,22 @@ export function useProgress({
 
     const pollActiveProgress = async () => {
       if (!isMounted) return;
-      
+
       try {
         setIsActiveLoading(true);
         setError(null);
         const activeProgressData = await api.getActiveProgress();
-        
+
         if (!isMounted) return;
-        
+
+        // Keep both active AND failed crawls visible for a few seconds to show errors
+        // This allows users to see error messages before they disappear
         setActiveProgress(activeProgressData);
-        
+
         // Continue polling - no restart needed
       } catch (err) {
         if (!isMounted) return;
-        
+
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch active progress';
         setError(errorMessage);
         console.error('Error fetching active progress:', err);
@@ -142,7 +144,7 @@ export function useProgress({
       // Use shorter intervals in test environment
       const isTestEnv = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
       const idleInterval = isTestEnv ? 100 : 15000; // 100ms in tests, 15s in production when idle
-      
+
       intervalId = setInterval(async () => {
         if (!isMounted || document.hidden) return;
         await pollActiveProgress();

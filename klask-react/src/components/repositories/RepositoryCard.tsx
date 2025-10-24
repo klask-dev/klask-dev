@@ -21,6 +21,7 @@ import { CrawlProgressBar, GitLabHierarchicalProgressBar } from '../ui/ProgressB
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useStopCrawl } from '../../hooks/useRepositories';
 import { isRepositoryCrawling, getRepositoryProgressFromActive, type CrawlProgressInfo } from '../../hooks/useProgress';
+import { InlineCrawlError } from './CrawlErrorDisplay';
 
 interface RepositoryCardProps {
   repository: RepositoryWithStats;
@@ -211,14 +212,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   };
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 relative z-10 ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md dark:hover:shadow-lg transition-shadow duration-200 relative z-10 ${className}`}>
       <div className="p-6 relative">
         {/* Actions Menu - positioned absolutely in top-right */}
         <div className="absolute top-2 right-2">
           <div className="relative">
             <button
               onClick={handleMenuClick}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+              className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -229,14 +230,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-10">
                 <div className="py-1">
                   <button
                     onClick={() => {
                       onEdit(repository);
                       setShowMenu(false);
                     }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
                   >
                     <PencilIcon className="h-4 w-4 mr-3" />
                     Edit
@@ -247,7 +248,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                       onToggleEnabled(repository);
                       setShowMenu(false);
                     }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
                   >
                     {repoData.enabled ? (
                       <>
@@ -266,7 +267,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                     <button
                       onClick={handleStopCrawlClick}
                       disabled={stopCrawlMutation?.isPending}
-                      className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center w-full px-4 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {stopCrawlMutation?.isPending ? (
                         <LoadingSpinner size="sm" className="mr-3" />
@@ -282,7 +283,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                         setShowMenu(false);
                       }}
                       disabled={!repoData.enabled}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid={`individual-crawl-menu-button-${repoData.id}`}
                     >
                       <ArrowPathIcon className="h-4 w-4 mr-3" />
@@ -290,14 +291,14 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                     </button>
                   )}
 
-                  <hr className="my-1" />
+                  <hr className="my-1 border-gray-300 dark:border-gray-600" />
 
                   <button
                     onClick={() => {
                       onDelete(repository);
                       setShowMenu(false);
                     }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                    className="flex items-center w-full px-4 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                   >
                     <TrashIcon className="h-4 w-4 mr-3" />
                     Delete
@@ -315,17 +316,17 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
               {getTypeIcon(repoData.repositoryType)}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 truncate">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
                 {repoData.name}
               </h3>
-              <p className="text-sm text-gray-500 truncate">
+              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                 {repoData.url}
               </p>
               {/* Display stats if available */}
               {stats && (stats.diskSizeMb !== undefined || stats.fileCount !== undefined) && (
                 <div className="flex items-center space-x-3 mt-1">
                   {stats.diskSizeMb !== undefined && stats.diskSizeMb > 0 && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
                       📁 {stats.diskSizeMb < 1
                         ? `${(stats.diskSizeMb * 1024).toFixed(0)} KB`
                         : stats.diskSizeMb < 1024
@@ -335,7 +336,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                     </span>
                   )}
                   {stats.fileCount !== undefined && stats.fileCount > 0 && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
                       📄 {stats.fileCount.toLocaleString()} files
                     </span>
                   )}
@@ -362,16 +363,16 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
         {/* Badges - positioned above metadata, horizontal and right-aligned */}
         <div className="flex justify-end items-center gap-2 mb-3">
-          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
+          <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded">
             {repoData.repositoryType}
           </span>
           {repoData.branch && (
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
               {repoData.branch}
             </span>
           )}
           {repoData.autoCrawlEnabled && (
-            <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded flex items-center space-x-1">
+            <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded flex items-center space-x-1">
               <BoltIcon className="h-3 w-3" />
               <span>Auto-crawl</span>
             </span>
@@ -379,26 +380,26 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Metadata */}
-        <div className="space-y-2 text-sm text-gray-600">
+        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center space-x-2">
             <ClockIcon className="h-4 w-4 flex-shrink-0" />
             <span>Last crawled: {formatLastCrawled(repoData.lastCrawled)}</span>
             {repoData.lastCrawlDurationSeconds && (
-              <span className="text-gray-400">
+              <span className="text-gray-400 dark:text-gray-500">
                 ({formatDuration(repoData.lastCrawlDurationSeconds)})
               </span>
             )}
           </div>
 
           {repoData.autoCrawlEnabled && repoData.nextCrawlAt && (
-            <div className="flex items-center space-x-2 text-green-600">
+            <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
               <BoltIcon className="h-4 w-4 flex-shrink-0" />
               <span>Next crawl: {formatNextCrawl(repoData.nextCrawlAt)}</span>
             </div>
           )}
 
           <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-gray-500">
               Created {formatCreatedAt(repoData.createdAt)}
             </span>
           </div>
@@ -425,16 +426,23 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </div>
         )}
 
+        {/* Crawl Error Display - Show if there's an error */}
+        {crawlProgress?.error_message && (
+          <div className="mt-4">
+            <InlineCrawlError errorMessage={crawlProgress.error_message} />
+          </div>
+        )}
+
         {/* Quick Actions */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
           <div className="flex space-x-2">
             <button
               onClick={() => onToggleEnabled(repository)}
               disabled={isLoading}
               className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                 repoData.enabled
-                  ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               {repoData.enabled ? (
@@ -455,7 +463,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             <button
               onClick={handleStopCrawlClick}
               disabled={stopCrawlMutation?.isPending || isLoading}
-              className="inline-flex items-center px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center px-3 py-1 text-xs font-medium text-red-700 dark:text-red-200 bg-red-100 dark:bg-red-900 rounded-full hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {stopCrawlMutation?.isPending ? (
                 <LoadingSpinner size="sm" className="h-3 w-3 mr-1" />
@@ -468,7 +476,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
             <button
               onClick={() => onCrawl(repository)}
               disabled={!repoData.enabled || isLoading}
-              className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-900 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               data-testid={`individual-crawl-button-${repoData.id}`}
             >
               <ArrowPathIcon className="h-3 w-3 mr-1" />

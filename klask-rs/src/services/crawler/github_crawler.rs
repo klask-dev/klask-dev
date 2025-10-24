@@ -1,4 +1,5 @@
 use super::branch_processor::CrawlProgress;
+use super::filter::filter_repositories;
 use crate::models::{Repository, RepositoryType};
 use crate::repositories::RepositoryRepository;
 use crate::services::encryption::EncryptionService;
@@ -148,26 +149,24 @@ impl GitHubCrawler {
                 }
             };
 
-        // Filter out excluded repositories using repository-specific exclusions
-        let excluded_repositories: Vec<String> = repository
-            .github_excluded_repositories
-            .as_ref()
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-            .unwrap_or_default();
-        let excluded_patterns: Vec<String> = repository
-            .github_excluded_patterns
-            .as_ref()
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-            .unwrap_or_default();
+        // Convert GitHub repositories to simple string names for filtering
+        let repo_names: Vec<String> = repositories.iter().map(|r| r.full_name.clone()).collect();
 
-        let filtered_repositories = github_service.filter_excluded_repositories_with_config(
-            repositories,
-            &excluded_repositories,
-            &excluded_patterns,
+        // Apply filtering logic: included filters first, then exclusions
+        let filtered_repo_names = filter_repositories(
+            repo_names,
+            repository.included_projects.as_deref(),
+            repository.included_projects_patterns.as_deref(),
+            repository.github_excluded_repositories.as_deref(),
+            repository.github_excluded_patterns.as_deref(),
         );
 
+        // Map back from filtered names to GitHub repository objects
+        let filtered_repositories: Vec<_> =
+            repositories.into_iter().filter(|r| filtered_repo_names.contains(&r.full_name)).collect();
+
         if filtered_repositories.is_empty() {
-            let error_msg = "No accessible GitHub repositories found after exclusion filtering";
+            let error_msg = "No accessible GitHub repositories found after filtering";
             self.progress_tracker.set_error(repository.id, error_msg.to_string()).await;
             // Mark crawl as failed in database
             let _ = repo_repo.fail_crawl(repository.id).await;
@@ -176,7 +175,7 @@ impl GitHubCrawler {
         }
 
         info!(
-            "Discovered {} GitHub repositories for repository {} (after exclusion filtering)",
+            "Discovered {} GitHub repositories for repository {} after filtering",
             filtered_repositories.len(),
             repository.name
         );
@@ -245,6 +244,12 @@ impl GitHubCrawler {
                 crawl_state: repository.crawl_state.clone(),
                 last_processed_project: repository.last_processed_project.clone(),
                 crawl_started_at: repository.crawl_started_at,
+                included_branches: repository.included_branches.clone(),
+                included_branches_patterns: repository.included_branches_patterns.clone(),
+                excluded_branches: repository.excluded_branches.clone(),
+                excluded_branches_patterns: repository.excluded_branches_patterns.clone(),
+                included_projects: repository.included_projects.clone(),
+                included_projects_patterns: repository.included_projects_patterns.clone(),
             };
 
             // Clone this specific repository

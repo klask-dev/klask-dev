@@ -35,7 +35,7 @@ export const SelectableRepositoryCard: React.FC<SelectableRepositoryCardProps> =
   return (
     <div className={clsx(
       'group relative rounded-lg',
-      selected ? 'ring-2 ring-blue-200 bg-blue-50 shadow-lg transform translate-y-0.5' : '',
+      selected ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20 shadow-lg transform translate-y-0.5' : '',
       'transition-all duration-200',
       className
     )}
@@ -46,10 +46,10 @@ export const SelectableRepositoryCard: React.FC<SelectableRepositoryCardProps> =
         <div
           className={clsx(
             'w-5 h-5 rounded border-2 transition-all duration-200 cursor-pointer flex items-center justify-center',
-            selected 
-              ? 'bg-blue-600 border-blue-600' 
-              : 'bg-white border-gray-300 opacity-0 group-hover:opacity-100',
-            'hover:border-blue-400'
+            selected
+              ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500'
+              : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 opacity-0 group-hover:opacity-100',
+            'hover:border-blue-400 dark:hover:border-blue-400'
           )}
           onClick={(e) => {
             e.stopPropagation();

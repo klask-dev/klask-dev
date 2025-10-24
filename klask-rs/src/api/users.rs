@@ -47,6 +47,8 @@ pub struct UserResponse {
     pub email: String,
     pub role: UserRole,
     pub active: bool,
+    pub avatar_url: Option<String>,
+    pub full_name: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub last_login: Option<chrono::DateTime<chrono::Utc>>,
@@ -61,6 +63,8 @@ impl From<User> for UserResponse {
             email: user.email,
             role: user.role,
             active: user.active,
+            avatar_url: user.avatar_url,
+            full_name: user.full_name,
             created_at: user.created_at,
             updated_at: user.updated_at,
             last_login: user.last_login,
@@ -143,6 +147,13 @@ async fn create_user(
         updated_at: chrono::Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: None,
+        phone: None,
+        timezone: Some("UTC".to_string()),
+        preferences: None,
+        login_count: 0,
     };
 
     match user_repository.create_user(&new_user).await {

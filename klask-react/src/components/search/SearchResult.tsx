@@ -57,19 +57,19 @@ export const SearchResult: React.FC<SearchResultProps> = ({
   const directory = extractedPath.directory;
 
   return (
-    <div 
-      className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 ${className}`}
+    <div
+      className={`bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 ${className}`}
     >
       {/* File Header */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-600">
         {/* Main row with file info and badges */}
         <div className="flex items-start justify-between gap-4">
           {/* Left side: Icon and file info */}
           <div className="flex items-start space-x-3 min-w-0 flex-1">
-            <DocumentTextIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+            <DocumentTextIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1">
               {/* File name - prominent */}
-              <h3 className="font-semibold text-gray-900 text-base leading-tight">
+              <h3 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">
                 {highlightQuery(filename, query)}
               </h3>
             </div>
@@ -78,17 +78,17 @@ export const SearchResult: React.FC<SearchResultProps> = ({
           {/* Right side: Badges */}
           <div className="flex flex-col items-end space-y-2">
             <div className="flex items-center space-x-2 flex-shrink-0">
-              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded">
+              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">
                 {result.extension || 'N/A'}
               </span>
-              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 text-green-700 rounded">
+              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">
                 {((result.score || 0) * 100).toFixed(0)}%
               </span>
             </div>
             {/* View File button moved here */}
             <button
               onClick={() => onFileClick(result)}
-              className="inline-flex items-center space-x-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+              className="inline-flex items-center space-x-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
             >
               <EyeIcon className="h-3 w-3" />
               <span>View File</span>
@@ -98,7 +98,7 @@ export const SearchResult: React.FC<SearchResultProps> = ({
         </div>
         
         {/* Metadata row */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-500">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-500 dark:text-gray-400">
           {result.repository_name && (
             <RepositoryBadge
               name={result.repository_name}
@@ -107,19 +107,19 @@ export const SearchResult: React.FC<SearchResultProps> = ({
             />
           )}
           <span className="inline-flex items-center">
-            <span className="font-medium text-gray-600">Project:</span>
+            <span className="font-medium text-gray-600 dark:text-gray-300">Project:</span>
             <span className="ml-1">{result.project || 'Unknown'}</span>
           </span>
-          <span className="text-gray-300">•</span>
+          <span className="text-gray-300 dark:text-gray-600">•</span>
           <span className="inline-flex items-center">
-            <span className="font-medium text-gray-600">Version:</span>
+            <span className="font-medium text-gray-600 dark:text-gray-300">Version:</span>
             <span className="ml-1">{result.version || 'Unknown'}</span>
           </span>
           {result.line_number && (
             <>
-              <span className="text-gray-300">•</span>
+              <span className="text-gray-300 dark:text-gray-600">•</span>
               <span className="inline-flex items-center">
-                <span className="font-medium text-gray-600">Line:</span>
+                <span className="font-medium text-gray-600 dark:text-gray-300">Line:</span>
                 <span className="ml-1">{result.line_number}</span>
               </span>
             </>
@@ -130,9 +130,9 @@ export const SearchResult: React.FC<SearchResultProps> = ({
       {/* Code Preview */}
       <div className="p-4">
         <div className="relative">
-          <div className="overflow-hidden rounded border border-gray-200">
+          <div className="overflow-hidden rounded border border-gray-200 dark:border-gray-600">
             <div
-              className="p-3 bg-gray-50 text-sm font-mono overflow-auto"
+              className="p-3 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-mono overflow-auto"
               style={{
                 maxHeight: '200px',
                 lineHeight: '1.5',
@@ -171,7 +171,7 @@ export const SearchResult: React.FC<SearchResultProps> = ({
         </div>
         
         {/* Full Path Info */}
-        <div className="mt-2 text-xs text-gray-500">
+        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center space-x-1">
             <FolderIcon className="h-3.5 w-3.5" />
             <span className="font-mono">{result.path || 'Unknown path'}</span>

@@ -55,7 +55,7 @@ kubectl logs -f deployment/klask-backend --kubeconfig ~/.kube/test
 ## Health Checks
 - Backend: `http://localhost:8080/health`
 - Frontend: `http://localhost:3000`
-- Database: `psql -h localhost -p 5432 -U klask -d klask`
+- Database: `psql -h localhost -p 5432 -U klask_user -d klask_dev`
 
 ## Troubleshooting
 

@@ -169,6 +169,7 @@ async fn main() -> Result<()> {
         config: config.clone(),
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time,
+        delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     };
 
     // Build application router

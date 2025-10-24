@@ -45,7 +45,7 @@ rust-test:
 # Rust database operations
 rust-migrate:
 	@echo "Waiting for database to be ready..."
-	@until cd klask-rs && docker-compose exec postgres pg_isready -U klask -d klask_rs; do sleep 1; done
+	@until cd klask-rs && docker-compose exec postgres pg_isready -U klask_user -d klask_dev; do sleep 1; done
 	cd klask-rs && sqlx migrate run
 
 # Rust build commands

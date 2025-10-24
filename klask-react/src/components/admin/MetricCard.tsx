@@ -22,51 +22,51 @@ interface MetricCardProps {
 
 const colorClasses = {
   blue: {
-    bg: 'bg-blue-50',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
     icon: 'text-blue-600',
     trend: {
-      up: 'text-green-600',
-      down: 'text-red-600'
+      up: 'text-green-600 dark:text-green-400',
+      down: 'text-red-600 dark:text-red-400'
     }
   },
   green: {
-    bg: 'bg-green-50',
+    bg: 'bg-green-50 dark:bg-green-900/20',
     icon: 'text-green-600',
     trend: {
-      up: 'text-green-600',
-      down: 'text-red-600'
+      up: 'text-green-600 dark:text-green-400',
+      down: 'text-red-600 dark:text-red-400'
     }
   },
   yellow: {
-    bg: 'bg-yellow-50',
+    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
     icon: 'text-yellow-600',
     trend: {
-      up: 'text-green-600',
-      down: 'text-red-600'
+      up: 'text-green-600 dark:text-green-400',
+      down: 'text-red-600 dark:text-red-400'
     }
   },
   red: {
-    bg: 'bg-red-50',
+    bg: 'bg-red-50 dark:bg-red-900/20',
     icon: 'text-red-600',
     trend: {
-      up: 'text-green-600',
-      down: 'text-red-600'
+      up: 'text-green-600 dark:text-green-400',
+      down: 'text-red-600 dark:text-red-400'
     }
   },
   purple: {
-    bg: 'bg-purple-50',
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
     icon: 'text-purple-600',
     trend: {
-      up: 'text-green-600',
-      down: 'text-red-600'
+      up: 'text-green-600 dark:text-green-400',
+      down: 'text-red-600 dark:text-red-400'
     }
   },
   indigo: {
-    bg: 'bg-indigo-50',
+    bg: 'bg-indigo-50 dark:bg-indigo-900/20',
     icon: 'text-indigo-600',
     trend: {
-      up: 'text-green-600',
-      down: 'text-red-600'
+      up: 'text-green-600 dark:text-green-400',
+      down: 'text-red-600 dark:text-red-400'
     }
   }
 };
@@ -93,8 +93,8 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   return (
     <div
       className={`
-        relative bg-white overflow-hidden shadow rounded-lg
-        ${isClickable ? 'cursor-pointer hover:shadow-md transition-shadow duration-200' : ''}
+        relative bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg
+        ${isClickable ? 'cursor-pointer hover:shadow-md dark:hover:shadow-xl transition-shadow duration-200' : ''}
       `}
       onClick={onClick}
     >
@@ -107,11 +107,11 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           </div>
           <div className="ml-5 w-0 flex-1">
             <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                 {title}
               </dt>
               <dd>
-                <div className="text-lg font-medium text-gray-900">
+                <div className="text-lg font-medium text-gray-900 dark:text-white">
                   {formatValue(value)}
                 </div>
               </dd>
@@ -119,15 +119,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           </div>
           {isClickable && (
             <div className="flex-shrink-0">
-              <ArrowRightIcon className="h-5 w-5 text-gray-400" />
+              <ArrowRightIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </div>
           )}
         </div>
-        
+
         {(description || trend) && (
           <div className="mt-3 flex items-center justify-between">
             {description && (
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
                 {description}
               </div>
             )}
@@ -141,7 +141,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
                 <span className="font-medium">
                   {trend.direction === 'up' ? '+' : '-'}{Math.abs(trend.value)}%
                 </span>
-                <span className="ml-1 text-gray-500">
+                <span className="ml-1 text-gray-500 dark:text-gray-400">
                   {trend.label}
                 </span>
               </div>

@@ -177,12 +177,20 @@ impl ProgressTracker {
 
     pub async fn get_all_active_progress(&self) -> Vec<CrawlProgressInfo> {
         let map = self.progress_map.read().await;
+        let now = Utc::now();
+        let recent_cutoff = now - chrono::Duration::seconds(60); // Show failed crawls for 60 seconds
+
         map.values()
             .filter(|p| {
-                !matches!(
-                    p.status,
-                    CrawlStatus::Completed | CrawlStatus::Failed | CrawlStatus::Cancelled
-                )
+                // Keep active crawls and recently failed crawls (for UI error display)
+                match p.status {
+                    CrawlStatus::Completed | CrawlStatus::Cancelled => false,
+                    CrawlStatus::Failed => {
+                        // Keep failed crawls that happened in the last 60 seconds
+                        p.completed_at.is_none_or(|completed| completed > recent_cutoff)
+                    }
+                    _ => true, // Keep all other active crawls (Starting, Cloning, Processing, Indexing)
+                }
             })
             .cloned()
             .collect()

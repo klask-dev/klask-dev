@@ -24,8 +24,8 @@ impl TestUserRepository {
     pub async fn create_user(&self, user: &User) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
             "#,
         )
         .bind(user.id.to_string())
@@ -38,6 +38,13 @@ impl TestUserRepository {
         .bind(user.updated_at)
         .bind(user.last_login)
         .bind(user.last_activity)
+        .bind(&user.avatar_url)
+        .bind(&user.bio)
+        .bind(&user.full_name)
+        .bind(&user.phone)
+        .bind(&user.timezone)
+        .bind(&user.preferences)
+        .bind(user.login_count)
         .execute(&self.pool)
         .await?;
 
@@ -47,7 +54,7 @@ impl TestUserRepository {
     #[allow(dead_code)]
     pub async fn get_user(&self, id: Uuid) -> Result<Option<User>> {
         let row = sqlx::query(
-            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity FROM users WHERE id = ?1"
+            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count FROM users WHERE id = ?1"
         )
         .bind(id.to_string())
         .fetch_optional(&self.pool)
@@ -65,6 +72,13 @@ impl TestUserRepository {
                 updated_at: row.get("updated_at"),
                 last_login: row.get("last_login"),
                 last_activity: row.get("last_activity"),
+                avatar_url: row.get("avatar_url"),
+                bio: row.get("bio"),
+                full_name: row.get("full_name"),
+                phone: row.get("phone"),
+                timezone: row.get("timezone"),
+                preferences: row.get("preferences"),
+                login_count: row.get("login_count"),
             };
             Ok(Some(user))
         } else {

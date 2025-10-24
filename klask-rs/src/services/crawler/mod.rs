@@ -1,6 +1,7 @@
 // Module declarations for crawler submodules
 pub mod branch_processor;
 pub mod file_processing;
+pub mod filter;
 pub mod git_operations;
 pub mod git_tree_walker;
 pub mod github_crawler;

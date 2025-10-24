@@ -57,6 +57,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time: Instant::now(),
         encryption_service: Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap()),
+        delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     };
 
     let app = klask_rs::api::create_router().await?.with_state(app_state.clone());
@@ -84,6 +85,13 @@ async fn create_admin_token(app_state: &AppState) -> Result<String> {
         updated_at: chrono::Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: Some("Test Admin".to_string()),
+        phone: None,
+        timezone: None,
+        preferences: None,
+        login_count: 0,
     };
 
     // Insert admin user
@@ -131,6 +139,13 @@ async fn create_regular_user_token(app_state: &AppState) -> Result<String> {
         updated_at: chrono::Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: Some("Test User".to_string()),
+        phone: None,
+        timezone: None,
+        preferences: None,
+        login_count: 0,
     };
 
     // Insert regular user
