@@ -16,6 +16,7 @@ import { clsx } from 'clsx';
 
 import { authSelectors, useAuthStore } from '../../stores/auth-store';
 import { IconButton } from '../ui/Button';
+import AvatarDisplay from '../common/AvatarDisplay';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -122,9 +123,11 @@ export const Navbar: React.FC = () => {
                     <div>
                       <Menu.Button className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <span className="sr-only">Open user menu</span>
-                        <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                          <UserIcon className="w-5 h-5 text-gray-600" />
-                        </div>
+                        <AvatarDisplay
+                          avatarUrl={user?.avatar_url}
+                          displayName={user?.full_name || user?.username || 'U'}
+                          size="sm"
+                        />
                         <span className="ml-3 text-gray-700 text-sm font-medium hidden lg:block">
                           {user?.username}
                         </span>

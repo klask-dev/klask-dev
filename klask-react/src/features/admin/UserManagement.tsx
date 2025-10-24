@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
-import { 
+import {
   PlusIcon,
   FunnelIcon,
   CheckIcon,
@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { UserForm } from '../../components/admin/UserForm';
+import AvatarDisplay from '../../components/common/AvatarDisplay';
 import { 
   useUsers, 
   useCreateUser, 
@@ -392,6 +393,12 @@ const UserManagement: React.FC = () => {
                         checked={selectedUsers.includes(user.id)}
                         onChange={(e) => handleSelectUser(user.id, e.target.checked)}
                         className="mr-4 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <AvatarDisplay
+                        avatarUrl={user.avatar_url}
+                        displayName={user.full_name || user.username}
+                        size="md"
+                        className="mr-4"
                       />
                       <div>
                         <div className="text-sm font-medium text-gray-900">
