@@ -269,10 +269,9 @@ async fn update_profile(
     }
 
     if let Some(ref avatar_url) = payload.avatar_url {
-        if avatar_url.len() > 500 {
-            return Err(AuthError::InvalidInput(
-                "Avatar URL must be 500 characters or less".to_string(),
-            ));
+        // Allow large base64 data URIs (typical avatar ~100KB base64 = ~133KB string)
+        if avatar_url.len() > 1_000_000 {
+            return Err(AuthError::InvalidInput("Avatar URL must be 1MB or less".to_string()));
         }
     }
 
