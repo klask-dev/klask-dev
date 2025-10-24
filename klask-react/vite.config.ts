@@ -16,6 +16,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      external: [
+        // Mark refractor imports as external to avoid bundle errors
+        /^refractor\/.*$/,
+      ],
       onwarn(warning, warn) {
         // Ignore refractor import warnings for both lib and lang directories
         if (warning.code === 'UNRESOLVED_IMPORT' && warning.message?.includes('refractor/')) {
@@ -50,13 +54,14 @@ export default defineConfig({
       'react-syntax-highlighter/dist/esm/styles/prism/one-light',
       'react-syntax-highlighter/dist/esm/styles/prism/one-dark',
       'react-window',
-      'refractor/lib/core',
-      'refractor/lib/all',
+      'dompurify',
     ],
     exclude: [
       // Exclude individual language modules from pre-bundling
       // to prevent creating many small chunks
       'react-syntax-highlighter/dist/esm/languages/prism/*',
+      // Exclude refractor to avoid bundle resolution errors
+      'refractor',
     ],
   },
   test: {
