@@ -61,7 +61,7 @@ export function useIndexMetrics(options: UseIndexMetricsOptions = {}): UseIndexM
     if (metricsQuery.data.stats || metricsQuery.data.health) {
       setLastUpdateTime(new Date());
     }
-  }, [metricsQuery.data]);
+  }, [metricsQuery.data.stats, metricsQuery.data.health]);
 
   // Calculate next refresh time
   useEffect(() => {
