@@ -825,12 +825,18 @@ async fn crawl_repository(
 
     // Start crawl using the crawler service
     let crawler_service = app_state.crawler_service.clone();
+    let progress_tracker = app_state.progress_tracker.clone();
     let repository_clone = repository.clone();
+    let repository_id = repository.id;
 
     // Spawn crawl task in background
     tokio::spawn(async move {
         if let Err(e) = crawler_service.crawl_repository(&repository_clone).await {
-            error!("Crawl failed for repository {}: {}", repository_clone.name, e);
+            let error_msg = format!("{}", e);
+            error!("Crawl failed for repository {}: {}", repository_clone.name, error_msg);
+
+            // Record the error in progress tracker so it's visible in the UI
+            progress_tracker.set_error(repository_id, error_msg).await;
         }
     });
 
