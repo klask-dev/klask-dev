@@ -359,14 +359,11 @@ pub struct AvatarUploadResponse {
 }
 
 async fn upload_avatar(_auth_user: AuthenticatedUser) -> Result<Json<AvatarUploadResponse>, AuthError> {
-    // For now, we accept the avatar as a data URI from the frontend
-    // In production, you would store this in cloud storage (S3, etc)
-    // and return a proper URL
-
-    // For this MVP, we'll just acknowledge receipt and let the frontend
-    // handle storing it in the profile via the /api/auth/profile endpoint
+    // Avatar is processed in the frontend and sent via PUT /api/auth/profile
+    // This endpoint exists to acknowledge the upload endpoint exists
+    // The frontend handles base64 conversion and storage
     Ok(Json(AvatarUploadResponse {
-        avatar_url: "avatar_processed".to_string(),
+        avatar_url: "avatar_upload_acknowledged".to_string(),
     }))
 }
 
