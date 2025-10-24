@@ -1,0 +1,196 @@
+import React from 'react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import type { RefreshInterval } from '../../../hooks/useIndexMetrics';
+
+interface AutoRefreshToggleProps {
+  interval: RefreshInterval;
+  onIntervalChange: (interval: RefreshInterval) => void;
+  lastUpdate: Date | null;
+  nextRefresh: Date | null;
+  isLoading?: boolean;
+  onManualRefresh?: () => Promise<void>;
+  className?: string;
+}
+
+/**
+ * Control component for auto-refresh settings
+ * Allows selection of refresh interval and shows timing information
+ */
+export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
+  interval,
+  onIntervalChange,
+  lastUpdate,
+  nextRefresh,
+  isLoading = false,
+  onManualRefresh,
+  className = '',
+}) => {
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  const intervals: RefreshInterval[] = ['off', '5s', '10s', '30s', '60s'];
+
+  const getIntervalLabel = (val: RefreshInterval): string => {
+    switch (val) {
+      case '5s':
+        return '5 seconds';
+      case '10s':
+        return '10 seconds';
+      case '30s':
+        return '30 seconds';
+      case '60s':
+        return '1 minute';
+      case 'off':
+      default:
+        return 'Off';
+    }
+  };
+
+  const formatTimeAgo = (date: Date | null): string => {
+    if (!date) return 'Never';
+
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
+  };
+
+  const formatCountdown = (date: Date | null): string => {
+    if (!date) return 'Never';
+
+    const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
+    if (seconds <= 0) return 'Soon';
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    return `${Math.floor(seconds / 3600)}h`;
+  };
+
+  const handleManualRefresh = async () => {
+    if (!onManualRefresh) return;
+
+    try {
+      setIsRefreshing(true);
+      await onManualRefresh();
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const isAutoRefreshEnabled = interval !== 'off';
+
+  return (
+    <div className={`space-y-4 ${className}`}>
+      {/* Main Control */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Auto-refresh Interval
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="relative inline-block">
+                <select
+                  value={interval}
+                  onChange={(e) => onIntervalChange(e.target.value as RefreshInterval)}
+                  disabled={isLoading || isRefreshing}
+                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-900 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed transition-all"
+                >
+                  {intervals.map((val) => (
+                    <option key={val} value={val}>
+                      {getIntervalLabel(val)}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                  <svg
+                    className="fill-current h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                  </svg>
+                </div>
+              </div>
+
+              {isAutoRefreshEnabled && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                  <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
+                  Active
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Manual Refresh Button */}
+          <button
+            onClick={handleManualRefresh}
+            disabled={isLoading || isRefreshing}
+            className="h-10 w-10 p-2 rounded-lg border border-blue-300 bg-white hover:bg-blue-50 disabled:bg-gray-100 disabled:border-gray-300 text-blue-600 disabled:text-gray-400 transition-all flex items-center justify-center"
+            title="Refresh now"
+          >
+            <ArrowPathIcon
+              className={`h-5 w-5 ${isLoading || isRefreshing ? 'animate-spin' : ''}`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Timing Information */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Last Update */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <p className="text-xs font-medium text-gray-600">Last Updated</p>
+          <p className="text-sm font-mono font-bold text-gray-900 mt-1">
+            {formatTimeAgo(lastUpdate)}
+          </p>
+          {lastUpdate && (
+            <p className="text-xs text-gray-500 mt-1">
+              {lastUpdate.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+
+        {/* Next Refresh */}
+        <div className={`${
+          isAutoRefreshEnabled
+            ? 'bg-green-50 border-green-200'
+            : 'bg-gray-50 border-gray-200'
+        } border rounded-lg p-3`}>
+          <p className="text-xs font-medium text-gray-600">Next Refresh</p>
+          <p className={`text-sm font-mono font-bold mt-1 ${
+            isAutoRefreshEnabled
+              ? 'text-green-900'
+              : 'text-gray-900'
+          }`}>
+            {isAutoRefreshEnabled ? formatCountdown(nextRefresh) : 'Disabled'}
+          </p>
+          {isAutoRefreshEnabled && nextRefresh && (
+            <p className="text-xs text-gray-500 mt-1">
+              {nextRefresh.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Refresh Status */}
+      {(isLoading || isRefreshing) && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-300 rounded-lg">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" />
+          <span className="text-sm font-medium text-blue-900">
+            {isRefreshing ? 'Refreshing metrics...' : 'Loading metrics...'}
+          </span>
+        </div>
+      )}
+
+      {/* Info Message */}
+      <p className="text-xs text-gray-600 flex items-start gap-2">
+        <span className="font-bold text-gray-400 mt-0.5">ℹ</span>
+        <span>
+          Enable auto-refresh to automatically update index metrics at regular intervals.
+          Manual refresh always fetches the latest data immediately.
+        </span>
+      </p>
+    </div>
+  );
+};

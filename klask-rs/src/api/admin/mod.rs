@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
 use tracing::{debug, error, info};
 
+pub mod search;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemStats {
     pub uptime_seconds: u64,
@@ -140,7 +142,8 @@ pub async fn create_router() -> Result<Router<AppState>> {
         .route("/seed", post(seed_database))
         .route("/seed/clear", post(clear_seed_data))
         .route("/seed/stats", get(get_seed_stats))
-        .route("/search/reset-index", post(reset_search_index));
+        .route("/search/reset-index", post(reset_search_index))
+        .nest("/search", search::create_router().await?);
 
     Ok(router)
 }
@@ -422,10 +425,10 @@ async fn get_recent_activity_impl(pool: &PgPool) -> Result<RecentActivity> {
 
     // Recent crawls (last crawled repositories)
     let recent_crawls_rows = sqlx::query(
-        "SELECT name, last_crawled 
-         FROM repositories 
-         WHERE last_crawled IS NOT NULL 
-         ORDER BY last_crawled DESC 
+        "SELECT name, last_crawled
+         FROM repositories
+         WHERE last_crawled IS NOT NULL
+         ORDER BY last_crawled DESC
          LIMIT 10",
     )
     .fetch_all(pool)
@@ -495,6 +498,7 @@ async fn get_seed_stats(State(app_state): State<AppState>) -> Result<Json<Seedin
 
     Ok(Json(stats))
 }
+
 // Search index management endpoints
 
 async fn reset_search_index(

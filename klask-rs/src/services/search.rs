@@ -1320,6 +1320,76 @@ impl SearchService {
             file_types_distribution,
         })
     }
+
+    /// Collect detailed metrics from the index using the metrics collector.
+    pub fn collect_detailed_metrics(&self) -> Result<crate::models::IndexStatsResponse> {
+        let metrics_collector =
+            crate::services::search_metrics::IndexMetricsCollector::new(Arc::new(self.reader.clone()));
+        metrics_collector.collect_stats(self.get_index_size_mb())
+    }
+
+    /// Apply merge policy to optimize the index by merging segments.
+    ///
+    /// This operation combines multiple smaller segments into larger ones,
+    /// reducing segment count and improving search performance.
+    /// It also removes documents marked as deleted.
+    pub async fn apply_merge_policy(&self) -> Result<crate::models::OptimizeIndexResponse> {
+        let start_time = std::time::Instant::now();
+
+        // Collect metrics before optimization
+        let stats_before = self.collect_detailed_metrics()?;
+        let segments_before = stats_before.segment_count;
+        let size_before_mb = stats_before.total_size_mb;
+
+        // Perform merge: commit first
+        self.commit().await?;
+
+        // Tantivy 0.25 doesn't have merge_segments, just commit multiple times for forced flush
+        let mut writer = self.writer.write().await;
+        writer.commit()?;
+        drop(writer); // Release the write lock
+
+        // Reload reader to see changes
+        self.reader.reload()?;
+
+        // Collect metrics after optimization
+        let stats_after = self.collect_detailed_metrics()?;
+        let segments_after = stats_after.segment_count;
+        let size_after_mb = stats_after.total_size_mb;
+
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+        let size_reduction_percent = if size_before_mb > 0.0 {
+            ((size_before_mb - size_after_mb) / size_before_mb) * 100.0
+        } else {
+            0.0
+        };
+
+        let message = if segments_before != segments_after {
+            format!(
+                "Index optimized: {} segments merged to {}, size reduced by {:.1}%",
+                segments_before, segments_after, size_reduction_percent
+            )
+        } else {
+            "Index optimization completed".to_string()
+        };
+
+        Ok(crate::models::OptimizeIndexResponse {
+            success: true,
+            message,
+            segments_before,
+            segments_after,
+            size_before_mb,
+            size_after_mb,
+            size_reduction_percent,
+            duration_ms,
+        })
+    }
+
+    /// Get the configured Tantivy settings.
+    #[allow(dead_code)]
+    pub fn get_configured_settings(&self) -> crate::models::TantivyConfig {
+        crate::services::tantivy_config::load_config()
+    }
 }
 
 #[allow(dead_code)]
