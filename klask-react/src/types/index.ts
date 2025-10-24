@@ -101,6 +101,19 @@ export interface Repository {
   crawlState?: string;
   lastProcessedProject?: string;
   crawlStartedAt?: string;
+  // Enhanced filtering fields for branch and project selection
+  /** Comma-separated list of exact branch names to include (e.g., "main, develop") */
+  includedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to include (e.g., "release-*, hotfix-*") */
+  includedBranchesPatterns?: string;
+  /** Comma-separated list of exact branch names to exclude (e.g., "temp-*, wip-*") */
+  excludedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to exclude (e.g., "archive-*, backup-*") */
+  excludedBranchesPatterns?: string;
+  /** Comma-separated list of exact project/repository paths to include (e.g., "team/project, org/repo") */
+  includedProjects?: string;
+  /** Comma-separated list of wildcard patterns for projects/repositories to include (replaces old namespace filter) */
+  includedProjectsPatterns?: string;
 }
 
 export interface RepositoryWithStats {
@@ -291,6 +304,53 @@ export interface CreateRepositoryRequest {
   githubNamespace?: string;
   githubExcludedRepositories?: string;
   githubExcludedPatterns?: string;
+  // Enhanced filtering fields for branch and project selection
+  /** Comma-separated list of exact branch names to include */
+  includedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to include */
+  includedBranchesPatterns?: string;
+  /** Comma-separated list of exact branch names to exclude */
+  excludedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to exclude */
+  excludedBranchesPatterns?: string;
+  /** Comma-separated list of exact project/repository paths to include */
+  includedProjects?: string;
+  /** Comma-separated list of wildcard patterns for projects/repositories to include */
+  includedProjectsPatterns?: string;
+}
+
+export interface UpdateRepositoryRequest {
+  name?: string;
+  url?: string;
+  repositoryType?: RepositoryType;
+  branch?: string;
+  enabled?: boolean;
+  accessToken?: string;
+  gitlabNamespace?: string;
+  isGroup?: boolean;
+  autoCrawlEnabled?: boolean;
+  cronSchedule?: string;
+  crawlFrequencyHours?: number;
+  maxCrawlDurationMinutes?: number;
+  gitlabExcludedProjects?: string;
+  gitlabExcludedPatterns?: string;
+  // GitHub specific fields
+  githubNamespace?: string;
+  githubExcludedRepositories?: string;
+  githubExcludedPatterns?: string;
+  // Enhanced filtering fields for branch and project selection
+  /** Comma-separated list of exact branch names to include */
+  includedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to include */
+  includedBranchesPatterns?: string;
+  /** Comma-separated list of exact branch names to exclude */
+  excludedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to exclude */
+  excludedBranchesPatterns?: string;
+  /** Comma-separated list of exact project/repository paths to include */
+  includedProjects?: string;
+  /** Comma-separated list of wildcard patterns for projects/repositories to include */
+  includedProjectsPatterns?: string;
 }
 
 export interface CrawlStatus {

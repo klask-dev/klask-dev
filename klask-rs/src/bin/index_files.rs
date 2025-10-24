@@ -39,6 +39,12 @@ async fn main() -> Result<()> {
         crawl_state: None,
         last_processed_project: None,
         crawl_started_at: None,
+        included_branches: None,
+        included_branches_patterns: None,
+        excluded_branches: None,
+        excluded_branches_patterns: None,
+        included_projects: None,
+        included_projects_patterns: None,
     };
 
     // Initialize crawler service (database is optional for this direct indexing)

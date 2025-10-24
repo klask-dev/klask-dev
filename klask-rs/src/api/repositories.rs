@@ -43,6 +43,14 @@ pub struct CreateRepositoryRequest {
     pub github_namespace: Option<String>,
     pub github_excluded_repositories: Option<String>,
     pub github_excluded_patterns: Option<String>,
+    // Branch filtering fields
+    pub included_branches: Option<String>,
+    pub included_branches_patterns: Option<String>,
+    pub excluded_branches: Option<String>,
+    pub excluded_branches_patterns: Option<String>,
+    // Project filtering fields
+    pub included_projects: Option<String>,
+    pub included_projects_patterns: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -68,6 +76,14 @@ pub struct UpdateRepositoryRequest {
     pub github_namespace: Option<String>,
     pub github_excluded_repositories: Option<String>,
     pub github_excluded_patterns: Option<String>,
+    // Branch filtering fields
+    pub included_branches: Option<String>,
+    pub included_branches_patterns: Option<String>,
+    pub excluded_branches: Option<String>,
+    pub excluded_branches_patterns: Option<String>,
+    // Project filtering fields
+    pub included_projects: Option<String>,
+    pub included_projects_patterns: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -554,6 +570,12 @@ async fn create_repository(
         crawl_state: Some("idle".to_string()),
         last_processed_project: None,
         crawl_started_at: None,
+        included_branches: request.included_branches,
+        included_branches_patterns: request.included_branches_patterns,
+        excluded_branches: request.excluded_branches,
+        excluded_branches_patterns: request.excluded_branches_patterns,
+        included_projects: request.included_projects,
+        included_projects_patterns: request.included_projects_patterns,
     };
 
     match repo_repository.create_repository(&repository).await {
@@ -683,6 +705,24 @@ async fn update_repository(
     }
     if let Some(github_excluded_patterns) = request.github_excluded_patterns {
         repository.github_excluded_patterns = Some(github_excluded_patterns);
+    }
+    if let Some(included_branches) = request.included_branches {
+        repository.included_branches = Some(included_branches);
+    }
+    if let Some(included_branches_patterns) = request.included_branches_patterns {
+        repository.included_branches_patterns = Some(included_branches_patterns);
+    }
+    if let Some(excluded_branches) = request.excluded_branches {
+        repository.excluded_branches = Some(excluded_branches);
+    }
+    if let Some(excluded_branches_patterns) = request.excluded_branches_patterns {
+        repository.excluded_branches_patterns = Some(excluded_branches_patterns);
+    }
+    if let Some(included_projects) = request.included_projects {
+        repository.included_projects = Some(included_projects);
+    }
+    if let Some(included_projects_patterns) = request.included_projects_patterns {
+        repository.included_projects_patterns = Some(included_projects_patterns);
     }
 
     // Handle access token update with encryption

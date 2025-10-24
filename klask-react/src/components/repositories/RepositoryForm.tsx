@@ -47,6 +47,25 @@ const createRepositorySchema = (isEditing: boolean, hasExistingToken: boolean) =
   githubExcludedPatterns: z
     .string()
     .optional(),
+  // Enhanced filtering fields for branch and project selection
+  includedBranches: z
+    .string()
+    .optional(),
+  includedBranchesPatterns: z
+    .string()
+    .optional(),
+  excludedBranches: z
+    .string()
+    .optional(),
+  excludedBranchesPatterns: z
+    .string()
+    .optional(),
+  includedProjects: z
+    .string()
+    .optional(),
+  includedProjectsPatterns: z
+    .string()
+    .optional(),
   enabled: z.boolean(),
 }).refine((data) => {
   // For GitLab, accessToken is required only for new repositories
@@ -198,6 +217,12 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       githubNamespace: repository.githubNamespace || '',
       githubExcludedRepositories: repository.githubExcludedRepositories || '',
       githubExcludedPatterns: repository.githubExcludedPatterns || '',
+      includedBranches: repository.includedBranches || '',
+      includedBranchesPatterns: repository.includedBranchesPatterns || '',
+      excludedBranches: repository.excludedBranches || '',
+      excludedBranchesPatterns: repository.excludedBranchesPatterns || '',
+      includedProjects: repository.includedProjects || '',
+      includedProjectsPatterns: repository.includedProjectsPatterns || '',
     } : {
       name: '',
       url: '',
@@ -212,6 +237,12 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       githubNamespace: '',
       githubExcludedRepositories: '',
       githubExcludedPatterns: '',
+      includedBranches: '',
+      includedBranchesPatterns: '',
+      excludedBranches: '',
+      excludedBranchesPatterns: '',
+      includedProjects: '',
+      includedProjectsPatterns: '',
     },
   });
 
@@ -385,6 +416,12 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
           githubNamespace: repository.githubNamespace || '',
           githubExcludedRepositories: repository.githubExcludedRepositories || '',
           githubExcludedPatterns: repository.githubExcludedPatterns || '',
+          includedBranches: repository.includedBranches || '',
+          includedBranchesPatterns: repository.includedBranchesPatterns || '',
+          excludedBranches: repository.excludedBranches || '',
+          excludedBranchesPatterns: repository.excludedBranchesPatterns || '',
+          includedProjects: repository.includedProjects || '',
+          includedProjectsPatterns: repository.includedProjectsPatterns || '',
         };
         reset(formData);
         setSchedulingData({
@@ -406,6 +443,15 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
           gitlabExcludedProjects: '',
           gitlabExcludedPatterns: '',
           isGroup: false,
+          githubNamespace: '',
+          githubExcludedRepositories: '',
+          githubExcludedPatterns: '',
+          includedBranches: '',
+          includedBranchesPatterns: '',
+          excludedBranches: '',
+          excludedBranchesPatterns: '',
+          includedProjects: '',
+          includedProjectsPatterns: '',
         };
         reset(formData);
         setSchedulingData({
@@ -420,10 +466,16 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
   }, [repository?.id, repository, reset, currentRepositoryId]);
 
   const handleFormSubmit = (data: RepositoryFormData) => {
-    // Clean up branch field if empty and merge scheduling data
+    // Clean up empty strings from all filter fields and merge scheduling data
     const submitData: RepositoryFormSubmitData = {
       ...data,
       branch: data.branch?.trim() || undefined,
+      includedBranches: data.includedBranches?.trim() || undefined,
+      includedBranchesPatterns: data.includedBranchesPatterns?.trim() || undefined,
+      excludedBranches: data.excludedBranches?.trim() || undefined,
+      excludedBranchesPatterns: data.excludedBranchesPatterns?.trim() || undefined,
+      includedProjects: data.includedProjects?.trim() || undefined,
+      includedProjectsPatterns: data.includedProjectsPatterns?.trim() || undefined,
       // For GitLab repositories, default to gitlab.com if URL is empty
       url: data.repositoryType === 'GitLab' && (!data.url || data.url.trim() === '')
         ? 'https://gitlab.com'
@@ -627,27 +679,6 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                     </div>
                   )}
 
-                  {/* Branch (for Git repositories) */}
-                  {watchedType !== 'FileSystem' && (
-                    <div>
-                      <label htmlFor="branch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Branch (Optional)
-                      </label>
-                      <input
-                        {...register('branch')}
-                        type="text"
-                        className={`input-field ${errors.branch ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                        placeholder="main"
-                      />
-                      {errors.branch && (
-                        <p className="mt-1 text-sm text-red-600">{errors.branch.message}</p>
-                      )}
-                      <p className="mt-1 text-xs text-gray-500">
-                        Leave empty to use the default branch
-                      </p>
-                    </div>
-                  )}
-
                   {/* Enabled Toggle */}
                   <div className="flex items-center">
                     <input
@@ -756,23 +787,6 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         </p>
                       </div>
 
-                      <div>
-                        <label htmlFor="gitlabNamespace" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Namespace Filter (Optional)
-                        </label>
-                        <input
-                          {...register('gitlabNamespace')}
-                          type="text"
-                          className={`input-field ${errors.gitlabNamespace ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="username or group-name"
-                        />
-                        {errors.gitlabNamespace && (
-                          <p className="mt-1 text-sm text-red-600">{errors.gitlabNamespace.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Filter to only import repositories from a specific namespace
-                        </p>
-                      </div>
                     </>
                   )}
 
@@ -867,23 +881,6 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         </p>
                       </div>
 
-                      <div>
-                        <label htmlFor="githubNamespace" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Organization/User Filter (Optional)
-                        </label>
-                        <input
-                          {...register('githubNamespace')}
-                          type="text"
-                          className={`input-field ${errors.githubNamespace ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="organization-name or username"
-                        />
-                        {errors.githubNamespace && (
-                          <p className="mt-1 text-sm text-red-600">{errors.githubNamespace.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Filter to only import repositories from a specific organization or user
-                        </p>
-                      </div>
                     </>
                   )}
                 </div>
@@ -892,90 +889,204 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
               {/* Filters & Exclusions Tab */}
               {activeTab === 'filters' && (
                 <div className="space-y-6">
-                  {watchedType === 'GitLab' && (
-                    <>
+                  {/* Branch Selection Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Branch Selection</h3>
+                    <div className="space-y-4">
+                      {/* Included Branches */}
                       <div>
-                        <label htmlFor="gitlabExcludedProjects" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Excluded Projects (Optional)
+                        <label htmlFor="includedBranches" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Included Branches (Optional)
                         </label>
                         <input
-                          {...register('gitlabExcludedProjects')}
+                          {...register('includedBranches')}
                           type="text"
-                          className={`input-field ${errors.gitlabExcludedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="team/project-archive, old/legacy-system"
+                          className={`input-field ${errors.includedBranches ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="main, develop, release-*"
                         />
-                        {errors.gitlabExcludedProjects && (
-                          <p className="mt-1 text-sm text-red-600">{errors.gitlabExcludedProjects.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Comma-separated list of exact project paths to exclude
-                        </p>
-                      </div>
-
-                      <div>
-                        <label htmlFor="gitlabExcludedPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Excluded Patterns (Optional)
-                        </label>
-                        <input
-                          {...register('gitlabExcludedPatterns')}
-                          type="text"
-                          className={`input-field ${errors.gitlabExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="*-archive, test-*, *-temp"
-                        />
-                        {errors.gitlabExcludedPatterns && (
-                          <p className="mt-1 text-sm text-red-600">{errors.gitlabExcludedPatterns.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Comma-separated patterns with wildcards (*) to exclude projects
-                        </p>
-                      </div>
-                    </>
-                  )}
-
-                  {watchedType === 'GitHub' && (
-                    <>
-                      <div>
-                        <label htmlFor="githubExcludedRepositories" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Excluded Repositories (Optional)
-                        </label>
-                        <input
-                          {...register('githubExcludedRepositories')}
-                          type="text"
-                          className={`input-field ${errors.githubExcludedRepositories ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="org/repo-archive, user/legacy-project"
-                        />
-                        {errors.githubExcludedRepositories && (
-                          <p className="mt-1 text-sm text-red-600">{errors.githubExcludedRepositories.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Comma-separated list of exact repository paths to exclude
-                        </p>
-                      </div>
-
-                      <div>
-                        <label htmlFor="githubExcludedPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Excluded Patterns (Optional)
-                        </label>
-                        <input
-                          {...register('githubExcludedPatterns')}
-                          type="text"
-                          className={`input-field ${errors.githubExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="*-archive, test-*, *-temp"
-                        />
-                        {errors.githubExcludedPatterns && (
-                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.githubExcludedPatterns.message}</p>
+                        {errors.includedBranches && (
+                          <p className="mt-1 text-sm text-red-600">{errors.includedBranches.message}</p>
                         )}
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Comma-separated patterns with wildcards (*) to exclude repositories
+                          Comma-separated list of exact branch names or patterns to include
                         </p>
                       </div>
-                    </>
+
+                      {/* Included Branches Patterns */}
+                      <div>
+                        <label htmlFor="includedBranchesPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Included Branches Patterns (Optional)
+                        </label>
+                        <input
+                          {...register('includedBranchesPatterns')}
+                          type="text"
+                          className={`input-field ${errors.includedBranchesPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="release-*, hotfix-*, feature-*"
+                        />
+                        {errors.includedBranchesPatterns && (
+                          <p className="mt-1 text-sm text-red-600">{errors.includedBranchesPatterns.message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Comma-separated list of wildcard patterns (e.g., release-*, hotfix-*)
+                        </p>
+                      </div>
+
+                      {/* Excluded Branches */}
+                      <div>
+                        <label htmlFor="excludedBranches" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Excluded Branches (Optional)
+                        </label>
+                        <input
+                          {...register('excludedBranches')}
+                          type="text"
+                          className={`input-field ${errors.excludedBranches ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="temp-branch, wip-branch"
+                        />
+                        {errors.excludedBranches && (
+                          <p className="mt-1 text-sm text-red-600">{errors.excludedBranches.message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Comma-separated list of exact branch names to exclude
+                        </p>
+                      </div>
+
+                      {/* Excluded Branches Patterns */}
+                      <div>
+                        <label htmlFor="excludedBranchesPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Excluded Branches Patterns (Optional)
+                        </label>
+                        <input
+                          {...register('excludedBranchesPatterns')}
+                          type="text"
+                          className={`input-field ${errors.excludedBranchesPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="archive-*, backup-*, test-*"
+                        />
+                        {errors.excludedBranchesPatterns && (
+                          <p className="mt-1 text-sm text-red-600">{errors.excludedBranchesPatterns.message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Comma-separated list of wildcard patterns to exclude
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project/Repository Selection Section - GitLab and GitHub only */}
+                  {(watchedType === 'GitLab' || watchedType === 'GitHub') && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                        {watchedType === 'GitLab' ? 'Project' : 'Repository'} Selection
+                      </h3>
+                      <div className="space-y-4">
+                        {/* Included Projects/Repositories */}
+                        <div>
+                          <label
+                            htmlFor="includedProjects"
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            {watchedType === 'GitLab' ? 'Included Projects' : 'Included Repositories'} (Optional)
+                          </label>
+                          <input
+                            {...register('includedProjects')}
+                            type="text"
+                            className={`input-field ${errors.includedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                            placeholder={watchedType === 'GitLab' ? 'team/project1, org/repo2' : 'org/repo1, user/repo2'}
+                          />
+                          {errors.includedProjects && (
+                            <p className="mt-1 text-sm text-red-600">{errors.includedProjects.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated list of exact {watchedType === 'GitLab' ? 'project' : 'repository'} paths to include
+                          </p>
+                        </div>
+
+                        {/* Included Projects/Repositories Patterns */}
+                        <div>
+                          <label
+                            htmlFor="includedProjectsPatterns"
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            {watchedType === 'GitLab' ? 'Included Projects Patterns' : 'Included Repositories Patterns'} (Optional)
+                          </label>
+                          <input
+                            {...register('includedProjectsPatterns')}
+                            type="text"
+                            className={`input-field ${errors.includedProjectsPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                            placeholder={watchedType === 'GitLab' ? 'team/*, team-*/core-*' : 'org/*, user/core-*'}
+                          />
+                          {errors.includedProjectsPatterns && (
+                            <p className="mt-1 text-sm text-red-600">{errors.includedProjectsPatterns.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated list of wildcard patterns (replaces old namespace filter)
+                          </p>
+                        </div>
+
+                        {/* Excluded Projects/Repositories */}
+                        <div>
+                          <label
+                            htmlFor={watchedType === 'GitLab' ? 'gitlabExcludedProjects' : 'githubExcludedRepositories'}
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            {watchedType === 'GitLab' ? 'Excluded Projects' : 'Excluded Repositories'} (Optional)
+                          </label>
+                          <input
+                            {...register(watchedType === 'GitLab' ? 'gitlabExcludedProjects' : 'githubExcludedRepositories')}
+                            type="text"
+                            className={`input-field ${
+                              watchedType === 'GitLab'
+                                ? errors.gitlabExcludedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                                : errors.githubExcludedRepositories ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                            }`}
+                            placeholder={watchedType === 'GitLab' ? 'team/project-archive, old/legacy-system' : 'org/repo-archive, user/legacy-project'}
+                          />
+                          {watchedType === 'GitLab' && errors.gitlabExcludedProjects && (
+                            <p className="mt-1 text-sm text-red-600">{errors.gitlabExcludedProjects.message}</p>
+                          )}
+                          {watchedType === 'GitHub' && errors.githubExcludedRepositories && (
+                            <p className="mt-1 text-sm text-red-600">{errors.githubExcludedRepositories.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated list of exact {watchedType === 'GitLab' ? 'project' : 'repository'} paths to exclude
+                          </p>
+                        </div>
+
+                        {/* Excluded Patterns */}
+                        <div>
+                          <label
+                            htmlFor={watchedType === 'GitLab' ? 'gitlabExcludedPatterns' : 'githubExcludedPatterns'}
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            Excluded Patterns (Optional)
+                          </label>
+                          <input
+                            {...register(watchedType === 'GitLab' ? 'gitlabExcludedPatterns' : 'githubExcludedPatterns')}
+                            type="text"
+                            className={`input-field ${
+                              watchedType === 'GitLab'
+                                ? errors.gitlabExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                                : errors.githubExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                            }`}
+                            placeholder="*-archive, test-*, *-temp"
+                          />
+                          {watchedType === 'GitLab' && errors.gitlabExcludedPatterns && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.gitlabExcludedPatterns.message}</p>
+                          )}
+                          {watchedType === 'GitHub' && errors.githubExcludedPatterns && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.githubExcludedPatterns.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated patterns with wildcards (*) to exclude {watchedType === 'GitLab' ? 'projects' : 'repositories'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
 
-                  {(watchedType === 'Git' || watchedType === 'FileSystem') && (
+                  {watchedType === 'FileSystem' && (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                       <FunnelIcon className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                      <p>No filter options available for {watchedType} repositories.</p>
+                      <p>No filter options available for FileSystem repositories.</p>
                     </div>
                   )}
                 </div>

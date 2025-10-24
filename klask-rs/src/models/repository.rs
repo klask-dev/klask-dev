@@ -57,6 +57,26 @@ pub struct Repository {
     pub last_processed_project: Option<String>, // For GitLab: project path, For Git: branch, For FileSystem: null
     #[serde(rename = "crawlStartedAt")]
     pub crawl_started_at: Option<chrono::DateTime<chrono::Utc>>,
+    // Branch filtering fields
+    /// Comma-separated list of branches to include. If set, only these branches are crawled.
+    #[serde(rename = "includedBranches")]
+    pub included_branches: Option<String>,
+    /// Comma-separated list of glob patterns for branches to include (e.g., "release-*", "v*-stable").
+    #[serde(rename = "includedBranchesPatterns")]
+    pub included_branches_patterns: Option<String>,
+    /// Comma-separated list of branches to exclude from crawling.
+    #[serde(rename = "excludedBranches")]
+    pub excluded_branches: Option<String>,
+    /// Comma-separated list of glob patterns for branches to exclude (e.g., "*-archive", "temp-*").
+    #[serde(rename = "excludedBranchesPatterns")]
+    pub excluded_branches_patterns: Option<String>,
+    // Project/repository filtering fields
+    /// Comma-separated list of projects/repositories to include. If set, only these are crawled.
+    #[serde(rename = "includedProjects")]
+    pub included_projects: Option<String>,
+    /// Comma-separated list of glob patterns for projects/repositories to include (e.g., "my-org/*", "*-sdk").
+    #[serde(rename = "includedProjectsPatterns")]
+    pub included_projects_patterns: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
