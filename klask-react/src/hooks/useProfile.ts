@@ -62,10 +62,28 @@ export function useUploadAvatar() {
   const user = useAuthStore((state) => state.user);
 
   return useMutation({
-    mutationFn: (file: globalThis.File) => api.uploadAvatar(file),
-    onSuccess: (response: { avatar_url: string }) => {
+    mutationFn: async (file: globalThis.File) => {
+      // First acknowledge the upload request
+      await api.uploadAvatar(file);
+
+      // Then convert file to base64 data URI and save to profile
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUri = event.target?.result as string;
+          // Update profile with avatar data URI
+          api
+            .updateProfile({ avatar_url: dataUri })
+            .then(() => resolve(dataUri))
+            .catch(reject);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+    },
+    onSuccess: (avatar_url: string) => {
       if (user) {
-        const updatedUser = { ...user, avatar_url: response.avatar_url };
+        const updatedUser = { ...user, avatar_url };
         setUser(updatedUser);
         queryClient.setQueryData(['auth', 'profile'], updatedUser);
       }
