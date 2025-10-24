@@ -21,6 +21,7 @@ import { CrawlProgressBar, GitLabHierarchicalProgressBar } from '../ui/ProgressB
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useStopCrawl } from '../../hooks/useRepositories';
 import { isRepositoryCrawling, getRepositoryProgressFromActive, type CrawlProgressInfo } from '../../hooks/useProgress';
+import { InlineCrawlError } from './CrawlErrorDisplay';
 
 interface RepositoryCardProps {
   repository: RepositoryWithStats;
@@ -422,6 +423,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                 currentFile={crawlProgress.current_file}
               />
             )}
+          </div>
+        )}
+
+        {/* Crawl Error Display - Show if there's an error */}
+        {crawlProgress?.error_message && (
+          <div className="mt-4">
+            <InlineCrawlError errorMessage={crawlProgress.error_message} />
           </div>
         )}
 

@@ -10,6 +10,7 @@ import { SelectableRepositoryCard } from '../../components/repositories/Selectab
 import { Checkbox } from '../../components/ui/Checkbox';
 import { RepositoryForm } from '../../components/repositories/RepositoryForm';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { CrawlErrorDisplay } from '../../components/repositories/CrawlErrorDisplay';
 import { 
   useRepositories, 
   useCreateRepository, 
@@ -322,6 +323,24 @@ const RepositoriesPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Crawl Errors Alert - Show if any repository has crawl errors */}
+      {activeProgress.filter(p => p.error_message).length > 0 && (
+        <div className="space-y-3">
+          {activeProgress
+            .filter(p => p.error_message)
+            .map(progress => (
+              <CrawlErrorDisplay
+                key={progress.repository_id}
+                errorMessage={progress.error_message!}
+                occurredAt={progress.updated_at}
+                repositoryName={progress.repository_name}
+                compact={true}
+              />
+            ))
+          }
+        </div>
+      )}
 
       {/* Stats */}
       {memoizedStats && (
