@@ -10,6 +10,7 @@ import { AppLayout } from './components/layout/AppLayout';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { AdminRoute } from './components/common/AdminRoute';
 import { SearchFiltersProvider } from './contexts/SearchFiltersContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 // Lazy load pages for better performance
 import { Suspense } from 'react';
@@ -38,8 +39,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="min-h-screen bg-gray-50">
-          <Toaster
+        <ThemeProvider>
+          <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+            <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
@@ -249,13 +251,14 @@ function App() {
               } 
             />
           </Routes>
-        </div>
+          </div>
+        </ThemeProvider>
       </BrowserRouter>
-      
+
       {/* React Query DevTools (only in development) */}
       {import.meta.env.DEV && (
-        <ReactQueryDevtools 
-          initialIsOpen={false} 
+        <ReactQueryDevtools
+          initialIsOpen={false}
         />
       )}
     </QueryClientProvider>

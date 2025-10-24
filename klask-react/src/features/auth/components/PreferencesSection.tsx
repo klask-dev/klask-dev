@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import type { UserPreferences } from '../../../types';
 import { useProfile } from '../../../hooks/useProfile';
+import { useTheme } from '../../../hooks/useTheme';
 
 const PreferencesSection: React.FC = () => {
   const { user, updateProfile, isUpdating } = useProfile();
+  const { updateTheme } = useTheme();
   const [preferences, setPreferences] = useState<UserPreferences>(
     user?.preferences || {
       theme: 'auto',
@@ -18,6 +20,8 @@ const PreferencesSection: React.FC = () => {
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'auto') => {
     setPreferences({ ...preferences, theme });
+    // Apply theme immediately for visual feedback
+    updateTheme(theme);
   };
 
   const handleLanguageChange = (language: 'en' | 'fr' | 'es' | 'de') => {
