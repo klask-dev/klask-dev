@@ -51,8 +51,13 @@ const RepositoriesPage: React.FC = () => {
 
   // Helper to check if repository is currently crawling
   const isRepositoryCrawling = useCallback((repositoryId: string) => {
-    return activeProgress.some(progress => progress.repository_id === repositoryId) ||
-           crawlingRepos.has(repositoryId);
+    // Check if crawling in activeProgress (excluding failed/completed/cancelled)
+    const isActivelyCrawling = activeProgress.some(
+      progress =>
+        progress.repository_id === repositoryId &&
+        !['failed', 'completed', 'cancelled'].includes(progress.status.toLowerCase())
+    );
+    return isActivelyCrawling || crawlingRepos.has(repositoryId);
   }, [activeProgress, crawlingRepos]);
 
   // Helper to get selected repositories that are not crawling
