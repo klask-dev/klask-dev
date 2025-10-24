@@ -233,22 +233,22 @@ function App() {
             </Route>
             
             {/* 404 route */}
-            <Route 
-              path="*" 
+            <Route
+              path="*"
               element={
-                <div className="min-h-screen flex items-center justify-center">
+                <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
                   <div className="text-center">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
-                    <p className="text-gray-600 mb-8">Page not found</p>
-                    <a 
-                      href="/home" 
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">404</h1>
+                    <p className="text-gray-600 dark:text-gray-400 mb-8">Page not found</p>
+                    <a
+                      href="/home"
                       className="btn-primary"
                     >
                       Go to Home
                     </a>
                   </div>
                 </div>
-              } 
+              }
             />
           </Routes>
           </div>

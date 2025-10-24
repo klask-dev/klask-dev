@@ -18,7 +18,7 @@ const ActivitySection: React.FC = () => {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400">
         <p className="font-medium">Failed to load activity data</p>
         <button
           onClick={() => refetch()}
@@ -58,25 +58,25 @@ const ActivitySection: React.FC = () => {
     <div className="space-y-8">
       {/* Account Overview */}
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Account Overview</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Account Overview</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-600 font-medium">Member Since</p>
-            <p className="text-lg font-bold text-blue-900 mt-1">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Member Since</p>
+            <p className="text-lg font-bold text-blue-900 dark:text-blue-300 mt-1">
               {formatDate(user?.created_at)}
             </p>
           </div>
 
-          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-sm text-green-600 font-medium">Total Logins</p>
-            <p className="text-lg font-bold text-green-900 mt-1">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium">Total Logins</p>
+            <p className="text-lg font-bold text-green-900 dark:text-green-300 mt-1">
               {activity?.login_count || 0}
             </p>
           </div>
 
-          <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-            <p className="text-sm text-purple-600 font-medium">Last Login</p>
-            <p className="text-sm font-bold text-purple-900 mt-1">
+          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+            <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Last Login</p>
+            <p className="text-sm font-bold text-purple-900 dark:text-purple-300 mt-1">
               {formatDate(activity?.last_login || user?.last_login)}
             </p>
           </div>
@@ -86,42 +86,42 @@ const ActivitySection: React.FC = () => {
       {/* Active Devices */}
       {activity?.devices && activity.devices.length > 0 && (
         <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Active Devices</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Active Devices</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Device</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">IP Address</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Last Seen</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Device</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">IP Address</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Last Seen</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {activity.devices.map((device, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition">
+                  <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                          <span className="text-xs font-bold text-gray-700">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
                             {getDeviceIcon(device.user_agent).charAt(0)}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-gray-900 dark:text-white">
                             {device.device_name || getDeviceIcon(device.user_agent)}
                           </p>
-                          <p className="text-xs text-gray-500 truncate max-w-xs">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">
                             {device.user_agent}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <code className="text-gray-900 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                      <code className="text-gray-900 dark:text-gray-300 font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                         {device.ip}
                       </code>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                       {formatDate(device.last_seen)}
                     </td>
                   </tr>
@@ -133,7 +133,7 @@ const ActivitySection: React.FC = () => {
       )}
 
       {(!activity?.devices || activity.devices.length === 0) && (
-        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-center">
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 text-center">
           <p>No device activity recorded</p>
         </div>
       )}
@@ -143,8 +143,8 @@ const ActivitySection: React.FC = () => {
         activity.devices.length > 0 &&
         activity.total_devices &&
         activity.total_devices > limit && (
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Showing {(page - 1) * limit + 1} to {Math.min(page * limit, activity.total_devices)} of{' '}
               {activity.total_devices} devices
             </p>
@@ -152,14 +152,14 @@ const ActivitySection: React.FC = () => {
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition"
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition text-gray-700 dark:text-gray-300"
               >
                 Previous
               </button>
               <button
                 onClick={() => setPage(page + 1)}
                 disabled={activity.total_devices ? page * limit >= activity.total_devices : false}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition"
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition text-gray-700 dark:text-gray-300"
               >
                 Next
               </button>
@@ -174,7 +174,7 @@ const ActivitySection: React.FC = () => {
             setPage(1);
             refetch();
           }}
-          className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition flex items-center gap-2"
+          className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path

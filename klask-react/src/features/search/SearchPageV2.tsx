@@ -6,8 +6,8 @@ import { SearchResults } from '../../components/search/SearchResults';
 import { useAdvancedSearch, useSearchHistory } from '../../hooks/useSearch';
 import { getErrorMessage } from '../../lib/api';
 import type { SearchResult } from '../../types';
-import { 
-  ClockIcon, 
+import {
+  ClockIcon,
   ChartBarIcon,
   DocumentMagnifyingGlassIcon,
   AdjustmentsHorizontalIcon
@@ -19,21 +19,21 @@ const SearchPageV2: React.FC = () => {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({});
   const [showFilters, setShowFilters] = useState(true);
-  
+
   const { history, addToHistory, clearHistory } = useSearchHistory();
-  
+
   // Initialize query from location state (when returning from file view)
   useEffect(() => {
     const initialQuery = location.state?.initialQuery as string;
     const searchFilters = location.state?.filters as SearchFilters;
-    
+
     if (initialQuery) {
       setQuery(initialQuery);
     }
     if (searchFilters) {
       setFilters(searchFilters);
     }
-    
+
     // Clear the location state to avoid re-applying on refresh
     if (initialQuery || searchFilters) {
       window.history.replaceState({}, '', window.location.pathname);
@@ -65,7 +65,7 @@ const SearchPageV2: React.FC = () => {
 
   const handleFileClick = useCallback((result: SearchResult) => {
     navigate(`/files/doc/${result.doc_address}`, {
-      state: { 
+      state: {
         searchQuery: query,
         searchResult: result,
         // Preserve search state for return navigation
@@ -83,7 +83,7 @@ const SearchPageV2: React.FC = () => {
     if (historicalQuery.trim()) {
       addToHistory(historicalQuery.trim());
     }
-    
+
     // Force a manual refetch of the search query to bypass any debounce issues
     setTimeout(() => {
       if (refetch) {
@@ -127,7 +127,7 @@ const SearchPageV2: React.FC = () => {
                 Search through your indexed repositories with powerful filters and real-time results.
               </p>
             </div>
-            
+
             <div className="mt-4 md:mt-0 flex items-center space-x-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -140,7 +140,7 @@ const SearchPageV2: React.FC = () => {
                 <AdjustmentsHorizontalIcon className="h-4 w-4 mr-2" />
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
               </button>
-              
+
               {totalResults > 0 && (
                 <div className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white text-gray-700">
                   <ChartBarIcon className="h-4 w-4 mr-2" />

@@ -77,10 +77,10 @@ const PreferencesSection: React.FC = () => {
         <div>
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Language</h3>
           <select
-            value={preferences.language}
+            value={preferences.language || 'en'}
             onChange={(e) => handleLanguageChange(e.target.value as 'en' | 'fr' | 'es' | 'de')}
             disabled={isUpdating || isSaving}
-            className="w-full max-w-md px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+            className="w-full max-w-md px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="en">English</option>
             <option value="fr">Francais</option>

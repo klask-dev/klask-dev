@@ -20,9 +20,9 @@ const AdminDashboard: React.FC = () => {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">Error loading dashboard: {error instanceof Error ? error.message : String(error)}</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-8">Admin Dashboard</h1>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+          <p className="text-red-600 dark:text-red-400">Error loading dashboard: {error instanceof Error ? error.message : String(error)}</p>
         </div>
       </div>
     );
@@ -43,12 +43,12 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
         <div className="flex items-center space-x-4">
           <button
             onClick={() => refetch()}
             disabled={isLoading}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
             title="Refresh dashboard data"
           >
             <ArrowPathIcon className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -56,7 +56,7 @@ const AdminDashboard: React.FC = () => {
           </button>
           <div className="flex items-center space-x-2">
             <div className="h-2 w-2 bg-green-400 rounded-full"></div>
-            <span className="text-sm text-gray-500">System Online</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">System Online</span>
           </div>
         </div>
       </div>
@@ -64,14 +64,14 @@ const AdminDashboard: React.FC = () => {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-white shadow rounded-lg p-6 animate-pulse">
+            <div key={i} className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 animate-pulse">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="h-12 w-12 bg-gray-200 rounded-md"></div>
+                  <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-md"></div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-6 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
                 </div>
               </div>
             </div>
@@ -81,7 +81,7 @@ const AdminDashboard: React.FC = () => {
         <>
           {/* System Overview */}
           <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">System Overview</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">System Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <MetricCard
                 title="System Status"
@@ -119,7 +119,7 @@ const AdminDashboard: React.FC = () => {
 
           {/* Search Stats */}
           <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Search & Crawling</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Search & Crawling</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <MetricCard
                 title="Search Index"
@@ -149,7 +149,7 @@ const AdminDashboard: React.FC = () => {
 
           {/* Repository Breakdown */}
           <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Repository Types</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Repository Types</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <MetricCard
                 title="Git Repositories"
@@ -177,27 +177,27 @@ const AdminDashboard: React.FC = () => {
           {/* Search Index Metrics by Repository */}
           {dashboardData?.search?.documents_by_repository && dashboardData.search.documents_by_repository.length > 0 && (
             <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Documents by Repository</h2>
-              <div className="bg-white shadow rounded-lg overflow-hidden">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Documents by Repository</h2>
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Repository
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Type
                         </th>
-                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Documents
                         </th>
-                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Percentage
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {dashboardData.search.documents_by_repository
                         .sort((a, b) => b.document_count - a.document_count)
                         .slice(0, 10)
@@ -206,7 +206,7 @@ const AdminDashboard: React.FC = () => {
                             ? ((repo.document_count / dashboardData.search.total_documents) * 100).toFixed(1)
                             : '0.0';
                           return (
-                            <tr key={index} className="hover:bg-gray-50">
+                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <RepositoryBadge
                                   name={repo.repository_name}
@@ -214,15 +214,15 @@ const AdminDashboard: React.FC = () => {
                                   size="sm"
                                 />
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 {repo.repository_type || 'Unknown'}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-right">
                                 {repo.document_count.toLocaleString()}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                  <div className="w-20 bg-gray-200 rounded-full h-2">
+                                  <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                     <div
                                       className="bg-blue-600 h-2 rounded-full"
                                       style={{ width: `${percentage}%` }}
@@ -238,7 +238,7 @@ const AdminDashboard: React.FC = () => {
                   </table>
                 </div>
                 {dashboardData.search.documents_by_repository.length > 10 && (
-                  <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-500 text-center">
+                  <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 text-center">
                     Showing top 10 of {dashboardData.search.documents_by_repository.length} repositories
                   </div>
                 )}
@@ -250,17 +250,17 @@ const AdminDashboard: React.FC = () => {
           {dashboardData?.recent_activity && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Recent Users */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Users</h3>
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Users</h3>
                 <div className="space-y-3">
                   {dashboardData.recent_activity.recent_users.length > 0 ? (
                     dashboardData.recent_activity.recent_users.map((user, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{user.username}</p>
-                          <p className="text-xs text-gray-500">{user.role}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{user.username}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{user.role}</p>
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
                           <time dateTime={user.last_seen}>
                             {formatDateTime(user.last_seen)}
                           </time>
@@ -268,23 +268,23 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-500">No recent users</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No recent users</p>
                   )}
                 </div>
               </div>
 
               {/* Recent Repositories */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Repositories</h3>
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Repositories</h3>
                 <div className="space-y-3">
                   {dashboardData.recent_activity.recent_repositories.length > 0 ? (
                     dashboardData.recent_activity.recent_repositories.map((repo, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{repo.name}</p>
-                          <p className="text-xs text-gray-500">{repo.repository_type}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{repo.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{repo.repository_type}</p>
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
                           <time dateTime={repo.created_at}>
                             {formatDateTime(repo.created_at)}
                           </time>
@@ -292,23 +292,23 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-500">No recent repositories</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No recent repositories</p>
                   )}
                 </div>
               </div>
 
               {/* Recent Crawls */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Crawls</h3>
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Crawls</h3>
                 <div className="space-y-3">
                   {dashboardData.recent_activity.recent_crawls.length > 0 ? (
                     dashboardData.recent_activity.recent_crawls.map((crawl, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{crawl.repository_name}</p>
-                          <p className="text-xs text-gray-500">{crawl.status}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{crawl.repository_name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{crawl.status}</p>
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
                           {crawl.last_crawled ? (
                             <time dateTime={crawl.last_crawled}>
                               {formatDateTime(crawl.last_crawled)}
@@ -320,7 +320,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-500">No recent crawls</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No recent crawls</p>
                   )}
                 </div>
               </div>

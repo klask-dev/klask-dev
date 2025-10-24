@@ -110,14 +110,14 @@ export const IndexManagement: React.FC = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Index Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Index Management</h1>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
           <div className="flex items-start gap-3">
-            <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+            <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-red-900">Failed to Load Metrics</h3>
-              <p className="text-red-700 text-sm mt-1">{error.message}</p>
+              <h3 className="font-semibold text-red-900 dark:text-red-200">Failed to Load Metrics</h3>
+              <p className="text-red-700 dark:text-red-300 text-sm mt-1">{error.message}</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -138,7 +138,7 @@ export const IndexManagement: React.FC = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Index Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Index Management</h1>
         </div>
         <div className="flex items-center justify-center py-12">
           <LoadingSpinner />
@@ -152,8 +152,8 @@ export const IndexManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Index Management</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Index Management</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Manage and monitor the Tantivy search index used for file content search.
           </p>
         </div>
@@ -174,7 +174,7 @@ export const IndexManagement: React.FC = () => {
       {/* Quick Stats Summary */}
       {stats && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Stats</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <IndexStatsCard
               title="Total Documents"
@@ -214,9 +214,9 @@ export const IndexManagement: React.FC = () => {
         <div className="lg:col-span-1 space-y-6">
           {/* Health Status */}
           {health && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Index Health</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Index Health</h2>
               </div>
               <div className="p-6">
                 <HealthIndicator health={health} />
@@ -226,9 +226,9 @@ export const IndexManagement: React.FC = () => {
 
           {/* Tuning Recommendations */}
           {tuning && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Tuning</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tuning</h2>
               </div>
               <div className="p-6">
                 <TuningPanel
@@ -245,9 +245,9 @@ export const IndexManagement: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Segments */}
           {stats && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Segments</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Segments</h2>
               </div>
               <div className="p-6">
                 <SegmentVisualization segments={stats.segments} />
@@ -257,9 +257,9 @@ export const IndexManagement: React.FC = () => {
 
           {/* Cache Statistics */}
           {stats && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Cache Statistics</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Cache Statistics</h2>
               </div>
               <div className="p-6">
                 <CacheStatsChart cache={stats.cache_stats} />
@@ -270,21 +270,21 @@ export const IndexManagement: React.FC = () => {
       </div>
 
       {/* Danger Zone - Reset Index */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Danger Zone</h2>
-          <p className="mt-1 text-sm text-gray-600">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Danger Zone</h2>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Irreversible index operations that require caution
           </p>
         </div>
 
         <div className="p-6">
-          <div className="border border-red-200 rounded-lg p-4 bg-red-50">
+          <div className="border border-red-200 dark:border-red-800 rounded-lg p-4 bg-red-50 dark:bg-red-900/40">
             <div className="flex items-start gap-3">
-              <ExclamationTriangleIcon className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-red-900 mb-2">Reset Search Index</h3>
-                <p className="text-sm text-red-700 mb-4">
+                <h3 className="text-lg font-semibold text-red-900 dark:text-red-200 mb-2">Reset Search Index</h3>
+                <p className="text-sm text-red-700 dark:text-red-300 mb-4">
                   This will completely delete all documents from the search index.
                   All search functionality will be unavailable until repositories are crawled again.
                   <strong className="block mt-2">This action cannot be undone.</strong>
@@ -308,10 +308,10 @@ export const IndexManagement: React.FC = () => {
           </div>
 
           {/* Additional Information */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
             <div className="flex items-start gap-3">
-              <InformationCircleIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-700">
+              <InformationCircleIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-700 dark:text-blue-300">
                 <p className="font-semibold mb-2">Index Management Guide</p>
                 <ul className="list-disc list-inside space-y-1 text-xs">
                   <li><strong>Optimize Index:</strong> Merge segments and remove deleted documents</li>

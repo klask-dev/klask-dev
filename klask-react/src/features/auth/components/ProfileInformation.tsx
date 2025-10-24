@@ -82,7 +82,7 @@ const ProfileInformation: React.FC = () => {
     <div className="space-y-6">
       {/* Full Name */}
       <div>
-        <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Full Name
         </label>
         <input
@@ -91,18 +91,18 @@ const ProfileInformation: React.FC = () => {
           value={formData.full_name}
           onChange={(e) => handleChange('full_name', e.target.value)}
           placeholder="Enter your full name"
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition ${
-            errors.full_name ? 'border-red-500' : 'border-gray-300'
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-900 text-gray-900 dark:text-white ${
+            errors.full_name ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
           }`}
           disabled={isUpdating}
         />
-        {errors.full_name && <p className="mt-1 text-sm text-red-600">{errors.full_name}</p>}
-        <p className="mt-1 text-xs text-gray-500">{formData.full_name.length}/255</p>
+        {errors.full_name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.full_name}</p>}
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formData.full_name.length}/255</p>
       </div>
 
       {/* Bio */}
       <div>
-        <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Bio
         </label>
         <textarea
@@ -111,18 +111,18 @@ const ProfileInformation: React.FC = () => {
           onChange={(e) => handleChange('bio', e.target.value)}
           placeholder="Tell us about yourself"
           rows={4}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-none ${
-            errors.bio ? 'border-red-500' : 'border-gray-300'
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white ${
+            errors.bio ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
           }`}
           disabled={isUpdating}
         />
-        {errors.bio && <p className="mt-1 text-sm text-red-600">{errors.bio}</p>}
-        <p className="mt-1 text-xs text-gray-500">{formData.bio.length}/2000</p>
+        {errors.bio && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.bio}</p>}
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formData.bio.length}/2000</p>
       </div>
 
       {/* Phone */}
       <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Phone Number
         </label>
         <input
@@ -131,24 +131,24 @@ const ProfileInformation: React.FC = () => {
           value={formData.phone}
           onChange={(e) => handleChange('phone', e.target.value)}
           placeholder="+1 (555) 123-4567"
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition ${
-            errors.phone ? 'border-red-500' : 'border-gray-300'
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-900 text-gray-900 dark:text-white ${
+            errors.phone ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
           }`}
           disabled={isUpdating}
         />
-        {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
+        {errors.phone && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>}
       </div>
 
       {/* Timezone */}
       <div>
-        <label htmlFor="timezone" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="timezone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Timezone
         </label>
         <select
           id="timezone"
           value={formData.timezone}
           onChange={(e) => handleChange('timezone', e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
           disabled={isUpdating}
         >
           {getAvailableTimezones().map((tz) => (
@@ -161,24 +161,24 @@ const ProfileInformation: React.FC = () => {
 
       {/* Status */}
       {hasChanges && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
-          <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2">
+          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zm-11-1a1 1 0 11-2 0 1 1 0 012 0z"
               clipRule="evenodd"
             />
           </svg>
-          <span className="text-sm text-blue-700">
+          <span className="text-sm text-blue-700 dark:text-blue-300">
             {isUpdating ? 'Saving changes...' : 'Unsaved changes'}
           </span>
         </div>
       )}
 
       {isUpdating && (
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-2">
+        <div className="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center gap-2">
           <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-gray-700">Updating your profile...</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">Updating your profile...</span>
         </div>
       )}
     </div>

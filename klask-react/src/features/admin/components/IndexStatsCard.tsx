@@ -20,31 +20,31 @@ const getColorClasses = (status?: 'healthy' | 'warning' | 'critical') => {
   switch (status) {
     case 'healthy':
       return {
-        bg: 'bg-green-50',
-        border: 'border-green-200',
-        text: 'text-green-900',
-        icon: 'text-green-600',
+        bg: 'bg-green-50 dark:bg-green-900/20',
+        border: 'border-green-200 dark:border-green-800',
+        text: 'text-green-900 dark:text-green-200',
+        icon: 'text-green-600 dark:text-green-400',
       };
     case 'warning':
       return {
-        bg: 'bg-yellow-50',
-        border: 'border-yellow-200',
-        text: 'text-yellow-900',
-        icon: 'text-yellow-600',
+        bg: 'bg-yellow-50 dark:bg-yellow-900/20',
+        border: 'border-yellow-200 dark:border-yellow-800',
+        text: 'text-yellow-900 dark:text-yellow-200',
+        icon: 'text-yellow-600 dark:text-yellow-400',
       };
     case 'critical':
       return {
-        bg: 'bg-red-50',
-        border: 'border-red-200',
-        text: 'text-red-900',
-        icon: 'text-red-600',
+        bg: 'bg-red-50 dark:bg-red-900/20',
+        border: 'border-red-200 dark:border-red-800',
+        text: 'text-red-900 dark:text-red-200',
+        icon: 'text-red-600 dark:text-red-400',
       };
     default:
       return {
-        bg: 'bg-blue-50',
-        border: 'border-blue-200',
-        text: 'text-blue-900',
-        icon: 'text-blue-600',
+        bg: 'bg-blue-50 dark:bg-blue-900/20',
+        border: 'border-blue-200 dark:border-blue-800',
+        text: 'text-blue-900 dark:text-blue-200',
+        icon: 'text-blue-600 dark:text-blue-400',
       };
   }
 };
@@ -95,7 +95,7 @@ export const IndexStatsCard: React.FC<IndexStatsCardProps> = ({
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-600">
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
             {title}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
@@ -103,7 +103,7 @@ export const IndexStatsCard: React.FC<IndexStatsCardProps> = ({
               {formatNumber(value)}
             </p>
             {unit && (
-              <span className="text-sm text-gray-500 font-medium">
+              <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
                 {unit}
               </span>
             )}
@@ -119,7 +119,7 @@ export const IndexStatsCard: React.FC<IndexStatsCardProps> = ({
       {trend && (
         <div className="mt-4 flex items-center gap-2">
           <div className={`flex items-center gap-1 text-sm font-medium ${
-            trend.direction === 'up' ? 'text-green-600' : 'text-red-600'
+            trend.direction === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
           }`}>
             {trend.direction === 'up' ? (
               <ArrowTrendingUpIcon className="h-4 w-4" />
@@ -130,7 +130,7 @@ export const IndexStatsCard: React.FC<IndexStatsCardProps> = ({
               {trend.direction === 'up' ? '+' : '-'}{trend.value}%
             </span>
           </div>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             {trend.label}
           </span>
         </div>

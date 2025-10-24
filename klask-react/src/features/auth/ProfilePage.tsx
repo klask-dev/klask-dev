@@ -71,8 +71,8 @@ const ProfilePage: React.FC = () => {
   if (!user) {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <p className="text-blue-900">Please log in to view your profile</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 text-center">
+          <p className="text-blue-900 dark:text-blue-300">Please log in to view your profile</p>
         </div>
       </div>
     );
@@ -83,17 +83,17 @@ const ProfilePage: React.FC = () => {
       <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
         {/* Page Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
-          <p className="text-gray-600 mt-1">Manage your account information and preferences</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Profile Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account information and preferences</p>
         </div>
 
         {/* Profile Header */}
         <ProfileHeader />
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           {/* Tab Navigation */}
-          <div className="border-b border-gray-200">
+          <div className="border-b border-gray-200 dark:border-gray-700">
             <div className="flex flex-wrap md:flex-nowrap">
               {tabs.map((tab) => (
                 <button
@@ -101,8 +101,8 @@ const ProfilePage: React.FC = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-1 px-4 py-4 md:px-6 font-medium text-sm md:text-base flex items-center justify-center gap-2 border-b-2 transition ${
                     activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600 bg-blue-50'
-                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'border-blue-600 text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400'
+                      : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                 >
                   {tab.icon}
@@ -122,17 +122,17 @@ const ProfilePage: React.FC = () => {
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+        <div className="bg-red-50 dark:bg-red-900/40 border-2 border-red-200 dark:border-red-800 rounded-lg p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-bold text-red-900">Danger Zone</h3>
-              <p className="text-sm text-red-700 mt-1">
+              <h3 className="text-lg font-bold text-red-900 dark:text-red-300">Danger Zone</h3>
+              <p className="text-sm text-red-700 dark:text-red-400 mt-1">
                 Permanently delete your account and all associated data. This action cannot be undone.
               </p>
             </div>
             <button
               onClick={() => setDeleteModalOpen(true)}
-              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium flex-shrink-0"
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-lg transition font-medium flex-shrink-0"
             >
               Delete Account
             </button>

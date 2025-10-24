@@ -82,10 +82,10 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Main Control */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-gradient-to-r from-blue-50 dark:from-blue-900/20 to-indigo-50 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
+            <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
               Auto-refresh Interval
             </label>
             <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
                   value={interval}
                   onChange={(e) => onIntervalChange(e.target.value as RefreshInterval)}
                   disabled={isLoading || isRefreshing}
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-900 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed transition-all"
+                  className="appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-gray-100 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
                 >
                   {intervals.map((val) => (
                     <option key={val} value={val}>
@@ -102,7 +102,7 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 dark:text-gray-400">
                   <svg
                     className="fill-current h-4 w-4"
                     xmlns="http://www.w3.org/2000/svg"
@@ -114,8 +114,8 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
               </div>
 
               {isAutoRefreshEnabled && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                  <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full text-xs font-semibold">
+                  <div className="w-2 h-2 bg-green-600 dark:bg-green-500 rounded-full animate-pulse" />
                   Active
                 </div>
               )}
@@ -126,7 +126,7 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
           <button
             onClick={handleManualRefresh}
             disabled={isLoading || isRefreshing}
-            className="h-10 w-10 p-2 rounded-lg border border-blue-300 bg-white hover:bg-blue-50 disabled:bg-gray-100 disabled:border-gray-300 text-blue-600 disabled:text-gray-400 transition-all flex items-center justify-center"
+            className="h-10 w-10 p-2 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:border-gray-300 dark:disabled:border-gray-600 text-blue-600 dark:text-blue-400 disabled:text-gray-400 dark:disabled:text-gray-500 transition-all flex items-center justify-center"
             title="Refresh now"
           >
             <ArrowPathIcon
@@ -139,13 +139,13 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
       {/* Timing Information */}
       <div className="grid grid-cols-2 gap-3">
         {/* Last Update */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <p className="text-xs font-medium text-gray-600">Last Updated</p>
-          <p className="text-sm font-mono font-bold text-gray-900 mt-1">
+        <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-3">
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Last Updated</p>
+          <p className="text-sm font-mono font-bold text-gray-900 dark:text-gray-100 mt-1">
             {formatTimeAgo(lastUpdate)}
           </p>
           {lastUpdate && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {lastUpdate.toLocaleTimeString()}
             </p>
           )}
@@ -154,19 +154,27 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
         {/* Next Refresh */}
         <div className={`${
           isAutoRefreshEnabled
-            ? 'bg-green-50 border-green-200'
-            : 'bg-gray-50 border-gray-200'
+            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600'
         } border rounded-lg p-3`}>
-          <p className="text-xs font-medium text-gray-600">Next Refresh</p>
+          <p className={`text-xs font-medium ${
+            isAutoRefreshEnabled
+              ? 'text-green-700 dark:text-green-400'
+              : 'text-gray-600 dark:text-gray-400'
+          }`}>Next Refresh</p>
           <p className={`text-sm font-mono font-bold mt-1 ${
             isAutoRefreshEnabled
-              ? 'text-green-900'
-              : 'text-gray-900'
+              ? 'text-green-900 dark:text-green-300'
+              : 'text-gray-900 dark:text-gray-100'
           }`}>
             {isAutoRefreshEnabled ? formatCountdown(nextRefresh) : 'Disabled'}
           </p>
           {isAutoRefreshEnabled && nextRefresh && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className={`text-xs mt-1 ${
+              isAutoRefreshEnabled
+                ? 'text-green-700 dark:text-green-400'
+                : 'text-gray-500 dark:text-gray-400'
+            }`}>
               {nextRefresh.toLocaleTimeString()}
             </p>
           )}
@@ -175,17 +183,17 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
 
       {/* Refresh Status */}
       {(isLoading || isRefreshing) && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-300 rounded-lg">
-          <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" />
-          <span className="text-sm font-medium text-blue-900">
+        <div className="flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 dark:border-blue-400 border-t-transparent" />
+          <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
             {isRefreshing ? 'Refreshing metrics...' : 'Loading metrics...'}
           </span>
         </div>
       )}
 
       {/* Info Message */}
-      <p className="text-xs text-gray-600 flex items-start gap-2">
-        <span className="font-bold text-gray-400 mt-0.5">ℹ</span>
+      <p className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-2">
+        <span className="font-bold text-gray-400 dark:text-gray-500 mt-0.5">ℹ</span>
         <span>
           Enable auto-refresh to automatically update index metrics at regular intervals.
           Manual refresh always fetches the latest data immediately.

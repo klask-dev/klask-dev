@@ -57,13 +57,13 @@ const ProfileHeader: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8">
         {/* Avatar Section */}
         <div className="flex flex-col items-center">
           <div
-            className={`relative w-32 h-32 rounded-full mb-4 overflow-hidden border-4 border-gray-200 ${
-              dragOver ? 'border-blue-500 bg-blue-50' : ''
+            className={`relative w-32 h-32 rounded-full mb-4 overflow-hidden border-4 ${
+              dragOver ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-600'
             } cursor-pointer transition-colors`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -117,7 +117,7 @@ const ProfileHeader: React.FC = () => {
             disabled={uploadAvatarMutation.isPending}
           />
 
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
             Drag and drop or click to upload
             <br />
             Max size: 5MB
@@ -127,22 +127,22 @@ const ProfileHeader: React.FC = () => {
         {/* User Info Section */}
         <div className="flex-1">
           <div className="mb-2">
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               {user?.full_name || user?.username}
             </h1>
-            <p className="text-gray-600">@{user?.username}</p>
+            <p className="text-gray-600 dark:text-gray-400">@{user?.username}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mt-6">
             <div>
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="font-medium text-gray-900">{user?.email}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+              <p className="font-medium text-gray-900 dark:text-white">{user?.email}</p>
             </div>
 
             <div>
-              <p className="text-sm text-gray-600">Role</p>
-              <p className="font-medium text-gray-900">
-                <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Role</p>
+              <p className="font-medium text-gray-900 dark:text-white">
+                <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                   {user?.role}
                 </span>
               </p>
@@ -150,24 +150,24 @@ const ProfileHeader: React.FC = () => {
 
             {user?.phone && (
               <div>
-                <p className="text-sm text-gray-600">Phone</p>
-                <p className="font-medium text-gray-900">{user.phone}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                <p className="font-medium text-gray-900 dark:text-white">{user.phone}</p>
               </div>
             )}
 
             {user?.login_count !== undefined && (
               <div>
-                <p className="text-sm text-gray-600">Logins</p>
-                <p className="font-medium text-gray-900">{user.login_count}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Logins</p>
+                <p className="font-medium text-gray-900 dark:text-white">{user.login_count}</p>
               </div>
             )}
           </div>
 
           {user?.bio && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-sm text-gray-600">Bio</p>
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Bio</p>
               <p
-                className="text-gray-900 italic"
+                className="text-gray-900 dark:text-gray-300 italic"
                 dangerouslySetInnerHTML={{
                   __html: DOMPurify.sanitize(user.bio, {
                     ALLOWED_TAGS: [],

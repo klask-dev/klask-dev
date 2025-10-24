@@ -2,10 +2,10 @@ import React from 'react';
 import { SearchResult } from './SearchResult';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Pagination } from '../ui/Pagination';
-import { 
-  MagnifyingGlassIcon, 
+import {
+  MagnifyingGlassIcon,
   ExclamationTriangleIcon,
-  DocumentMagnifyingGlassIcon 
+  DocumentMagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import type { SearchResult as SearchResultType } from '../../types';
 
@@ -56,7 +56,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             Search your codebase
           </h3>
           <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
-            Enter a search term to find files, functions, classes, and content across 
+            Enter a search term to find files, functions, classes, and content across
             your repositories. Use filters to narrow down your results.
           </p>
           <div className="mt-6 grid grid-cols-1 gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -164,7 +164,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               )}
             </p>
           </div>
-          
+
           {results.length > 0 && !usePagination && (
             <div className="text-sm text-gray-500 dark:text-gray-400">
               Showing {results.length} of {totalResults}
@@ -183,7 +183,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             onFileClick={onFileClick}
           />
         ))}
-        
+
         {/* Load More Indicator (Legacy) */}
         {!usePagination && hasNextPage && (
           <div className="flex items-center justify-center py-4">

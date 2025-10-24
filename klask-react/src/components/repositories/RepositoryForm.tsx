@@ -317,14 +317,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
     };
   };
 
-  // Debug: Monitor button state
+  // Monitor button state for validation
   React.useEffect(() => {
-    const shouldDisable = (() => {
-      if (!isValid || isLoading) return true;
-      if (!isEditing) return false;
-      return !isDirty && !hasSchedulingChanged;
-    })();
-
+    // Button state is computed dynamically in the submit button element
   }, [isValid, isLoading, isEditing, isDirty, hasSchedulingChanged, errors]);
 
   // Handle scheduling data changes
@@ -499,22 +494,22 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+        <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {formTitle}
             </h3>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
           </div>
 
           {/* Tab Navigation */}
-          <div className="border-b border-gray-200 mb-6">
+          <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
             <nav className="-mb-px flex space-x-8">
               {tabs.map((tab) => {
                 const validation = getTabValidationState(tab.id);
@@ -527,22 +522,22 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                     onClick={() => setActiveTab(tab.id)}
                     className={`group inline-flex items-center py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                       isActive
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     <tab.icon className={`mr-2 h-5 w-5 ${
-                      isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                      isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
                     }`} />
                     {tab.name}
                     {validation.hasErrors && (
-                      <ExclamationTriangleIcon className="ml-2 h-4 w-4 text-red-500" />
+                      <ExclamationTriangleIcon className="ml-2 h-4 w-4 text-red-500 dark:text-red-400" />
                     )}
                     {!validation.hasErrors && validation.hasWarnings && (
-                      <div className="ml-2 h-2 w-2 bg-amber-400 rounded-full" />
+                      <div className="ml-2 h-2 w-2 bg-amber-400 dark:bg-amber-500 rounded-full" />
                     )}
                     {!validation.hasErrors && !validation.hasWarnings && tab.required && (
-                      <CheckCircleIcon className="ml-2 h-4 w-4 text-green-500" />
+                      <CheckCircleIcon className="ml-2 h-4 w-4 text-green-500 dark:text-green-400" />
                     )}
                   </button>
                 );
@@ -559,7 +554,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                 <div className="space-y-6">
                   {/* Repository Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Repository Name *
                     </label>
                     <input
@@ -575,7 +570,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
 
                   {/* Repository Type */}
                   <div>
-                    <label htmlFor="repositoryType" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="repositoryType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Repository Type *
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -584,8 +579,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                           key={type}
                           className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
                             watchedType === type
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 hover:border-gray-400'
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                           }`}
                         >
                           <input
@@ -595,8 +590,10 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                             className="sr-only"
                           />
                           <div className="flex flex-col items-center space-y-1">
-                            {getTypeIcon(type)}
-                            <span className="text-xs font-medium">{type}</span>
+                            <div className={watchedType === type ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}>
+                              {getTypeIcon(type)}
+                            </div>
+                            <span className="text-xs font-medium text-gray-900 dark:text-gray-100">{type}</span>
                           </div>
                         </label>
                       ))}
@@ -609,7 +606,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                   {/* Repository URL - Not for GitLab/GitHub types */}
                   {watchedType !== 'GitLab' && watchedType !== 'GitHub' && (
                     <div>
-                      <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Repository URL *
                       </label>
                       <input
@@ -633,7 +630,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                   {/* Branch (for Git repositories) */}
                   {watchedType !== 'FileSystem' && (
                     <div>
-                      <label htmlFor="branch" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="branch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Branch (Optional)
                       </label>
                       <input
@@ -656,9 +653,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                     <input
                       {...register('enabled')}
                       type="checkbox"
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded"
                     />
-                    <label htmlFor="enabled" className="ml-2 block text-sm text-gray-900">
+                    <label htmlFor="enabled" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
                       Enable this repository for crawling
                     </label>
                   </div>
@@ -670,14 +667,14 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                 <div className="space-y-6">
                   {watchedType === 'GitLab' && (
                     <>
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-800">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-800/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+                        <p className="text-sm text-blue-800 dark:text-blue-300">
                           GitLab repositories will be automatically discovered and imported using your access token.
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           GitLab Server URL (Optional)
                         </label>
                         <input
@@ -689,27 +686,27 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         {errors.url && (
                           <p className="mt-1 text-sm text-red-600">{errors.url.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Leave empty to use gitlab.com, or enter your self-hosted GitLab URL
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Personal Access Token {!isEditing || !hasExistingToken ? '*' : ''}
                         </label>
 
                         {hasExistingToken && !showTokenField ? (
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-md">
                               <div className="flex items-center">
-                                <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                                <span className="text-sm text-green-700">Access token configured</span>
+                                <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full mr-2"></div>
+                                <span className="text-sm text-green-700 dark:text-green-300">Access token configured</span>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(true)}
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
                               >
                                 Change token
                               </button>
@@ -733,9 +730,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                                 title={showGitLabToken ? 'Hide token' : 'Show token'}
                               >
                                 {showGitLabToken ? (
-                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 ) : (
-                                  <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 )}
                               </button>
                             </div>
@@ -743,7 +740,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(false)}
-                                className="text-sm text-gray-600 hover:text-gray-800 underline"
+                                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 underline"
                               >
                                 Keep existing token
                               </button>
@@ -752,15 +749,15 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         )}
 
                         {errors.accessToken && (
-                          <p className="mt-1 text-sm text-red-600">{errors.accessToken.message}</p>
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accessToken.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Create a token with 'read_repository' scope in GitLab settings
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="gitlabNamespace" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="gitlabNamespace" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Namespace Filter (Optional)
                         </label>
                         <input
@@ -772,7 +769,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         {errors.gitlabNamespace && (
                           <p className="mt-1 text-sm text-red-600">{errors.gitlabNamespace.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Filter to only import repositories from a specific namespace
                         </p>
                       </div>
@@ -781,14 +778,14 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
 
                   {watchedType === 'GitHub' && (
                     <>
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-800">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-800/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+                        <p className="text-sm text-blue-800 dark:text-blue-300">
                           GitHub repositories will be automatically discovered and imported using your Personal Access Token.
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           GitHub API URL (Optional)
                         </label>
                         <input
@@ -806,21 +803,21 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                       </div>
 
                       <div>
-                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Personal Access Token {!isEditing || !hasExistingToken ? '*' : ''}
                         </label>
 
                         {hasExistingToken && !showTokenField ? (
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-md">
                               <div className="flex items-center">
-                                <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                                <span className="text-sm text-green-700">Access token configured</span>
+                                <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full mr-2"></div>
+                                <span className="text-sm text-green-700 dark:text-green-300">Access token configured</span>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(true)}
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
                               >
                                 Change token
                               </button>
@@ -844,9 +841,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                                 title={showGitHubToken ? 'Hide token' : 'Show token'}
                               >
                                 {showGitHubToken ? (
-                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 ) : (
-                                  <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 )}
                               </button>
                             </div>
@@ -854,7 +851,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(false)}
-                                className="text-sm text-gray-600 hover:text-gray-800 underline"
+                                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 underline"
                               >
                                 Keep existing token
                               </button>
@@ -863,15 +860,15 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         )}
 
                         {errors.accessToken && (
-                          <p className="mt-1 text-sm text-red-600">{errors.accessToken.message}</p>
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accessToken.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Create a token with 'repo' scope in GitHub settings
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="githubNamespace" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="githubNamespace" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Organization/User Filter (Optional)
                         </label>
                         <input
@@ -898,7 +895,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                   {watchedType === 'GitLab' && (
                     <>
                       <div>
-                        <label htmlFor="gitlabExcludedProjects" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="gitlabExcludedProjects" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Excluded Projects (Optional)
                         </label>
                         <input
@@ -916,7 +913,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                       </div>
 
                       <div>
-                        <label htmlFor="gitlabExcludedPatterns" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="gitlabExcludedPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Excluded Patterns (Optional)
                         </label>
                         <input
@@ -938,7 +935,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                   {watchedType === 'GitHub' && (
                     <>
                       <div>
-                        <label htmlFor="githubExcludedRepositories" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="githubExcludedRepositories" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Excluded Repositories (Optional)
                         </label>
                         <input
@@ -956,7 +953,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                       </div>
 
                       <div>
-                        <label htmlFor="githubExcludedPatterns" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="githubExcludedPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Excluded Patterns (Optional)
                         </label>
                         <input
@@ -966,9 +963,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                           placeholder="*-archive, test-*, *-temp"
                         />
                         {errors.githubExcludedPatterns && (
-                          <p className="mt-1 text-sm text-red-600">{errors.githubExcludedPatterns.message}</p>
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.githubExcludedPatterns.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Comma-separated patterns with wildcards (*) to exclude repositories
                         </p>
                       </div>
@@ -976,8 +973,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                   )}
 
                   {(watchedType === 'Git' || watchedType === 'FileSystem') && (
-                    <div className="text-center py-8 text-gray-500">
-                      <FunnelIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <FunnelIcon className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                       <p>No filter options available for {watchedType} repositories.</p>
                     </div>
                   )}
@@ -987,8 +984,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
               {/* Auto Crawling / Scheduling Tab */}
               {activeTab === 'scheduling' && (
                 <div className="space-y-6">
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <h4 className="text-md font-medium text-gray-900 mb-4">Automatic Crawling Schedule</h4>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Automatic Crawling Schedule</h4>
                     <CronScheduleForm
                       autoCrawlEnabled={schedulingData.autoCrawlEnabled}
                       cronSchedule={schedulingData.cronSchedule}
@@ -1003,7 +1000,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
             </div>
 
             {/* Tab Navigation & Actions */}
-            <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
               {/* Tab Navigation Buttons */}
               <div className="flex space-x-3">
                 {/* Previous Tab Button */}

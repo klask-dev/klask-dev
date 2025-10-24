@@ -88,7 +88,7 @@ const SecuritySection: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Current Password */}
         <div>
-          <label htmlFor="current_password" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="current_password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Current Password
           </label>
           <div className="relative">
@@ -97,15 +97,15 @@ const SecuritySection: React.FC = () => {
               type={showPasswords.current ? 'text' : 'password'}
               value={formData.current_password}
               onChange={(e) => handleChange('current_password', e.target.value)}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition pr-10 ${
-                errors.current_password ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition pr-10 bg-white dark:bg-gray-900 text-gray-900 dark:text-white ${
+                errors.current_password ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}
               disabled={changePasswordMutation.isPending}
             />
             <button
               type="button"
               onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             >
               {showPasswords.current ? (
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -128,13 +128,13 @@ const SecuritySection: React.FC = () => {
             </button>
           </div>
           {errors.current_password && (
-            <p className="mt-1 text-sm text-red-600">{errors.current_password}</p>
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.current_password}</p>
           )}
         </div>
 
         {/* New Password */}
         <div>
-          <label htmlFor="new_password" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="new_password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             New Password
           </label>
           <div className="relative">
@@ -143,15 +143,15 @@ const SecuritySection: React.FC = () => {
               type={showPasswords.new ? 'text' : 'password'}
               value={formData.new_password}
               onChange={(e) => handleChange('new_password', e.target.value)}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition pr-10 ${
-                errors.new_password ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition pr-10 bg-white dark:bg-gray-900 text-gray-900 dark:text-white ${
+                errors.new_password ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}
               disabled={changePasswordMutation.isPending}
             />
             <button
               type="button"
               onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             >
               {showPasswords.new ? (
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -174,30 +174,30 @@ const SecuritySection: React.FC = () => {
             </button>
           </div>
           {errors.new_password && (
-            <p className="mt-1 text-sm text-red-600">{errors.new_password}</p>
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.new_password}</p>
           )}
 
           {/* Password Strength Indicator */}
           {formData.new_password && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">Password Strength:</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Password Strength:</p>
                 <span
                   className={`text-sm font-medium ${
                     passwordValidation.strength === 'weak'
-                      ? 'text-red-600'
+                      ? 'text-red-600 dark:text-red-400'
                       : passwordValidation.strength === 'fair'
-                        ? 'text-yellow-600'
+                        ? 'text-yellow-600 dark:text-yellow-400'
                         : passwordValidation.strength === 'good'
-                          ? 'text-blue-600'
-                          : 'text-green-600'
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-green-600 dark:text-green-400'
                   }`}
                 >
                   {getPasswordStrengthLabel(passwordValidation.strength)}
                 </span>
               </div>
 
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all ${getPasswordStrengthColor(
                     passwordValidation.strength
@@ -209,7 +209,7 @@ const SecuritySection: React.FC = () => {
               </div>
 
               {passwordValidation.errors.length > 0 && (
-                <ul className="text-xs text-gray-600 space-y-1">
+                <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                   {passwordValidation.errors.map((error, idx) => (
                     <li key={idx} className="flex items-center gap-1">
                       <svg className="w-3 h-3 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
@@ -230,7 +230,7 @@ const SecuritySection: React.FC = () => {
 
         {/* Confirm Password */}
         <div>
-          <label htmlFor="new_password_confirm" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="new_password_confirm" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Confirm New Password
           </label>
           <div className="relative">
@@ -239,15 +239,15 @@ const SecuritySection: React.FC = () => {
               type={showPasswords.confirm ? 'text' : 'password'}
               value={formData.new_password_confirm}
               onChange={(e) => handleChange('new_password_confirm', e.target.value)}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition pr-10 ${
-                errors.new_password_confirm ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition pr-10 bg-white dark:bg-gray-900 text-gray-900 dark:text-white ${
+                errors.new_password_confirm ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
               }`}
               disabled={changePasswordMutation.isPending}
             />
             <button
               type="button"
               onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             >
               {showPasswords.confirm ? (
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -270,7 +270,7 @@ const SecuritySection: React.FC = () => {
             </button>
           </div>
           {errors.new_password_confirm && (
-            <p className="mt-1 text-sm text-red-600">{errors.new_password_confirm}</p>
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.new_password_confirm}</p>
           )}
         </div>
 
@@ -279,7 +279,7 @@ const SecuritySection: React.FC = () => {
           <button
             type="submit"
             disabled={changePasswordMutation.isPending || !formData.current_password || !formData.new_password}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+            className="px-6 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded-lg disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition flex items-center gap-2"
           >
             {changePasswordMutation.isPending && (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
