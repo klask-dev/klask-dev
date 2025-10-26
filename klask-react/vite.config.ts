@@ -60,7 +60,7 @@ export default defineConfig({
       // Exclude individual language modules from pre-bundling
       // to prevent creating many small chunks
       'react-syntax-highlighter/dist/esm/languages/prism/*',
-      // Exclude refractor to avoid resolution errors
+      // Exclude refractor to avoid dynamic import resolution errors
       'refractor',
     ],
   },

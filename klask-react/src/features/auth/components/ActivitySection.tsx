@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useUserActivity } from '../../../hooks/useProfile';
 import { useProfile } from '../../../hooks/useProfile';
 
@@ -174,15 +175,10 @@ const ActivitySection: React.FC = () => {
             setPage(1);
             refetch();
           }}
-          className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition flex items-center gap-2"
+          disabled={isLoading}
+          className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition flex items-center gap-2 disabled:opacity-50"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 1119.414 9H16a1 1 0 11 2 0v4a1 1 0 01-1 1h-4a1 1 0 110-2h2.101A9.002 9.002 0 005.103 4.1a1 1 0 01 .894-1.894A7 7 0 0117.414 4H19a1 1 0 011 1v2a1 1 0 11-2 0V5a1 1 0 00-1-1h-3.101A9.002 9.002 0 005 2a1 1 0 01-1-1z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <ArrowPathIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
