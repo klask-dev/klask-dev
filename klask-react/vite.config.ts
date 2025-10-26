@@ -49,7 +49,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'react-syntax-highlighter/dist/esm/prism',
+      // Don't pre-bundle react-syntax-highlighter/prism as it imports refractor/lib/all
+      // which causes resolution issues. It's lazy-loaded on demand in OptimizedSyntaxHighlighter.tsx
       'react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus',
       'react-syntax-highlighter/dist/esm/styles/prism/one-light',
       'react-syntax-highlighter/dist/esm/styles/prism/one-dark',
@@ -60,8 +61,9 @@ export default defineConfig({
       // Exclude individual language modules from pre-bundling
       // to prevent creating many small chunks
       'react-syntax-highlighter/dist/esm/languages/prism/*',
-      // Exclude refractor to avoid dynamic import resolution errors
+      // Exclude refractor and react-syntax-highlighter/prism to avoid import resolution errors
       'refractor',
+      'react-syntax-highlighter',
     ],
   },
   test: {
