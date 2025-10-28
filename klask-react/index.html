@@ -14,11 +14,12 @@
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
     <title>Klask - Code Search Engine</title>
+
+    <!-- Runtime configuration must load BEFORE any modules -->
+    <script src="/runtime-config.js"></script>
   </head>
   <body>
     <div id="root"></div>
-    <!-- Runtime configuration script -->
-    <script src="/runtime-config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
