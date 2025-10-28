@@ -47,7 +47,7 @@ cela permettra d'éviter d'écrire directement dans le champ de recherche pour l
 - quand, on réindex un document existant, comment on fait, date, est-ce qu'il est bien supprimé d'une version etc, ou tout court ?
 - enregistrer le document une seule fois dans l'index, et enregistrer une liste des versions, des paths, des projets, si le contenu est le même ?
 
-Gros problème : si un crawl immense n'était pas fini et que le serveur redémarre, le serveur reprend le crawling au démarrage, mais il ne répond à aucune autre requêtes => IMPOSSIBLE de se logguer !
+- [x] Gros problème : si un crawl immense n'était pas fini et que le serveur redémarre, le serveur reprend le crawling au démarrage, mais il ne répond à aucune autre requêtes => IMPOSSIBLE de se logguer !
 
 
 - pour le crawling github, il faut décrire que l'access token doit être de type "All repositories"

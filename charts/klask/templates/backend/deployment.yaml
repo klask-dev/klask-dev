@@ -82,7 +82,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "klask.postgresql.secretName" . }}
-                  key: password
+                  key: klask-password
             {{- else if .Values.backend.env.database.url }}
             - name: DATABASE_URL
               valueFrom:

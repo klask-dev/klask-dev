@@ -46,7 +46,7 @@ impl RepositoryRepository {
 
     pub async fn get_repository(&self, id: Uuid) -> Result<Option<Repository>> {
         let repository = sqlx::query_as::<_, Repository>(
-            "SELECT id, name, url, repository_type, branch, enabled, access_token, gitlab_namespace, is_group, last_crawled, created_at, updated_at, auto_crawl_enabled, cron_schedule, next_crawl_at, crawl_frequency_hours, max_crawl_duration_minutes, last_crawl_duration_seconds, gitlab_excluded_projects, gitlab_excluded_patterns, github_namespace, github_excluded_repositories, github_excluded_patterns, crawl_state, last_processed_project, crawl_started_at FROM repositories WHERE id = $1"
+            "SELECT id, name, url, repository_type, branch, enabled, access_token, gitlab_namespace, is_group, last_crawled, created_at, updated_at, auto_crawl_enabled, cron_schedule, next_crawl_at, crawl_frequency_hours, max_crawl_duration_minutes, last_crawl_duration_seconds, gitlab_excluded_projects, gitlab_excluded_patterns, github_namespace, github_excluded_repositories, github_excluded_patterns, crawl_state, last_processed_project, crawl_started_at, included_branches, included_branches_patterns, excluded_branches, excluded_branches_patterns, included_projects, included_projects_patterns FROM repositories WHERE id = $1"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -57,7 +57,7 @@ impl RepositoryRepository {
 
     pub async fn list_repositories(&self) -> Result<Vec<Repository>> {
         let repositories = sqlx::query_as::<_, Repository>(
-            "SELECT id, name, url, repository_type, branch, enabled, access_token, gitlab_namespace, is_group, last_crawled, created_at, updated_at, auto_crawl_enabled, cron_schedule, next_crawl_at, crawl_frequency_hours, max_crawl_duration_minutes, last_crawl_duration_seconds, gitlab_excluded_projects, gitlab_excluded_patterns, github_namespace, github_excluded_repositories, github_excluded_patterns, crawl_state, last_processed_project, crawl_started_at FROM repositories ORDER BY created_at DESC"
+            "SELECT id, name, url, repository_type, branch, enabled, access_token, gitlab_namespace, is_group, last_crawled, created_at, updated_at, auto_crawl_enabled, cron_schedule, next_crawl_at, crawl_frequency_hours, max_crawl_duration_minutes, last_crawl_duration_seconds, gitlab_excluded_projects, gitlab_excluded_patterns, github_namespace, github_excluded_repositories, github_excluded_patterns, crawl_state, last_processed_project, crawl_started_at, included_branches, included_branches_patterns, excluded_branches, excluded_branches_patterns, included_projects, included_projects_patterns FROM repositories ORDER BY created_at DESC"
         )
         .fetch_all(&self.pool)
         .await?;
@@ -77,7 +77,7 @@ impl RepositoryRepository {
 
     pub async fn update_repository(&self, id: Uuid, repository: &Repository) -> Result<Repository> {
         let result = sqlx::query_as::<_, Repository>(
-            "UPDATE repositories SET name = $2, url = $3, repository_type = $4, branch = $5, enabled = $6, access_token = $7, gitlab_namespace = $8, is_group = $9, auto_crawl_enabled = $10, cron_schedule = $11, next_crawl_at = $12, crawl_frequency_hours = $13, max_crawl_duration_minutes = $14, gitlab_excluded_projects = $15, gitlab_excluded_patterns = $16, github_namespace = $17, github_excluded_repositories = $18, github_excluded_patterns = $19, crawl_state = $20, last_processed_project = $21, crawl_started_at = $22, updated_at = NOW() WHERE id = $1 RETURNING id, name, url, repository_type, branch, enabled, access_token, gitlab_namespace, is_group, last_crawled, created_at, updated_at, auto_crawl_enabled, cron_schedule, next_crawl_at, crawl_frequency_hours, max_crawl_duration_minutes, last_crawl_duration_seconds, gitlab_excluded_projects, gitlab_excluded_patterns, github_namespace, github_excluded_repositories, github_excluded_patterns, crawl_state, last_processed_project, crawl_started_at"
+            "UPDATE repositories SET name = $2, url = $3, repository_type = $4, branch = $5, enabled = $6, access_token = $7, gitlab_namespace = $8, is_group = $9, auto_crawl_enabled = $10, cron_schedule = $11, next_crawl_at = $12, crawl_frequency_hours = $13, max_crawl_duration_minutes = $14, gitlab_excluded_projects = $15, gitlab_excluded_patterns = $16, github_namespace = $17, github_excluded_repositories = $18, github_excluded_patterns = $19, crawl_state = $20, last_processed_project = $21, crawl_started_at = $22, included_branches = $23, included_branches_patterns = $24, excluded_branches = $25, excluded_branches_patterns = $26, included_projects = $27, included_projects_patterns = $28, updated_at = NOW() WHERE id = $1 RETURNING id, name, url, repository_type, branch, enabled, access_token, gitlab_namespace, is_group, last_crawled, created_at, updated_at, auto_crawl_enabled, cron_schedule, next_crawl_at, crawl_frequency_hours, max_crawl_duration_minutes, last_crawl_duration_seconds, gitlab_excluded_projects, gitlab_excluded_patterns, github_namespace, github_excluded_repositories, github_excluded_patterns, crawl_state, last_processed_project, crawl_started_at, included_branches, included_branches_patterns, excluded_branches, excluded_branches_patterns, included_projects, included_projects_patterns"
         )
         .bind(id)
         .bind(&repository.name)
@@ -101,6 +101,12 @@ impl RepositoryRepository {
         .bind(&repository.crawl_state)
         .bind(&repository.last_processed_project)
         .bind(repository.crawl_started_at)
+        .bind(&repository.included_branches)
+        .bind(&repository.included_branches_patterns)
+        .bind(&repository.excluded_branches)
+        .bind(&repository.excluded_branches_patterns)
+        .bind(&repository.included_projects)
+        .bind(&repository.included_projects_patterns)
         .fetch_one(&self.pool)
         .await?;
 

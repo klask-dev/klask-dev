@@ -32,7 +32,7 @@ const AdminDashboard: React.FC = () => {
     const days = Math.floor(seconds / (24 * 60 * 60));
     const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
     const minutes = Math.floor((seconds % (60 * 60)) / 60);
-    
+
     if (days > 0) return `${days}d ${hours}h`;
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
@@ -90,7 +90,7 @@ const AdminDashboard: React.FC = () => {
                 icon={ServerIcon}
                 color="green"
               />
-              
+
               <MetricCard
                 title="Uptime"
                 value={formatUptime(dashboardData?.system?.uptime_seconds || 0)}
@@ -98,7 +98,7 @@ const AdminDashboard: React.FC = () => {
                 icon={ClockIcon}
                 color="blue"
               />
-              
+
               <MetricCard
                 title="Total Users"
                 value={dashboardData?.users?.total || 0}
@@ -106,7 +106,7 @@ const AdminDashboard: React.FC = () => {
                 icon={UsersIcon}
                 color="purple"
               />
-              
+
               <MetricCard
                 title="Repositories"
                 value={dashboardData?.repositories?.total_repositories || 0}
@@ -128,7 +128,7 @@ const AdminDashboard: React.FC = () => {
                 icon={MagnifyingGlassIcon}
                 color="blue"
               />
-              
+
               <MetricCard
                 title="Recently Crawled"
                 value={dashboardData?.repositories?.recently_crawled || 0}
@@ -136,7 +136,7 @@ const AdminDashboard: React.FC = () => {
                 icon={CogIcon}
                 color="green"
               />
-              
+
               <MetricCard
                 title="Never Crawled"
                 value={dashboardData?.repositories?.never_crawled || 0}

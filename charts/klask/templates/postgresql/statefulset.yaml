@@ -33,7 +33,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ include "klask.postgresql.secretName" . }}
-              key: password
+              key: klask-password
         - name: PGDATA
           value: /mnt/data/pgdata
         {{- with .Values.postgresql.config.extraEnv }}

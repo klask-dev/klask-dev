@@ -1,61 +1,43 @@
 # Example values for using external PostgreSQL database
 # Use this when you want to use a managed database service instead of deploying PostgreSQL in Kubernetes
+#
+# 📚 See IMMUTABLE_FIELDS.md for which fields cannot be changed between upgrades
+#
+# Usage:
+#   helm upgrade klask oci://ghcr.io/klask-dev/klask:0.2.0 \
+#     -f values-external-db.yaml \
+#     --namespace klask
 
-# Disable internal PostgreSQL
+# ============================================================================
+# PostgreSQL Configuration - EXTERNAL DATABASE
+# ============================================================================
+
 postgresql:
+  # Disable internal PostgreSQL - we're using an external managed database
   enabled: false
 
-# Backend configuration with external database
+  # If you ever need to use internal PostgreSQL again, use existingSecret
+  # to avoid immutable field conflicts:
+  # auth:
+  #   existingSecret: "klask-postgresql-credentials"
+  #   username: ""      # Leave empty when using existingSecret
+  #   password: ""      # Leave empty when using existingSecret
+  #   database: ""      # Leave empty when using existingSecret
+
+# ============================================================================
+# Backend Configuration with External Database
+# ============================================================================
+
 backend:
   enabled: true
+
   image:
-    repository: ghcr.io/your-org/klask-backend
-    tag: latest
-    pullPolicy: Always
-  
-  env:
-    # Use external database URL
-    - name: DATABASE_URL
-      value: "postgresql://username:password@your-db-host:5432/klask"
-    # Alternative: use Kubernetes secret
-    # - name: DATABASE_URL
-    #   valueFrom:
-    #     secretKeyRef:
-    #       name: klask-db-secret
-    #       key: database-url
-    - name: RUST_LOG
-      value: "info"
+    repository: ghcr.io/klask-dev/klask-backend
+    # ✅ CAN CHANGE: Safe to update between upgrades
+    tag: "0.2.0"
+    pullPolicy: IfNotPresent
 
-# Frontend configuration
-frontend:
-  enabled: true
-  image:
-    repository: ghcr.io/your-org/klask-frontend
-    tag: latest
-    pullPolicy: Always
-  
-  env:
-    - name: VITE_API_BASE_URL
-      value: "http://klask-backend:3000"
-
-# Enable ingress for external access
-ingress:
-  enabled: true
-  className: "nginx"  # or your ingress class
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # if using cert-manager
-  hosts:
-    - host: klask.yourdomain.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: klask-tls
-      hosts:
-        - klask.yourdomain.com
-
-# Resource requests and limits
-backend:
+  # Backend resources - ✅ CAN CHANGE
   resources:
     requests:
       cpu: 100m
@@ -64,7 +46,54 @@ backend:
       cpu: 500m
       memory: 512Mi
 
+  env:
+    database:
+      # External PostgreSQL connection string
+      # Format: postgresql://username:password@host:port/database
+      # ✅ CAN CHANGE: Safe to update between upgrades
+      url: "postgresql://klask:password@postgres.example.com:5432/klask"
+
+      # Alternative: Use Kubernetes secret (RECOMMENDED for production)
+      # Create the secret:
+      #   kubectl create secret generic klask-db-secret \
+      #     --from-literal=url='postgresql://...' \
+      #     -n klask
+      # Then uncomment:
+      # secretName: "klask-db-secret"
+      # secretKey: "url"
+
+    customVars: {}
+
+  # Persistence for search index - ✅ CAN INCREASE size
+  persistence:
+    enabled: true
+    size: 50Gi              # ✅ CAN CHANGE (increase only)
+    storageClass: ""        # Leave empty for cluster default
+
+  # Liveness & readiness probes - ✅ CAN CHANGE
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# ============================================================================
+# Frontend Configuration
+# ============================================================================
+
 frontend:
+  enabled: true
+
+  image:
+    repository: ghcr.io/klask-dev/klask-frontend
+    # ✅ CAN CHANGE: Safe to update between upgrades
+    tag: "0.2.0"
+    pullPolicy: IfNotPresent
+
+  # Frontend resources - ✅ CAN CHANGE
   resources:
     requests:
       cpu: 50m
@@ -72,3 +101,142 @@ frontend:
     limits:
       cpu: 200m
       memory: 256Mi
+
+  # ✅ CAN CHANGE: Safe to update between upgrades
+  env:
+    api:
+      baseUrl: "https://klask.yourdomain.com"
+
+# ============================================================================
+# Ingress Configuration (External Access)
+# ============================================================================
+
+ingress:
+  enabled: true
+  className: "nginx"  # or your ingress class (traefik, istio, etc.)
+
+  annotations:
+    # Enable TLS with cert-manager (optional)
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # CORS configuration (if needed)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "https://klask.yourdomain.com"
+
+  hosts:
+    - host: klask.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+  # TLS configuration
+  tls:
+    - secretName: klask-tls
+      hosts:
+        - klask.yourdomain.com
+
+# ============================================================================
+# Global Configuration
+# ============================================================================
+
+# ❌ DO NOT CHANGE: These are immutable after first deployment
+# nameOverride: ""
+# fullnameOverride: ""
+# See: IMMUTABLE_FIELDS.md
+
+# ✅ CAN CHANGE: Pod disruption budgets
+podDisruptionBudget:
+  enabled: true
+  backend:
+    minAvailable: 1
+  frontend:
+    minAvailable: 1
+
+# ✅ CAN CHANGE: Pod affinity rules
+affinity: {}
+  # Example: Pod anti-affinity to spread across nodes
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #     - weight: 100
+  #       podAffinityTerm:
+  #         labelSelector:
+  #           matchLabels:
+  #             app.kubernetes.io/name: klask
+  #         topologyKey: kubernetes.io/hostname
+
+# ✅ CAN CHANGE: Node selector
+nodeSelector: {}
+  # Example: deploy on specific nodes
+  # disktype: ssd
+
+# ✅ CAN CHANGE: Tolerations
+tolerations: []
+  # Example: tolerate taints
+  # - key: "key1"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+# ============================================================================
+# Monitoring (Optional)
+# ============================================================================
+
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    # Uncomment if you have Prometheus installed:
+    # interval: 30s
+
+# ============================================================================
+# Network Policy (Optional - Advanced)
+# ============================================================================
+
+networkPolicy:
+  enabled: false
+  # Configure if you need strict network policies
+  backend:
+    allowExternal: true
+
+# ============================================================================
+# Pre-Deployment Checklist
+# ============================================================================
+
+# Before deploying, ensure:
+#
+# 1. External PostgreSQL database is ready:
+#    - Accessible from Kubernetes cluster
+#    - Databases and tables created (migrations ran)
+#    - User credentials configured
+#
+# 2. Validate values before upgrade:
+#    ./.claude/validators/helm-values-validator.sh values-external-db.yaml
+#
+# 3. Dry-run to see what will change:
+#    helm upgrade klask oci://ghcr.io/klask-dev/klask:0.2.0 \
+#      -f values-external-db.yaml \
+#      --namespace klask \
+#      --dry-run --debug
+#
+# 4. Test in development environment first
+#
+# 5. Backup external database before production upgrade:
+#    pg_dump -h your-db-host -U klask klask > backup.sql
+#
+# ============================================================================
+# Safety Notes
+# ============================================================================
+
+# ✅ Safe to change frequently:
+#   - Image tags (backend.image.tag, frontend.image.tag)
+#   - Resource limits (cpu, memory)
+#   - Ingress configuration
+#   - Affinity and tolerations
+#   - External database connection string (but verify connectivity first!)
+#
+# ❌ NEVER change after initial deployment:
+#   - nameOverride / fullnameOverride (would require StatefulSet deletion)
+#   - Internal PostgreSQL credentials (if ever using postgresql.enabled: true)
+#
+# See IMMUTABLE_FIELDS.md for complete reference
+
+# ============================================================================
