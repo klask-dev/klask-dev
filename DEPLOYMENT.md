@@ -1,291 +1,206 @@
 # Klask Deployment Guide
 
-This guide explains how to deploy Klask using Docker for production environments.
+This guide covers deploying Klask to various environments.
 
-## Prerequisites
+## 📦 Table of Contents
 
-- Docker Engine 20.10+ 
-- Docker Compose 2.0+
-- Git
-- At least 2GB RAM and 10GB disk space
+- [Local Development](#local-development)
+- [Docker Compose](#docker-compose)
+- [Kubernetes (Helm)](#kubernetes-helm)
+- [Production Best Practices](#production-best-practices)
 
-## Quick Start
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/klask-dev/klask-rs.git
-   cd klask-rs
-   ```
+## 🏠 Local Development
 
-2. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env and change ENCRYPTION_KEY to a secure random string
-   nano .env
-   ```
-
-3. **Deploy with Docker Compose**
-   ```bash
-   # Deploy the full stack
-   docker-compose up -d
-   
-   # Or deploy only essential services (without pgAdmin and Redis)
-   docker-compose up -d postgres klask-backend klask-frontend
-   ```
-
-4. **Access the application**
-   - Frontend: http://localhost
-   - Backend API: http://localhost:3000
-   - pgAdmin (optional): http://localhost:8080
-
-## Environment Configuration
-
-### Required Environment Variables
-
-Edit the `.env` file before deployment:
+### Quick Start
 
 ```bash
-# CRITICAL: Change this encryption key for production!
-ENCRYPTION_KEY=your-super-secret-encryption-key-32-chars-minimum
+# 1. Start PostgreSQL
+docker-compose -f docker-compose.dev.yml up -d
 
-# Database credentials (change for production)
+# 2. Start backend
+cd klask-rs
+cargo run --bin klask-rs
+
+# 3. Start frontend (in another terminal)
+cd klask-react
+npm run dev
+```
+
+Access:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:3000
+
+---
+
+## 🐳 Docker Compose
+
+### Development Environment
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# With optional tools (pgAdmin, Redis)
+docker-compose --profile tools up -d
+```
+
+### Production Environment
+
+```bash
+# Use production compose file
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Configuration
+
+Create a `.env` file for environment variables:
+
+```env
+# Database
 POSTGRES_USER=klask
 POSTGRES_PASSWORD=your-secure-password
-POSTGRES_DB=klask_rs
+POSTGRES_DB=klask
 
-# Application settings
+# Backend
+JWT_SECRET=your-jwt-secret-change-in-production
+ENCRYPTION_KEY=your-encryption-key-change-in-production
 RUST_LOG=info
-PORT=3000
-HOST=0.0.0.0
+
+# Frontend
+VITE_API_URL=http://localhost:3000
 ```
 
-### Optional Services
+---
 
-The Docker Compose setup includes optional development and administration tools:
+## ☸️ Kubernetes (Helm)
+
+### Prerequisites
+
+- Kubernetes cluster (1.23+)
+- Helm 3.x
+- kubectl configured
+- Storage class for persistent volumes
+- Ingress controller (nginx, traefik, etc.)
+
+### Quick Install
 
 ```bash
-# Enable optional services (pgAdmin, Redis)
-docker-compose --profile tools up -d
+# Install with default values
+helm install klask ./charts/klask
 
-# Or specify individual services
-docker-compose up -d postgres klask-backend klask-frontend pgadmin
+# Install with custom values
+helm install klask ./charts/klask -f helm-example.yaml
 ```
 
-## Production Deployment
+### Basic Configuration
 
-### Security Considerations
-
-1. **Change default credentials**
-   - Update `ENCRYPTION_KEY` to a secure random string (32+ characters)
-   - Change PostgreSQL credentials (`POSTGRES_USER`, `POSTGRES_PASSWORD`)
-   - Update pgAdmin credentials if using the tools profile
-
-2. **Network security**
-   - Use a reverse proxy (nginx, Traefik) with SSL/TLS
-   - Restrict database access to application containers only
-   - Consider using Docker secrets for sensitive data
-
-3. **Data persistence**
-   - Database data is persisted in Docker volumes
-   - Search index and application data are persisted in volumes
-   - Back up these volumes regularly
-
-### SSL/TLS Configuration
-
-For production, use a reverse proxy to handle SSL termination:
+See [`helm-example.yaml`](helm-example.yaml) for a complete example. Here's a minimal setup:
 
 ```yaml
-# docker-compose.override.yml example
-version: '3.8'
-services:
-  klask-frontend:
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.klask.rule=Host(`your-domain.com`)"
-      - "traefik.http.routers.klask.tls.certresolver=letsencrypt"
+# minimal-values.yaml
+backend:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+
+frontend:
+  replicaCount: 1
+
+postgresql:
+  enabled: true
+  auth:
+    password: changeme
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: klask.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: klask-tls
+      hosts:
+        - klask.example.com
 ```
 
-### Resource Limits
-
-For production, consider adding resource limits:
-
-```yaml
-# docker-compose.override.yml example
-version: '3.8'
-services:
-  klask-backend:
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
-```
-
-## Service Architecture
-
-### Services Overview
-
-- **postgres**: PostgreSQL database for application data
-- **klask-backend**: Rust backend API server
-- **klask-frontend**: React frontend served by nginx
-- **pgadmin** (optional): Database administration interface
-- **redis** (optional): Caching layer for future use
-
-### Port Mapping
-
-- Frontend: `80:8080` (nginx serving React app)
-- Backend: `3000:3000` (Rust API server)
-- Database: `5432:5432` (PostgreSQL)
-- pgAdmin: `8080:80` (Database admin interface)
-- Redis: `6379:6379` (Cache server)
-
-### Data Volumes
-
-- `postgres_data`: Database files
-- `klask_data`: Application data and temporary files
-- `klask_index`: Search index files
-- `redis_data`: Redis persistence (if using Redis)
-
-## Administration
-
-### Health Checks
-
-All services include health checks:
+Install:
 
 ```bash
-# Check service status
-docker-compose ps
-
-# View service logs
-docker-compose logs klask-backend
-docker-compose logs klask-frontend
+helm install klask ./charts/klask -f minimal-values.yaml
 ```
 
-### Database Management
-
-Access the database directly:
+### Helm Commands
 
 ```bash
-# Connect to PostgreSQL
-docker-compose exec postgres psql -U klask_user -d klask_dev
+# Install
+helm install klask ./charts/klask -f values.yaml
 
-# Or use pgAdmin web interface
-# Navigate to http://localhost:8080
-# Login with admin@klask.dev / admin
+# Upgrade
+helm upgrade klask ./charts/klask -f values.yaml
+
+# Rollback
+helm rollback klask
+
+# Uninstall
+helm uninstall klask
+
+# View status
+helm status klask
+
+# Validation before upgrade
+helm upgrade klask ./charts/klask -f values.yaml --dry-run --debug
 ```
 
-### Backup and Restore
+See [charts/klask/SAFE_DEPLOYMENT.md](charts/klask/SAFE_DEPLOYMENT.md) for detailed deployment safety guide.
 
-```bash
-# Backup database
-docker-compose exec postgres pg_dump -U klask klask_rs > backup.sql
+---
 
-# Backup volumes
-docker run --rm -v klask-rs_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz /data
+## 🔒 Production Best Practices
 
-# Restore database
-docker-compose exec -T postgres psql -U klask_user klask_rs < backup.sql
-```
+### Security
 
-### Scaling
+1. **Change default passwords**
+2. **Use Kubernetes secrets for sensitive data**
+3. **Enable TLS/SSL with cert-manager**
+4. **Configure network policies**
 
-Scale individual services:
+### Resource Management
 
-```bash
-# Scale backend instances
-docker-compose up -d --scale klask-backend=3
+1. **Set appropriate resource limits**
+2. **Enable horizontal pod autoscaling**
+3. **Use appropriate storage classes**
 
-# Note: Frontend and database should remain as single instances
-# Load balancing requires additional configuration
-```
+### Monitoring
 
-## Troubleshooting
+1. **Enable Prometheus metrics**
+2. **Configure health checks**
+3. **Set up alerting**
 
-### Common Issues
+### High Availability
 
-1. **Database connection errors**
-   - Check if PostgreSQL container is healthy: `docker-compose ps`
-   - Verify DATABASE_URL in backend environment
-   - Check network connectivity between containers
+1. **Run multiple replicas**
+2. **Configure pod disruption budgets**
+3. **Use anti-affinity rules**
 
-2. **Frontend API errors**
-   - Verify backend is accessible at `http://klask-backend:3000`
-   - Check nginx configuration in frontend container
-   - Review backend logs: `docker-compose logs klask-backend`
+See full guide: [charts/klask/README.md](charts/klask/README.md)
 
-3. **Build failures**
-   - Ensure Docker has sufficient resources (memory, disk)
-   - Check for dependency conflicts in package.json or Cargo.toml
-   - Clear Docker build cache: `docker builder prune`
+---
 
-### Logs and Debugging
+## 📚 Additional Resources
 
-```bash
-# View all logs
-docker-compose logs
-
-# Follow logs for specific service
-docker-compose logs -f klask-backend
-
-# Debug container issues
-docker-compose exec klask-backend sh
-```
-
-### Performance Monitoring
-
-Monitor resource usage:
-
-```bash
-# Container resource usage
-docker stats
-
-# Detailed container inspection
-docker-compose exec klask-backend top
-```
-
-## Development vs Production
-
-### Development Mode
-
-For development, use the existing development setup:
-
-```bash
-# Use development compose file
-docker-compose -f docker-compose.yml up -d
-
-# Run services locally
-npm run dev  # Frontend
-cargo run    # Backend
-```
-
-### Production Optimizations
-
-The production Docker setup includes:
-
-- Multi-stage builds for optimized image sizes
-- Non-root user execution for security
-- Health checks for service monitoring
-- Proper signal handling for graceful shutdowns
-- Resource-optimized nginx configuration
-- Security headers and gzip compression
-
-## Migration from Development
-
-To migrate from a development setup:
-
-1. Export existing data from development database
-2. Update environment variables for production
-3. Deploy using production Docker Compose
-4. Import data into new production database
-5. Update any hardcoded URLs or configurations
-
-## Support
-
-For deployment issues:
-- Check the GitHub issues for known problems
-- Review logs for specific error messages
-- Ensure all prerequisites are met
-- Verify environment variable configuration
+- [Helm Chart Documentation](charts/klask/README.md)
+- [Helm Safety Guide](charts/klask/SAFE_DEPLOYMENT.md)
+- [Immutable Fields Reference](charts/klask/IMMUTABLE_FIELDS.md)
+- [Development Guide](CLAUDE.md)

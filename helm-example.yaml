@@ -1,0 +1,210 @@
+# Klask Helm Values - Basic Example
+#
+# This is a simplified example for deploying Klask to Kubernetes.
+# For production deployments, see charts/klask/values.yaml for all available options.
+#
+# Installation:
+#   helm install klask ./charts/klask -f helm-example.yaml
+#
+# Upgrade:
+#   helm upgrade klask ./charts/klask -f helm-example.yaml
+#
+# Uninstall:
+#   helm uninstall klask
+
+## @section Global Configuration
+
+# Global image registry (optional, overrides individual image registries)
+# global:
+#   imageRegistry: docker.io
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+# - name: my-registry-secret
+
+## @section Backend Configuration
+
+backend:
+  # Number of backend replicas (increase for high availability)
+  replicaCount: 1
+
+  image:
+    repository: klask/klask-backend
+    tag: "2.1.0"
+    pullPolicy: IfNotPresent
+
+  # Resource limits and requests
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # Backend service configuration
+  service:
+    type: ClusterIP
+    port: 3000
+
+  # Environment variables
+  env:
+    - name: RUST_LOG
+      value: "info"
+    - name: JWT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: klask-secrets
+          key: jwt-secret
+    - name: ENCRYPTION_KEY
+      valueFrom:
+        secretKeyRef:
+          name: klask-secrets
+          key: encryption-key
+
+  # Persistent storage for Tantivy index
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""  # Use default storage class
+    accessMode: ReadWriteOnce
+
+## @section Frontend Configuration
+
+frontend:
+  # Number of frontend replicas
+  replicaCount: 1
+
+  image:
+    repository: klask/klask-frontend
+    tag: "2.1.0"
+    pullPolicy: IfNotPresent
+
+  # Resource limits and requests
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+  # Frontend service configuration
+  service:
+    type: ClusterIP
+    port: 80
+
+## @section PostgreSQL Configuration
+
+postgresql:
+  # Enable built-in PostgreSQL (disable if using external database)
+  enabled: true
+
+  auth:
+    username: klask
+    password: changeme  # ⚠️  Change in production!
+    database: klask
+
+  # PostgreSQL persistence
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: ""  # Use default storage class
+
+  # Resource limits for PostgreSQL
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Use external PostgreSQL database instead
+# externalDatabase:
+#   host: postgres.example.com
+#   port: 5432
+#   username: klask
+#   password: secure-password
+#   database: klask
+
+## @section Ingress Configuration
+
+ingress:
+  # Enable ingress for external access
+  enabled: true
+
+  # Ingress class (nginx, traefik, etc.)
+  className: "nginx"
+
+  # Annotations for ingress (cert-manager, SSL redirect, etc.)
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+  # Hosts configuration
+  hosts:
+    - host: klask.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+  # TLS/SSL configuration
+  tls:
+    - secretName: klask-tls
+      hosts:
+        - klask.example.com
+
+## @section High Availability (Optional)
+
+# Horizontal Pod Autoscaler (HPA)
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+## @section Security
+
+# Service account for Kubernetes RBAC
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+## @section Monitoring (Optional)
+
+# Prometheus metrics
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+
+## @section Backup (Optional)
+
+# Velero backup annotations
+# podAnnotations:
+#   backup.velero.io/backup-volumes: data,index

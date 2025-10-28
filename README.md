@@ -3,153 +3,322 @@
 | Branch  | Build  | Coverage  |
 |---|---|---|
 | master  | [![CI/CD Pipeline](https://github.com/klask-dev/klask-dev/actions/workflows/ci.yml/badge.svg)](https://github.com/klask-dev/klask-dev/actions/workflows/ci.yml)  | [![Coverage Status](https://img.shields.io/coveralls/klask-dev/klask-dev/master.svg?style=flat-square)](https://coveralls.io/github/klask-dev/klask-dev?branch=master) |
+
 #### Docker
 [![Docker Stars](https://img.shields.io/docker/stars/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/) [![Docker pulls](https://img.shields.io/docker/pulls/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/) [![Docker build](https://img.shields.io/docker/automated/klask/klask.dev.svg?style=flat-square)](https://hub.docker.com/r/klask/klask.dev/builds/)
 
+## What is Klask?
 
-## What is klask.dev ?
-__klask.dev__ is an open source search engine for source code. This application was generated using [JHipster](https://jhipster.github.io).
+**Klask** is a modern, high-performance search engine for source code. Built with Rust and React, it provides fast, accurate code search across multiple Git repositories with advanced filtering and syntax highlighting.
 
-## 🦀 Modern Rust Version (rust-modernization branch)
+## 🚀 Modern Architecture (v2.x)
 
-We're actively developing a modern version using state-of-the-art technologies:
+The latest version of Klask uses cutting-edge technologies for performance and developer experience:
 
-- **Backend**: Rust + Axum + Tantivy + PostgreSQL
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
-- **Features**: JWT Authentication, Real-time Search, Git Crawling
+### Backend
+- **Rust** - High-performance, memory-safe systems programming
+- **Axum** - Modern async web framework
+- **Tantivy** - Full-text search engine (Rust equivalent of Lucene)
+- **PostgreSQL** - Robust relational database
+- **SQLx** - Compile-time SQL verification
 
-### Quick Start (Modern Version)
+### Frontend
+- **React 18** - Modern UI library with concurrent features
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Lightning-fast build tool
+- **TailwindCSS** - Utility-first CSS framework
+- **React Query** - Powerful data fetching and caching
+
+### Features
+- ✅ Multi-repository indexing (Git, GitLab, GitHub)
+- ✅ Real-time full-text search with Tantivy
+- ✅ JWT-based authentication
+- ✅ Syntax highlighting for 100+ languages
+- ✅ Advanced filtering (branches, projects, file types)
+- ✅ Scheduled auto-crawling with cron
+- ✅ Admin dashboard with metrics
+- ✅ Docker and Kubernetes ready
+
+---
+
+## 📦 Quick Start
+
+### Local Development (Docker Compose)
+
+The fastest way to run Klask locally:
+
 ```bash
-# Clone and switch to modern branch
-git checkout rust-modernization
+# Clone the repository
+git clone https://github.com/klask-dev/klask-dev.git
+cd klask-dev
 
-# Run both frontend and backend
-./start-dev.sh
+# Start all services with docker-compose
+docker-compose up -d
 
-# Or follow detailed guides:
-# - Development setup: DEVELOPMENT.md
-# - Testing guide: TESTING.md
+# Access Klask at http://localhost:5173
+# Backend API at http://localhost:3000
 ```
 
-**Status**: 
-- ✅ Authentication System
-- 🚧 Search Interface (in progress)
-- 📋 Repository Management (planned)
-- 🎨 Syntax Highlighting (planned)
+See [`docker-compose.yml`](docker-compose.yml) for full configuration.
 
-### Live demo
-http://app.klask.dev/
+### Manual Development Setup
 
-### How to run it ?
-You can run an instance easily by pulling the docker image and execute by following :
+#### Prerequisites
+- **Rust** 1.70+ ([install via rustup](https://rustup.rs/))
+- **Node.js** 18+ and npm
+- **PostgreSQL** 14+
+- **Docker** (optional, for database)
 
-    docker run klask/klask.dev
+#### 1. Start PostgreSQL Database
 
-#### docker-compose
-an example of a docker-compose.yml :
+```bash
+# Using Docker (recommended)
+docker-compose -f docker-compose.dev.yml up -d
 
-```Dockerfile
-version: '2'
-services:
-  klask-app:
-    image: klask/klask.dev:latest
-    ports:
-      - 8080:8080
-    volumes:
-      - /mnt/svn:/repo
-      - ./data:/klask-data
-      - ./application-docker.yml:/application-docker.yml
+# Or use your own PostgreSQL instance
+# Make sure to create a database named 'klask'
 ```
 
-`/mnt/svn` is the path to my repositories  
-`./data` is the location where elasticsearch files and database were saved.  
-The optional file `application-docker.yml` can overrides all properties defined in [application.yml](/src/main/resources/config/application.yml) and [application-docker.yml](/src/main/resources/config/application-docker.yml)   
+#### 2. Start Backend (Rust)
 
+```bash
+cd klask-rs
 
-## Development
-Before you can build this project, you must install and configure the following dependencies on your machine:
+# Install dependencies and run migrations
+cargo build
+sqlx migrate run
 
-1. [Node.js][]: We use Node to run a development web server and build the project.
-   Depending on your system, you can install Node either from source or as a pre-packaged bundle.
+# Start the backend server
+cargo run --bin klask-rs
 
-After installing Node, you should be able to run the following command to install development tools (like
-[Bower][] and [BrowserSync][]). You will only need to run this command when dependencies change in package.json.
-We use [Gulp][] as our build system. Install the Gulp command-line tool globally with:
+# Backend will be available at http://localhost:3000
+```
 
-    npm install
-    npm install -g gulp
-    npm install -g bower
-    bower update
-    bower install
-    gulp
+#### 3. Start Frontend (React)
 
+```bash
+cd klask-react
 
-Run the following commands in two separate terminals to create a blissful development experience where your browser
-auto-refreshes when files change on your hard drive.
+# Install dependencies
+npm install
 
-    ./mvnw
-    gulp
+# Start the development server
+npm run dev
 
-Bower is used to manage CSS and JavaScript dependencies used in this application. You can upgrade dependencies by
-specifying a newer version in `bower.json`. You can also run `bower update` and `bower install` to manage dependencies.
-Add the `-h` flag on any command to see how you can use it. For example, `bower update -h`.
+# Frontend will be available at http://localhost:5173
+```
 
+---
 
-## Building for production
+## 🐳 Docker Deployment
 
-To optimize the klask.dev client for production, run:
+### Docker Compose (Production)
 
-    ./mvnw -Pprod clean package
+```bash
+# Pull and start services
+docker-compose up -d
 
-This will concatenate and minify CSS and JavaScript files. It will also modify `index.html` so it references
-these new files.
+# View logs
+docker-compose logs -f
 
-To ensure everything worked, run:
+# Stop services
+docker-compose down
+```
 
-    java -jar target/*.war --spring.profiles.active=prod
+### Docker Images
 
-Then navigate to [http://localhost:8080](http://localhost:8080) in your browser.
+```bash
+# Backend
+docker pull klask/klask-backend:latest
+docker run -p 3000:3000 -e DATABASE_URL=postgres://... klask/klask-backend:latest
 
-## Testing
+# Frontend
+docker pull klask/klask-frontend:latest
+docker run -p 5173:80 klask/klask-frontend:latest
+```
 
-Unit tests are run by [Karma][] and written with [Jasmine][]. They're located in `src/test/javascript/` and can be run with:
+---
 
-    gulp test
+## ☸️ Kubernetes Deployment (Helm)
 
+### Quick Install
 
-## To run with docker in production :
+```bash
+# Add Klask Helm repository (if available)
+helm repo add klask https://charts.klask.dev
+helm repo update
 
-Utiliser les fichiers docker-compose dans src/main/docker
-    
-    docker-compose -f elasticsearch.yml up -d
-    docker-compose -f postgresql.yml up -d
-    
-    java -jar target/*.war --spring.profiles.active=prod
+# Install with default values
+helm install klask klask/klask
 
+# Install with custom values
+helm install klask klask/klask -f my-values.yaml
+```
 
+### Basic Configuration Example
 
+Create a `values.yaml`:
 
-## Continuous Integration
+```yaml
+backend:
+  replicaCount: 2
+  image:
+    repository: klask/klask-backend
+    tag: "2.1.0"
 
-To setup this project in Jenkins, use the following configuration:
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
 
-* Project name: `klask.dev`
-* Source Code Management
-    * Git Repository: `https://github.com/klask-dev/klask-dev.git`
-    * Branches to build: `*/master`
-    * Additional Behaviours: `Wipe out repository & force clone`
-* Build Triggers
-    * Poll SCM / Schedule: `H/5 * * * *`
-* Build
-    * Invoke Maven / Tasks: `-Pprod clean package`
-* Post-build Actions
-    * Publish JUnit test result report / Test Report XMLs: `build/test-results/*.xml`
+frontend:
+  replicaCount: 2
+  image:
+    repository: klask/klask-frontend
+    tag: "2.1.0"
 
-[JHipster]: https://jhipster.github.io/
-[Node.js]: https://nodejs.org/
-[Bower]: http://bower.io/
-[Gulp]: http://gulpjs.com/
-[BrowserSync]: http://www.browsersync.io/
-[Karma]: http://karma-runner.github.io/
-[Jasmine]: http://jasmine.github.io/2.0/introduction.html
-[Protractor]: https://angular.github.io/protractor/
+postgresql:
+  enabled: true
+  auth:
+    username: klask
+    password: changeme
+    database: klask
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: klask.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: klask-tls
+      hosts:
+        - klask.example.com
+```
+
+Then install:
+
+```bash
+helm install klask ./charts/klask -f values.yaml
+```
+
+See full Helm documentation: [charts/klask/README.md](charts/klask/README.md)
+
+---
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+klask-dev/
+├── klask-rs/           # Rust backend (Axum + Tantivy + PostgreSQL)
+│   ├── src/
+│   │   ├── api/        # REST API endpoints
+│   │   ├── models/     # Database models
+│   │   ├── services/   # Business logic (crawler, search, etc.)
+│   │   └── repositories/ # Database queries
+│   ├── migrations/     # SQL migrations (SQLx)
+│   └── Cargo.toml
+│
+├── klask-react/        # React frontend (TypeScript + Vite + TailwindCSS)
+│   ├── src/
+│   │   ├── api/        # API client (React Query)
+│   │   ├── components/ # Reusable UI components
+│   │   ├── features/   # Feature modules (search, admin, etc.)
+│   │   └── hooks/      # Custom React hooks
+│   └── package.json
+│
+├── charts/klask/       # Helm chart for Kubernetes deployment
+├── .claude/            # AI-assisted development tools
+└── docker-compose.yml  # Local development environment
+```
+
+### Running Tests
+
+```bash
+# Backend tests (Rust)
+cd klask-rs
+cargo test
+
+# Frontend tests (React)
+cd klask-react
+npm test
+
+# Integration tests
+npm run test:integration
+```
+
+### Building for Production
+
+```bash
+# Backend
+cd klask-rs
+cargo build --release
+
+# Frontend
+cd klask-react
+npm run build
+
+# Docker images
+docker build -t klask/klask-backend:latest -f klask-rs/Dockerfile .
+docker build -t klask/klask-frontend:latest -f klask-react/Dockerfile .
+```
+
+---
+
+## 📚 Documentation
+
+- **[Development Guide](CLAUDE.md)** - Comprehensive guide for contributors
+- **[Helm Deployment](charts/klask/README.md)** - Kubernetes deployment guide
+- **[API Documentation](docs/API.md)** - REST API reference
+- **[Architecture](docs/ARCHITECTURE.md)** - System architecture overview
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [contributing guide](CONTRIBUTING.md) before submitting pull requests.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`cargo test && npm test`)
+5. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🔗 Links
+
+- **Website**: [klask.dev](https://klask.dev)
+- **Documentation**: [docs.klask.dev](https://docs.klask.dev)
+- **Issue Tracker**: [GitHub Issues](https://github.com/klask-dev/klask-dev/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/klask-dev/klask-dev/discussions)
+
+---
+
+## 🙏 Acknowledgments
+
+Built with powerful open-source technologies:
+
+- [Rust](https://www.rust-lang.org/) - Systems programming language
+- [Tantivy](https://github.com/tantivy-search/tantivy) - Full-text search engine
+- [Axum](https://github.com/tokio-rs/axum) - Web framework
+- [React](https://react.dev/) - UI library
+- [Vite](https://vitejs.dev/) - Build tool
+- [TailwindCSS](https://tailwindcss.com/) - CSS framework

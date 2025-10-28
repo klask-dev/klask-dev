@@ -1,3 +1,15 @@
+# Klask Development Environment
+# Full-stack code search engine with Rust backend and React frontend
+#
+# Quick Start:
+#   docker-compose up -d
+#   Access frontend: http://localhost:5173
+#   Access backend API: http://localhost:3000
+#   Access pgAdmin: http://localhost:8080 (with --profile tools)
+#
+# With optional tools (pgAdmin, Redis):
+#   docker-compose --profile tools up -d
+
 services:
     # PostgreSQL Database
     postgres:
