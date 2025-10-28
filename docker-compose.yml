@@ -13,7 +13,7 @@
 services:
     # PostgreSQL Database
     postgres:
-        image: postgres:15-alpine
+        image: postgres:18-alpine
         container_name: klask-postgres-dev
         environment:
             POSTGRES_DB: klask_dev
@@ -23,7 +23,7 @@ services:
             - "5432:5432"
         volumes:
             - postgres_data:/var/lib/postgresql/data
-            - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+            # - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U klask_user -d klask_dev"]
             interval: 10s
@@ -35,9 +35,7 @@ services:
 
     # Klask Backend (Rust)
     klask-backend:
-        build:
-            context: .
-            dockerfile: Dockerfile
+        image: ghcr.io/klask-dev/klask-backend:pr-74
         container_name: klask-backend
         environment:
             - DATABASE_URL=postgres://klask_user:klask_password@postgres:5432/klask_dev
@@ -65,17 +63,19 @@ services:
 
     # Klask Frontend (React)
     klask-frontend:
-        build:
-            context: ../klask-react
-            dockerfile: Dockerfile
+        image: ghcr.io/klask-dev/klask-frontend:pr-74
         container_name: klask-frontend
         ports:
-            - "80:8080"
+            - "8080:8080"
         depends_on:
             - klask-backend
         networks:
             - klask-network
         restart: unless-stopped
+        environment:
+            # Use empty string to use relative paths (/api)
+            # This works because nginx proxies /api to klask-backend:3000
+            BACKEND_BASE_URL: ""
         healthcheck:
             test:
                 [
