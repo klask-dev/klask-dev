@@ -498,7 +498,22 @@ class ApiClient {
 
 // Create and export the API client instance
 // Lazy instantiation to ensure runtime config is loaded
-export const apiClient = new ApiClient();
+let _apiClient: ApiClient | null = null;
+
+function getApiClient(): ApiClient {
+  if (!_apiClient) {
+    _apiClient = new ApiClient();
+  }
+  return _apiClient;
+}
+
+export const apiClient = new Proxy({} as ApiClient, {
+  get(target, prop) {
+    const client = getApiClient();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
+  }
+});
 
 // Export the class for testing
 export { ApiClient };
