@@ -783,7 +783,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accessToken.message}</p>
                         )}
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Create a token with 'read_repository' scope in GitLab settings
+                          Create a token with 'read_api' and 'read_repository' scopes in GitLab settings
                         </p>
                       </div>
 

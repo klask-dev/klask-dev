@@ -80,21 +80,22 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
   const isAutoRefreshEnabled = interval !== 'off';
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Main Control */}
+    <div className={`space-y-3 ${className}`}>
+      {/* Main Control with Timing Information */}
       <div className="bg-gradient-to-r from-blue-50 dark:from-blue-900/20 to-indigo-50 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Left: Auto-refresh Interval */}
+          <div>
             <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
               Auto-refresh Interval
             </label>
             <div className="flex items-center gap-2">
-              <div className="relative inline-block">
+              <div className="relative inline-block flex-1">
                 <select
                   value={interval}
                   onChange={(e) => onIntervalChange(e.target.value as RefreshInterval)}
                   disabled={isLoading || isRefreshing}
-                  className="appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-gray-100 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
+                  className="w-full appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-gray-100 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
                 >
                   {intervals.map((val) => (
                     <option key={val} value={val}>
@@ -114,7 +115,7 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
               </div>
 
               {isAutoRefreshEnabled && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full text-xs font-semibold">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full text-xs font-semibold whitespace-nowrap">
                   <div className="w-2 h-2 bg-green-600 dark:bg-green-500 rounded-full animate-pulse" />
                   Active
                 </div>
@@ -122,62 +123,62 @@ export const AutoRefreshToggle: React.FC<AutoRefreshToggleProps> = ({
             </div>
           </div>
 
-          {/* Manual Refresh Button */}
-          <button
-            onClick={handleManualRefresh}
-            disabled={isLoading || isRefreshing}
-            className="h-10 w-10 p-2 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:border-gray-300 dark:disabled:border-gray-600 text-blue-600 dark:text-blue-400 disabled:text-gray-400 dark:disabled:text-gray-500 transition-all flex items-center justify-center"
-            title="Refresh now"
-          >
-            <ArrowPathIcon
-              className={`h-5 w-5 ${isLoading || isRefreshing ? 'animate-spin' : ''}`}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* Timing Information */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Last Update */}
-        <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-3">
-          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Last Updated</p>
-          <p className="text-sm font-mono font-bold text-gray-900 dark:text-gray-100 mt-1">
-            {formatTimeAgo(lastUpdate)}
-          </p>
-          {lastUpdate && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {lastUpdate.toLocaleTimeString()}
+          {/* Center: Last Update */}
+          <div className="bg-white/50 dark:bg-gray-800/30 rounded-lg p-3 border border-blue-100 dark:border-blue-900/30">
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Last Updated</p>
+            <p className="text-sm font-mono font-bold text-gray-900 dark:text-gray-100 mt-1">
+              {formatTimeAgo(lastUpdate)}
             </p>
-          )}
-        </div>
+            {lastUpdate && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {lastUpdate.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
 
-        {/* Next Refresh */}
-        <div className={`${
-          isAutoRefreshEnabled
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-            : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600'
-        } border rounded-lg p-3`}>
-          <p className={`text-xs font-medium ${
-            isAutoRefreshEnabled
-              ? 'text-green-700 dark:text-green-400'
-              : 'text-gray-600 dark:text-gray-400'
-          }`}>Next Refresh</p>
-          <p className={`text-sm font-mono font-bold mt-1 ${
-            isAutoRefreshEnabled
-              ? 'text-green-900 dark:text-green-300'
-              : 'text-gray-900 dark:text-gray-100'
-          }`}>
-            {isAutoRefreshEnabled ? formatCountdown(nextRefresh) : 'Disabled'}
-          </p>
-          {isAutoRefreshEnabled && nextRefresh && (
-            <p className={`text-xs mt-1 ${
+          {/* Right: Next Refresh + Manual Refresh Button */}
+          <div className="flex flex-col justify-between gap-2">
+            <div className={`${
               isAutoRefreshEnabled
-                ? 'text-green-700 dark:text-green-400'
-                : 'text-gray-500 dark:text-gray-400'
-            }`}>
-              {nextRefresh.toLocaleTimeString()}
-            </p>
-          )}
+                ? 'bg-green-50/50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                : 'bg-white/50 dark:bg-gray-800/30 border-blue-100 dark:border-blue-900/30'
+            } border rounded-lg p-3`}>
+              <p className={`text-xs font-medium ${
+                isAutoRefreshEnabled
+                  ? 'text-green-700 dark:text-green-400'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}>Next Refresh</p>
+              <p className={`text-sm font-mono font-bold mt-1 ${
+                isAutoRefreshEnabled
+                  ? 'text-green-900 dark:text-green-300'
+                  : 'text-gray-900 dark:text-gray-100'
+              }`}>
+                {isAutoRefreshEnabled ? formatCountdown(nextRefresh) : 'Disabled'}
+              </p>
+              {isAutoRefreshEnabled && nextRefresh && (
+                <p className={`text-xs mt-1 ${
+                  isAutoRefreshEnabled
+                    ? 'text-green-700 dark:text-green-400'
+                    : 'text-gray-500 dark:text-gray-400'
+                }`}>
+                  {nextRefresh.toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+
+            {/* Manual Refresh Button */}
+            <button
+              onClick={handleManualRefresh}
+              disabled={isLoading || isRefreshing}
+              className="h-10 px-4 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:border-gray-300 dark:disabled:border-gray-600 text-blue-600 dark:text-blue-400 disabled:text-gray-400 dark:disabled:text-gray-500 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+              title="Refresh now"
+            >
+              <ArrowPathIcon
+                className={`h-4 w-4 ${isLoading || isRefreshing ? 'animate-spin' : ''}`}
+              />
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
       </div>
 

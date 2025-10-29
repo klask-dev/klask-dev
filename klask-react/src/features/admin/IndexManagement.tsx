@@ -160,16 +160,14 @@ export const IndexManagement: React.FC = () => {
       </div>
 
       {/* Auto-Refresh Control */}
-      <div className="max-w-md">
-        <AutoRefreshToggle
-          interval={autoRefreshInterval}
-          onIntervalChange={setAutoRefreshInterval}
-          lastUpdate={lastUpdateTime}
-          nextRefresh={nextRefreshTime}
-          isLoading={isLoading}
-          onManualRefresh={manualRefresh}
-        />
-      </div>
+      <AutoRefreshToggle
+        interval={autoRefreshInterval}
+        onIntervalChange={setAutoRefreshInterval}
+        lastUpdate={lastUpdateTime}
+        nextRefresh={nextRefreshTime}
+        isLoading={isLoading}
+        onManualRefresh={manualRefresh}
+      />
 
       {/* Quick Stats Summary */}
       {stats && (
