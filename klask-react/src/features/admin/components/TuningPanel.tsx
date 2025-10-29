@@ -98,7 +98,13 @@ export const TuningPanel: React.FC<TuningPanelProps> = ({
 
                 {/* Expanded Details */}
                 {expandedRec === idx && (
-                  <div className="px-4 py-3 border-t border-opacity-20 border-current bg-opacity-30 bg-current dark:border-opacity-40">
+                  <div className={`px-4 py-3 border-t ${
+                    rec.impact === 'High'
+                      ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10'
+                      : rec.impact === 'Medium'
+                      ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-900/10'
+                      : 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10'
+                  }`}>
                     <div className="space-y-3">
                       <div>
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
