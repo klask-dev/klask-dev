@@ -47,15 +47,32 @@ impl IndexMetricsCollector {
         let mut segments = Vec::new();
         let mut segment_count = 0;
 
+        // First pass: collect all segments and their doc counts
+        let mut segment_data: Vec<(u64, u32)> = Vec::new();
+        let mut total_docs: u64 = 0;
+
         for segment_reader in segment_readers {
             let doc_count: u64 = segment_reader.num_docs() as u64;
             let max_doc = segment_reader.max_doc();
+            segment_data.push((doc_count, max_doc));
+            total_docs += doc_count;
+        }
 
-            // Count deleted documents (Tantivy 0.25 doesn't expose delete_bitset on SegmentReader)
-            let deleted_docs = 0u32; // Simplified - not available in 0.25
+        // Calculate total size in bytes
+        let total_size_bytes = (index_size_mb * 1_048_576.0) as u64;
+
+        // Second pass: create metrics with proportional size distribution
+        for (doc_count, max_doc) in segment_data {
+            // Distribute total size proportionally by document count
+            let size_bytes = if total_docs > 0 {
+                (total_size_bytes as f64 * (doc_count as f64 / total_docs as f64)) as u64
+            } else {
+                0
+            };
 
             let space_breakdown = SpaceBreakdown { postings: 0, store: 0, fast_fields: 0, positions: 0, other: 0 };
-            let size_bytes = 0u64;
+            // Count deleted documents (Tantivy 0.25 doesn't expose delete_bitset on SegmentReader)
+            let deleted_docs = 0u32; // Simplified - not available in 0.25
 
             segments.push(SegmentMetrics {
                 segment_ord: segment_count as u32,
@@ -68,8 +85,6 @@ impl IndexMetricsCollector {
 
             segment_count += 1;
         }
-
-        let total_size_bytes = (index_size_mb * 1_048_576.0) as u64;
 
         Ok(IndexStatsResponse {
             total_documents,
