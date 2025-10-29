@@ -36,6 +36,7 @@ declare global {
     RUNTIME_CONFIG?: {
       VITE_API_BASE_URL?: string;
     };
+    API_BASE_URL?: string;
   }
 }
 

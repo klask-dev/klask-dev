@@ -19,7 +19,10 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  return fetch(url, {
+  // Use absolute URL with API_BASE_URL if url is relative
+  const fullUrl = url.startsWith('http') ? url : `${window.API_BASE_URL}${url}`;
+
+  return fetch(fullUrl, {
     ...options,
     headers,
   });
