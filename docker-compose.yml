@@ -43,6 +43,7 @@ services:
             - PORT=3000
             - HOST=0.0.0.0
             - ENCRYPTION_KEY=${ENCRYPTION_KEY:-default-encryption-key-change-me}
+            - JWT_SECRET=${JWT_SECRET:-default-jwt-key-change-me}
         ports:
             - "3000:3000"
         volumes:
