@@ -10,7 +10,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
-    routing::{get, put},
+    routing::{get, post, put},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,12 @@ pub struct UserListQuery {
     pub offset: Option<u32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct VerifyPasswordRequest {
+    pub password: String,
+    pub hash: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
     pub id: Uuid,
@@ -53,6 +59,12 @@ pub struct UserResponse {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub last_login: Option<chrono::DateTime<chrono::Utc>>,
     pub last_activity: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VerifyPasswordResponse {
+    pub matches: bool,
+    pub message: String,
 }
 
 impl From<User> for UserResponse {
@@ -79,7 +91,8 @@ pub async fn create_router() -> Result<Router<AppState>> {
         .route("/{id}", get(get_user).put(update_user).delete(delete_user))
         .route("/{id}/role", put(update_user_role))
         .route("/{id}/status", put(update_user_status))
-        .route("/stats", get(get_user_stats));
+        .route("/stats", get(get_user_stats))
+        .route("/verify-password", post(verify_password_endpoint));
 
     Ok(router)
 }
@@ -304,6 +317,26 @@ async fn get_user_stats(
     }
 }
 
+async fn verify_password_endpoint(
+    _admin_user: AdminUser, // Require admin authentication
+    axum::Json(payload): axum::Json<VerifyPasswordRequest>,
+) -> Result<Json<VerifyPasswordResponse>, StatusCode> {
+    match verify_password(&payload.password, &payload.hash) {
+        Ok(true) => Ok(Json(VerifyPasswordResponse {
+            matches: true,
+            message: "Password matches the stored hash".to_string(),
+        })),
+        Ok(false) => Ok(Json(VerifyPasswordResponse {
+            matches: false,
+            message: "Password does NOT match the stored hash".to_string(),
+        })),
+        Err(e) => {
+            eprintln!("Error verifying password: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 fn hash_password(password: &str) -> Result<String> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
@@ -312,4 +345,18 @@ fn hash_password(password: &str) -> Result<String> {
         .map_err(|e| anyhow::anyhow!("Password hashing failed: {}", e))?
         .to_string();
     Ok(password_hash)
+}
+
+fn verify_password(password: &str, hash: &str) -> Result<bool> {
+    use argon2::password_hash::PasswordHash;
+    use argon2::PasswordVerifier;
+
+    let parsed_hash = PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Failed to parse password hash: {}", e))?;
+
+    let argon2 = Argon2::default();
+    match argon2.verify_password(password.as_bytes(), &parsed_hash) {
+        Ok(()) => Ok(true),
+        Err(argon2::password_hash::Error::Password) => Ok(false),
+        Err(e) => Err(anyhow::anyhow!("Password verification error: {}", e)),
+    }
 }
