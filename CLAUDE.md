@@ -3,6 +3,7 @@
 ## 🎯 Master Rules
 - **NEVER** add "Generated with Claude Code" on pull requests
 - **NEVER** add co-author on commits you create
+- **NEVER** commit on your own initiative
 - Use commit messages like any regular contributor
 - Always use `gh cli` to get information about issues/pull requests
 - Work in `klask-rs/` for backend (Rust) and `klask-react/` for frontend (React)

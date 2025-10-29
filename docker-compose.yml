@@ -72,10 +72,6 @@ services:
         networks:
             - klask-network
         restart: unless-stopped
-        environment:
-            # Use empty string to use relative paths (/api)
-            # This works because nginx proxies /api to klask-backend:3000
-            BACKEND_BASE_URL: ""
         healthcheck:
             test:
                 [

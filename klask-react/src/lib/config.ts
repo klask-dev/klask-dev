@@ -9,19 +9,13 @@
 export const getApiBaseUrl = (): string => {
   // Check for runtime configuration first (set by Docker entrypoint)
   if (typeof window !== 'undefined' && window.RUNTIME_CONFIG?.VITE_API_BASE_URL !== undefined) {
-    const url = window.RUNTIME_CONFIG.VITE_API_BASE_URL;
-    // Empty string means use relative paths (for nginx proxy)
-    return url === '' ? '' : url;
+      return window.RUNTIME_CONFIG.VITE_API_BASE_URL;
   }
   // Fallback to build-time environment variable
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
-  // Empty string means use relative paths (for nginx proxy)
-  if (envUrl === '') return '';
-  return envUrl || 'http://localhost:3000';
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 };
 
 /**
  * API base URL for the application
- * Empty string = relative paths (/api), used when behind nginx proxy
  */
 export const API_BASE_URL = getApiBaseUrl();
