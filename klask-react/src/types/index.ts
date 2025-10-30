@@ -32,6 +32,7 @@ export interface UserPreferences {
   language: 'en' | 'fr' | 'es' | 'de';
   notifications_email: boolean;
   show_activity: boolean;
+  size_unit: 'bytes' | 'kb' | 'mb';
 }
 
 // Profile Update Request

@@ -3,13 +3,15 @@ import { useLocation } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { FolderIcon, TagIcon, DocumentIcon } from '@heroicons/react/24/solid';
 import { useSearchFiltersContext } from '../../contexts/SearchFiltersContext';
+import { SizeFilter } from './SizeFilter';
 
 export interface SearchFilters {
   project?: string[];
   version?: string[];
   extension?: string[];
   language?: string[];
-  [key: string]: string[] | undefined;
+  size?: { min?: number; max?: number };
+  [key: string]: string[] | { min?: number; max?: number } | undefined;
 }
 
 interface FilterOption {
@@ -104,7 +106,12 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
     onFiltersChange({});
   };
 
-  const hasActiveFilters = Object.values(filters).some(filterArray => filterArray && filterArray.length > 0);
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    if (key === 'size') {
+      return value && (value.min !== undefined || value.max !== undefined);
+    }
+    return value && Array.isArray(value) && value.length > 0;
+  });
 
   // Memoized button component to prevent unnecessary re-renders during hover
   const FilterOptionButton = React.memo(
@@ -237,8 +244,37 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
       {hasActiveFilters && (
         <div className="mb-4">
           <div className="flex flex-wrap gap-1">
-            {Object.entries(filters).map(([key, values]) =>
-              values && values.length > 0 ? (
+            {Object.entries(filters).map(([key, values]) => {
+              if (key === 'size' && values && (values.min !== undefined || values.max !== undefined)) {
+                return (
+                  <div
+                    key={key}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded mr-1 mb-1"
+                  >
+                    <span className="capitalize">Size:</span>
+                    <span className="font-medium truncate max-w-20">
+                      {values.min !== undefined && values.max !== undefined
+                        ? `${values.min}-${values.max} bytes`
+                        : values.min !== undefined
+                        ? `>${values.min} bytes`
+                        : `<${values.max} bytes`}
+                    </span>
+                    <button
+                      onClick={() => {
+                        onFiltersChange({
+                          ...filters,
+                          size: undefined,
+                        });
+                      }}
+                      className="hover:text-blue-600 dark:hover:text-blue-300"
+                    >
+                      <XMarkIcon className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              }
+
+              return values && Array.isArray(values) && values.length > 0 ? (
                 <div key={key} className="space-y-1">
                   {values.map((value) => (
                     <div
@@ -249,7 +285,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                       <span className="font-medium truncate max-w-20" title={value}>{value}</span>
                       <button
                         onClick={() => {
-                          const currentValues = filters[key as keyof SearchFilters] || [];
+                          const currentValues = filters[key as keyof SearchFilters] as string[] || [];
                           const newValues = currentValues.filter(v => v !== value);
                           onFiltersChange({
                             ...filters,
@@ -263,8 +299,8 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                     </div>
                   ))}
                 </div>
-              ) : null
-            )}
+              ) : null;
+            })}
           </div>
         </div>
       )}
@@ -308,6 +344,19 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               filterKey="language"
             />
           )}
+
+          {/* Size Filter */}
+          <div className="mb-4">
+            <SizeFilter
+              value={filters.size}
+              onChange={(sizeValue) => {
+                onFiltersChange({
+                  ...filters,
+                  size: sizeValue,
+                });
+              }}
+            />
+          </div>
         </>
       )}
     </div>

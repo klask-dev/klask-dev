@@ -129,7 +129,7 @@ export const useSearchFilters = (options?: { enabled?: boolean }) => {
 // Multi-select search hook for new filters
 export const useMultiSelectSearch = (
   query: string,
-  filters: { [key: string]: string[] | undefined },
+  filters: { [key: string]: string[] | { min?: number; max?: number } | undefined },
   currentPage: number = 1,
   options: UseSearchOptions = {}
 ) => {
@@ -152,16 +152,27 @@ export const useMultiSelectSearch = (
       }
       
       // Handle multi-select filters - join with commas
-      if (filters.project && filters.project.length > 0) {
+      if (filters.project && Array.isArray(filters.project) && filters.project.length > 0) {
         searchParams.set('projects', filters.project.join(','));
       }
 
-      if (filters.version && filters.version.length > 0) {
+      if (filters.version && Array.isArray(filters.version) && filters.version.length > 0) {
         searchParams.set('versions', filters.version.join(','));
       }
 
-      if (filters.extension && filters.extension.length > 0) {
+      if (filters.extension && Array.isArray(filters.extension) && filters.extension.length > 0) {
         searchParams.set('extensions', filters.extension.join(','));
+      }
+
+      // Handle size range filter
+      if (filters.sizeRange && typeof filters.sizeRange === 'object') {
+        const sizeRange = filters.sizeRange as { min?: number; max?: number };
+        if (sizeRange.min !== undefined) {
+          searchParams.set('min_size', sizeRange.min.toString());
+        }
+        if (sizeRange.max !== undefined) {
+          searchParams.set('max_size', sizeRange.max.toString());
+        }
       }
 
       searchParams.set('limit', pageSize.toString());

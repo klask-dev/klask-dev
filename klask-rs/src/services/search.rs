@@ -24,6 +24,7 @@ pub struct FileData<'a> {
     pub project: &'a str,    // Individual project name (for GitLab/GitHub, same as repository for simple Git repos)
     pub version: &'a str,
     pub extension: &'a str,
+    pub size: u64, // File content size in bytes
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +64,8 @@ pub struct SearchQuery {
     pub project_filter: Option<String>,
     pub version_filter: Option<String>,
     pub extension_filter: Option<String>,
+    pub min_size: Option<u64>, // Minimum file size in bytes
+    pub max_size: Option<u64>, // Maximum file size in bytes
     pub limit: usize,
     pub offset: usize,
     pub include_facets: bool,
@@ -88,6 +91,7 @@ struct SearchFields {
     project: Field,    // Individual project name
     version: Field,
     extension: Field,
+    size: Field, // File content size in bytes
 }
 
 impl SearchService {
@@ -155,6 +159,9 @@ impl SearchService {
         schema_builder.add_text_field("version", STRING | STORED | FAST);
         schema_builder.add_text_field("extension", STRING | STORED | FAST);
 
+        // Size field for filtering by file content size (in bytes)
+        schema_builder.add_u64_field("size", FAST | STORED);
+
         schema_builder.build()
     }
 
@@ -168,6 +175,7 @@ impl SearchService {
             project: schema.get_field("project").expect("project field should exist"),
             version: schema.get_field("version").expect("version field should exist"),
             extension: schema.get_field("extension").expect("extension field should exist"),
+            size: schema.get_field("size").expect("size field should exist"),
         }
     }
 
@@ -184,6 +192,7 @@ impl SearchService {
             self.fields.project => file_data.project,
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
+            self.fields.size => file_data.size,
         );
 
         writer.add_document(doc)?;
@@ -217,6 +226,7 @@ impl SearchService {
             self.fields.project => file_data.project,
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
+            self.fields.size => file_data.size,
         );
 
         writer.add_document(doc)?;
@@ -307,6 +317,8 @@ impl SearchService {
                 let content = doc.get_first(self.fields.content).and_then(|v| v.as_str()).unwrap_or_default();
                 let version = doc.get_first(self.fields.version).and_then(|v| v.as_str()).unwrap_or_default();
                 let extension = doc.get_first(self.fields.extension).and_then(|v| v.as_str()).unwrap_or_default();
+                let size =
+                    doc.get_first(self.fields.size).and_then(|v| v.as_u64()).unwrap_or_else(|| content.len() as u64);
 
                 // Extract repository or use new_project as default
                 let repository = doc.get_first(self.fields.repository).and_then(|v| v.as_str()).unwrap_or(new_project);
@@ -321,6 +333,7 @@ impl SearchService {
                     self.fields.project => new_project,
                     self.fields.version => version,
                     self.fields.extension => extension,
+                    self.fields.size => size,
                 );
 
                 writer.add_document(new_doc)?;
@@ -475,6 +488,23 @@ impl SearchService {
                 }
                 filter_queries.push(Box::new(BooleanQuery::new(extension_clauses)) as Box<dyn tantivy::query::Query>);
             }
+        }
+
+        // Handle size filters (range queries)
+        if search_query.min_size.is_some() || search_query.max_size.is_some() {
+            use std::ops::Bound;
+            use tantivy::query::RangeQuery;
+
+            // Create terms from the size bounds
+            let min_term = search_query.min_size.map(|size| Term::from_field_u64(self.fields.size, size));
+            let max_term = search_query.max_size.map(|size| Term::from_field_u64(self.fields.size, size));
+
+            let min_bound = min_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+            let max_bound = max_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+
+            let size_range_query = RangeQuery::new(min_bound, max_bound);
+
+            filter_queries.push(Box::new(size_range_query) as Box<dyn tantivy::query::Query>);
         }
 
         // Combine base query with filters using BooleanQuery if we have filters
@@ -1224,6 +1254,7 @@ impl SearchService {
             project,
             version,
             extension,
+            size: content.len() as u64, // Calculate size from content length
         };
 
         // This is sync, so we need to use a runtime block

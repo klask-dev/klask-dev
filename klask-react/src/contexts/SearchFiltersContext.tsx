@@ -17,7 +17,8 @@ export interface SearchFilters {
   extension?: string[];
   language?: string[];
   repository?: string[];
-  [key: string]: string[] | undefined;
+  size?: { min?: number; max?: number };
+  [key: string]: string[] | { min?: number; max?: number } | undefined;
 }
 
 interface FilterOption {

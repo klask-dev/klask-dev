@@ -62,6 +62,9 @@ pub struct SearchRequest {
     pub projects: Option<String>,
     pub versions: Option<String>,
     pub extensions: Option<String>,
+    // Size filters in bytes
+    pub min_size: Option<u64>,
+    pub max_size: Option<u64>,
     pub include_facets: Option<bool>,
 }
 
@@ -74,6 +77,9 @@ pub struct FacetsRequest {
     pub projects: Option<String>,
     pub versions: Option<String>,
     pub extensions: Option<String>,
+    // Size filters in bytes
+    pub min_size: Option<u64>,
+    pub max_size: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -141,6 +147,8 @@ async fn search_files(
         project_filter: params.projects,
         version_filter: params.versions,
         extension_filter: params.extensions,
+        min_size: params.min_size,
+        max_size: params.max_size,
         limit: limit as usize,
         offset: offset as usize,
         include_facets: params.include_facets.unwrap_or(false),
@@ -246,6 +254,8 @@ async fn get_facets_with_filters(
         project_filter: params.projects,
         version_filter: params.versions,
         extension_filter: params.extensions,
+        min_size: params.min_size,
+        max_size: params.max_size,
         limit: 0, // We only need facets, not results
         offset: 0,
         include_facets: true, // Always include facets for this endpoint
