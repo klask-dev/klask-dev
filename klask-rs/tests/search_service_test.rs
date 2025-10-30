@@ -38,6 +38,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
+            size: 1024,
         };
         let result = service.upsert_file(file_data).await;
         eprintln!("Upsert result: {:?}", result);
@@ -69,6 +70,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
+            size: 1024,
         };
         service.upsert_file(file_data1).await.unwrap();
 
@@ -84,6 +86,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.1",
             extension: "rs",
+            size: 1024,
         };
         service.upsert_file(file_data2).await.unwrap();
 
@@ -100,6 +103,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             offset: 0,
             limit: 10,
             include_facets: false,
@@ -150,6 +155,7 @@ mod search_service_tests {
                 project: "test-project",
                 version: "1.0.0",
                 extension: ext,
+                size: 1024,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -163,6 +169,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -234,6 +242,7 @@ mod search_service_tests {
                 project,
                 version,
                 extension: ext,
+                size: 1024,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -251,6 +260,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -268,6 +279,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -283,6 +296,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: Some("rs".to_string()),
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -298,6 +313,8 @@ mod search_service_tests {
             version_filter: Some("1.0.0".to_string()),
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -327,6 +344,7 @@ mod search_service_tests {
                 project: "test-project",
                 version: "1.0.0",
                 extension: "rs",
+                size: 1024,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -340,6 +358,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -357,6 +377,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 10,
             include_facets: false,
@@ -372,6 +394,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 20,
             include_facets: false,
@@ -395,6 +419,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
+            size: 1024,
         };
         service.upsert_file(file_data).await.unwrap();
 
@@ -407,6 +432,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 1,
             offset: 0,
             include_facets: false,
@@ -443,6 +470,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
+            size: 1024,
         };
         service.upsert_file(file_data).await.unwrap();
 
@@ -459,6 +487,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             offset: 0,
             limit: 10,
             include_facets: false,
@@ -483,6 +513,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
+            size: 1024,
         };
         service.upsert_file(file_data).await.unwrap();
 
@@ -520,6 +551,7 @@ mod search_service_tests {
                 project: "test-project",
                 version: "1.0.0",
                 extension: "rs",
+                size: 1024,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -560,6 +592,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
+            size: 1024,
         };
         service.upsert_file(file_data).await.unwrap();
 
@@ -575,6 +608,8 @@ mod search_service_tests {
                 version_filter: None,
                 extension_filter: None,
                 repository_filter: None,
+                min_size: None,
+                max_size: None,
                 limit: 10,
                 offset: 0,
                 include_facets: false,
@@ -605,6 +640,7 @@ mod search_service_tests {
             project: "test-project",
             version: "1.0.0",
             extension: "rs",
+            size: 1024,
         };
         service.upsert_file(file_data).await.unwrap();
         service.commit().await.unwrap();
@@ -616,6 +652,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -632,6 +670,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -667,6 +707,7 @@ mod search_service_tests {
                 project: "test-project",
                 version: &version,
                 extension: "rs",
+                size: 1024,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -681,6 +722,8 @@ mod search_service_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
