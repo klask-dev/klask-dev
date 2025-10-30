@@ -317,8 +317,7 @@ impl SearchService {
                 let content = doc.get_first(self.fields.content).and_then(|v| v.as_str()).unwrap_or_default();
                 let version = doc.get_first(self.fields.version).and_then(|v| v.as_str()).unwrap_or_default();
                 let extension = doc.get_first(self.fields.extension).and_then(|v| v.as_str()).unwrap_or_default();
-                let size =
-                    doc.get_first(self.fields.size).and_then(|v| v.as_u64()).unwrap_or_else(|| content.len() as u64);
+                let size = doc.get_first(self.fields.size).and_then(|v| v.as_u64()).unwrap_or(content.len() as u64);
 
                 // Extract repository or use new_project as default
                 let repository = doc.get_first(self.fields.repository).and_then(|v| v.as_str()).unwrap_or(new_project);
