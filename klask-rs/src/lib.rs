@@ -5,6 +5,7 @@ pub mod database;
 pub mod models;
 pub mod repositories;
 pub mod services;
+pub mod utils;
 
 // Always available for integration tests but marked as test-only
 #[cfg(any(test, debug_assertions))]

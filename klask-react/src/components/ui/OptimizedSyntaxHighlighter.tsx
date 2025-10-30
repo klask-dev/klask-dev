@@ -1,29 +1,12 @@
-import React, { Suspense, lazy } from 'react';
-import { LoadingSpinner } from './LoadingSpinner';
-import VirtualizedSyntaxHighlighter from './VirtualizedSyntaxHighlighter';
+import React, { useMemo } from 'react';
+import { Highlight, themes } from 'prism-react-renderer';
 
-// Lazy load react-syntax-highlighter
-const SyntaxHighlighter = lazy(() => import('react-syntax-highlighter').then(module => ({
-  default: module.Prism
-})));
-
-// Lazy load styles
-const loadStyles = async (styleName: 'oneLight' | 'oneDark' | 'vscDarkPlus') => {
-  try {
-    const styles = await import('react-syntax-highlighter/dist/esm/styles/prism');
-    if (styleName === 'oneDark') {
-      return styles.oneDark;
-    } else if (styleName === 'vscDarkPlus') {
-      return styles.vscDarkPlus;
-    } else {
-      return styles.oneLight || styles.prism;
-    }
-  } catch (error) {
-    console.warn('Failed to load syntax highlighting style:', error);
-    // Return a basic style as fallback
-    return {};
-  }
-};
+/**
+ * OptimizedSyntaxHighlighter
+ *
+ * Uses prism-react-renderer for fast, reliable syntax highlighting.
+ * Supports 100+ languages out of the box with proper theme support.
+ */
 
 interface OptimizedSyntaxHighlighterProps {
   children: string;
@@ -41,64 +24,58 @@ interface OptimizedSyntaxHighlighterProps {
   containerHeight?: number;
 }
 
+// Theme mapping
+const getTheme = (styleName: string, isDarkMode: boolean) => {
+  const themeMap: Record<string, any> = {
+    oneLight: themes.oneLight,
+    oneDark: themes.oneDark,
+    vscDarkPlus: themes.vsDark,
+  };
+
+  // Default to system theme if not specified
+  if (!styleName) {
+    return isDarkMode ? themes.vsDark : themes.oneLight;
+  }
+
+  return themeMap[styleName] || (isDarkMode ? themes.vsDark : themes.oneLight);
+};
+
 const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
   children,
   language,
-  style = 'oneLight',
+  style,
   showLineNumbers = true,
-  wrapLines = false,
   wrapLongLines = false,
   customStyle = {},
   lineNumberStyle = {},
   className = '',
-  enableVirtualization = true,
-  maxLines = 1000,
-  lineHeight = 22,
-  containerHeight = 600
 }) => {
-  const [loadedStyle, setLoadedStyle] = React.useState<any>(null);
-
-  React.useEffect(() => {
-    loadStyles(style).then(styleObj => {
-      setLoadedStyle(styleObj);
-    });
-  }, [style]);
-
-  // Check if we should use virtualization
-  const lines = React.useMemo(() => children.split('\n'), [children]);
-  const shouldVirtualize = React.useMemo(() => {
-    return enableVirtualization && (lines.length > maxLines || children.length > 100000);
-  }, [enableVirtualization, lines.length, children.length, maxLines]);
-
-  // Use virtualized highlighter for large content
-  if (shouldVirtualize) {
+  // Detect dark mode
+  const isDarkMode = useMemo(() => {
+    if (typeof window === 'undefined') return true;
     return (
-      <VirtualizedSyntaxHighlighter
-        language={language}
-        style={style}
-        showLineNumbers={showLineNumbers}
-        wrapLines={wrapLines}
-        customStyle={customStyle}
-        lineNumberStyle={lineNumberStyle}
-        className={className}
-        maxLines={maxLines}
-        lineHeight={lineHeight}
-        containerHeight={containerHeight}
-      >
-        {children}
-      </VirtualizedSyntaxHighlighter>
+      window.matchMedia &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches
     );
-  }
+  }, []);
 
-  // If content is too large, show a warning and use plain text
-  if (children.length > 50000) {
+  const theme = useMemo(() => getTheme(style || '', isDarkMode), [style, isDarkMode]);
+
+  // Check if file is too large
+  if (children.length > 100000) {
     return (
-      <div style={customStyle} className="p-4 bg-gray-50 border rounded">
-        <div className="mb-4 p-2 bg-yellow-100 border-l-4 border-yellow-400 text-yellow-700">
-          <p className="font-medium">Large File Warning</p>
-          <p className="text-sm">This file is very large ({(children.length / 1024).toFixed(1)}KB). Syntax highlighting has been disabled for performance.</p>
+      <div
+        style={customStyle}
+        className={`p-4 bg-gray-50 dark:bg-slate-950 border rounded ${className}`}
+      >
+        <div className="mb-4 p-2 bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-400 text-yellow-700 dark:text-yellow-200">
+          <p className="font-medium">Large File</p>
+          <p className="text-sm">
+            This file is very large ({(children.length / 1024).toFixed(1)}KB).
+            Syntax highlighting has been disabled for performance.
+          </p>
         </div>
-        <pre className="whitespace-pre-wrap text-sm font-mono overflow-auto">
+        <pre className="whitespace-pre-wrap text-sm font-mono overflow-auto text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 p-4 rounded">
           {children}
         </pre>
       </div>
@@ -106,27 +83,56 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
   }
 
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center p-8" style={customStyle}>
-        <div className="text-center">
-          <LoadingSpinner size="sm" className="mb-2" />
-          <p className="text-sm text-gray-500">Loading syntax highlighter...</p>
-        </div>
-      </div>
-    }>
-      <SyntaxHighlighter
-        language={language}
-        style={loadedStyle || {}}
-        showLineNumbers={showLineNumbers}
-        wrapLines={wrapLines}
-        wrapLongLines={wrapLongLines}
-        customStyle={customStyle}
-        lineNumberStyle={lineNumberStyle}
-        className={className}
-      >
-        {children}
-      </SyntaxHighlighter>
-    </Suspense>
+    <Highlight theme={theme} code={children} language={language.toLowerCase()}>
+      {({ className: highlightClassName, style: highlightStyle, tokens, getLineProps, getTokenProps }) => (
+        <pre
+          className={`${highlightClassName} ${className} p-4 rounded overflow-x-auto`}
+          style={{
+            ...highlightStyle,
+            ...customStyle,
+            margin: 0,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontSize: '0.875rem',
+            lineHeight: '1.5',
+          }}
+        >
+          <code>
+            {tokens.map((line, lineIndex) => (
+              <div
+                key={lineIndex}
+                {...getLineProps({ line })}
+                style={{
+                  display: 'flex',
+                  whiteSpace: wrapLongLines ? 'pre-wrap' : 'pre',
+                  wordBreak: wrapLongLines ? 'break-word' : 'normal',
+                }}
+              >
+                {showLineNumbers && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '3rem',
+                      marginRight: '1rem',
+                      textAlign: 'right',
+                      userSelect: 'none',
+                      opacity: 0.5,
+                      ...lineNumberStyle,
+                    }}
+                  >
+                    {lineIndex + 1}
+                  </span>
+                )}
+                <span style={{ flex: 1 }}>
+                  {line.map((token, tokenIndex) => (
+                    <span key={tokenIndex} {...getTokenProps({ token })} />
+                  ))}
+                </span>
+              </div>
+            ))}
+          </code>
+        </pre>
+      )}
+    </Highlight>
   );
 };
 

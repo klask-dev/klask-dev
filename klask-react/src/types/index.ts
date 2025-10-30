@@ -10,6 +10,13 @@ export interface User {
   updated_at: string;
   last_login?: string;
   last_activity?: string;
+  avatar_url?: string;
+  bio?: string;
+  full_name?: string;
+  phone?: string;
+  timezone?: string;
+  preferences?: UserPreferences;
+  login_count?: number;
 }
 
 export const UserRole = {
@@ -18,6 +25,50 @@ export const UserRole = {
 } as const;
 
 export type UserRole = typeof UserRole[keyof typeof UserRole];
+
+// User Preferences
+export interface UserPreferences {
+  theme: 'light' | 'dark' | 'auto';
+  language: 'en' | 'fr' | 'es' | 'de';
+  notifications_email: boolean;
+  show_activity: boolean;
+}
+
+// Profile Update Request
+export interface UpdateProfileRequest {
+  full_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  phone?: string;
+  timezone?: string;
+  preferences?: UserPreferences;
+}
+
+// Password Management
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}
+
+// User Activity
+export interface UserActivity {
+  last_login?: string;
+  login_count: number;
+  last_activity?: string;
+  created_at: string;
+  devices: ActiveDevice[];
+  total_devices?: number;
+  current_page?: number;
+  page_size?: number;
+}
+
+export interface ActiveDevice {
+  ip: string;
+  user_agent: string;
+  last_seen: string;
+  device_name?: string;
+}
 
 export interface Repository {
   id: string;
@@ -50,6 +101,19 @@ export interface Repository {
   crawlState?: string;
   lastProcessedProject?: string;
   crawlStartedAt?: string;
+  // Enhanced filtering fields for branch and project selection
+  /** Comma-separated list of exact branch names to include (e.g., "main, develop") */
+  includedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to include (e.g., "release-*, hotfix-*") */
+  includedBranchesPatterns?: string;
+  /** Comma-separated list of exact branch names to exclude (e.g., "temp-*, wip-*") */
+  excludedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to exclude (e.g., "archive-*, backup-*") */
+  excludedBranchesPatterns?: string;
+  /** Comma-separated list of exact project/repository paths to include (e.g., "team/project, org/repo") */
+  includedProjects?: string;
+  /** Comma-separated list of wildcard patterns for projects/repositories to include (replaces old namespace filter) */
+  includedProjectsPatterns?: string;
 }
 
 export interface RepositoryWithStats {
@@ -240,6 +304,53 @@ export interface CreateRepositoryRequest {
   githubNamespace?: string;
   githubExcludedRepositories?: string;
   githubExcludedPatterns?: string;
+  // Enhanced filtering fields for branch and project selection
+  /** Comma-separated list of exact branch names to include */
+  includedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to include */
+  includedBranchesPatterns?: string;
+  /** Comma-separated list of exact branch names to exclude */
+  excludedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to exclude */
+  excludedBranchesPatterns?: string;
+  /** Comma-separated list of exact project/repository paths to include */
+  includedProjects?: string;
+  /** Comma-separated list of wildcard patterns for projects/repositories to include */
+  includedProjectsPatterns?: string;
+}
+
+export interface UpdateRepositoryRequest {
+  name?: string;
+  url?: string;
+  repositoryType?: RepositoryType;
+  branch?: string;
+  enabled?: boolean;
+  accessToken?: string;
+  gitlabNamespace?: string;
+  isGroup?: boolean;
+  autoCrawlEnabled?: boolean;
+  cronSchedule?: string;
+  crawlFrequencyHours?: number;
+  maxCrawlDurationMinutes?: number;
+  gitlabExcludedProjects?: string;
+  gitlabExcludedPatterns?: string;
+  // GitHub specific fields
+  githubNamespace?: string;
+  githubExcludedRepositories?: string;
+  githubExcludedPatterns?: string;
+  // Enhanced filtering fields for branch and project selection
+  /** Comma-separated list of exact branch names to include */
+  includedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to include */
+  includedBranchesPatterns?: string;
+  /** Comma-separated list of exact branch names to exclude */
+  excludedBranches?: string;
+  /** Comma-separated list of wildcard patterns for branches to exclude */
+  excludedBranchesPatterns?: string;
+  /** Comma-separated list of exact project/repository paths to include */
+  includedProjects?: string;
+  /** Comma-separated list of wildcard patterns for projects/repositories to include */
+  includedProjectsPatterns?: string;
 }
 
 export interface CrawlStatus {

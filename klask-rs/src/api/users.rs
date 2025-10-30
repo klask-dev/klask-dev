@@ -1,16 +1,14 @@
 use crate::auth::extractors::{AdminUser, AppState};
+use crate::auth::AuthError;
 use crate::models::{User, UserRole};
 use crate::repositories::{user_repository::UserStats, UserRepository};
+use crate::utils::password::{hash_password, verify_password};
 use anyhow::Result;
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
-    Argon2,
-};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
-    routing::{get, put},
+    routing::{get, post, put},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -40,6 +38,12 @@ pub struct UserListQuery {
     pub offset: Option<u32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct VerifyPasswordRequest {
+    pub password: String,
+    pub hash: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
     pub id: Uuid,
@@ -47,10 +51,18 @@ pub struct UserResponse {
     pub email: String,
     pub role: UserRole,
     pub active: bool,
+    pub avatar_url: Option<String>,
+    pub full_name: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub last_login: Option<chrono::DateTime<chrono::Utc>>,
     pub last_activity: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VerifyPasswordResponse {
+    pub matches: bool,
+    pub message: String,
 }
 
 impl From<User> for UserResponse {
@@ -61,6 +73,8 @@ impl From<User> for UserResponse {
             email: user.email,
             role: user.role,
             active: user.active,
+            avatar_url: user.avatar_url,
+            full_name: user.full_name,
             created_at: user.created_at,
             updated_at: user.updated_at,
             last_login: user.last_login,
@@ -75,7 +89,8 @@ pub async fn create_router() -> Result<Router<AppState>> {
         .route("/{id}", get(get_user).put(update_user).delete(delete_user))
         .route("/{id}/role", put(update_user_role))
         .route("/{id}/status", put(update_user_status))
-        .route("/stats", get(get_user_stats));
+        .route("/stats", get(get_user_stats))
+        .route("/verify-password", post(verify_password_endpoint));
 
     Ok(router)
 }
@@ -114,22 +129,22 @@ async fn create_user(
     State(app_state): State<AppState>,
     _admin_user: AdminUser, // Require admin authentication
     Json(payload): Json<CreateUserRequest>,
-) -> Result<Json<UserResponse>, StatusCode> {
+) -> Result<Json<UserResponse>, AuthError> {
     let user_repository = UserRepository::new(app_state.database.pool().clone());
 
     // Check if username or email already exists
     if let Ok(Some(_)) = user_repository.find_by_username(&payload.username).await {
-        return Err(StatusCode::CONFLICT);
+        return Err(AuthError::UsernameExists);
     }
 
     if let Ok(Some(_)) = user_repository.find_by_email(&payload.email).await {
-        return Err(StatusCode::CONFLICT);
+        return Err(AuthError::EmailExists);
     }
 
     // Hash password using argon2
     let password_hash = match hash_password(&payload.password) {
         Ok(hash) => hash,
-        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),
     };
 
     let new_user = User {
@@ -143,11 +158,18 @@ async fn create_user(
         updated_at: chrono::Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: None,
+        phone: None,
+        timezone: Some("UTC".to_string()),
+        preferences: None,
+        login_count: 0,
     };
 
     match user_repository.create_user(&new_user).await {
         Ok(user) => Ok(Json(UserResponse::from(user))),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(_) => Err(AuthError::InvalidInput("Failed to create user".to_string())),
     }
 }
 
@@ -156,21 +178,21 @@ async fn update_user(
     Path(id): Path<Uuid>,
     _admin_user: AdminUser, // Require admin authentication
     Json(payload): Json<UpdateUserRequest>,
-) -> Result<Json<UserResponse>, StatusCode> {
+) -> Result<Json<UserResponse>, AuthError> {
     let user_repository = UserRepository::new(app_state.database.pool().clone());
 
     // Check if user exists
     match user_repository.get_user(id).await {
         Ok(Some(_)) => {}
-        Ok(None) => return Err(StatusCode::NOT_FOUND),
-        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Ok(None) => return Err(AuthError::UserNotFound),
+        Err(_) => return Err(AuthError::InvalidInput("Database error".to_string())),
     }
 
     // Check for username/email conflicts if they're being updated
     if let Some(ref username) = payload.username {
         if let Ok(Some(existing_user)) = user_repository.find_by_username(username).await {
             if existing_user.id != id {
-                return Err(StatusCode::CONFLICT);
+                return Err(AuthError::UsernameExists);
             }
         }
     }
@@ -178,7 +200,7 @@ async fn update_user(
     if let Some(ref email) = payload.email {
         if let Ok(Some(existing_user)) = user_repository.find_by_email(email).await {
             if existing_user.id != id {
-                return Err(StatusCode::CONFLICT);
+                return Err(AuthError::EmailExists);
             }
         }
     }
@@ -187,13 +209,13 @@ async fn update_user(
     let mut updated_user = if payload.username.is_some() || payload.email.is_some() {
         match user_repository.update_user(id, payload.username.as_deref(), payload.email.as_deref()).await {
             Ok(user) => user,
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => return Err(AuthError::InvalidInput("Failed to update user".to_string())),
         }
     } else {
         match user_repository.get_user(id).await {
             Ok(Some(user)) => user,
-            Ok(None) => return Err(StatusCode::NOT_FOUND),
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Ok(None) => return Err(AuthError::UserNotFound),
+            Err(_) => return Err(AuthError::InvalidInput("Database error".to_string())),
         }
     };
 
@@ -201,11 +223,11 @@ async fn update_user(
     if let Some(password) = payload.password {
         let password_hash = match hash_password(&password) {
             Ok(hash) => hash,
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),
         };
         updated_user = match user_repository.update_user_password(id, &password_hash).await {
             Ok(user) => user,
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => return Err(AuthError::InvalidInput("Failed to update password".to_string())),
         };
     }
 
@@ -213,7 +235,7 @@ async fn update_user(
     if let Some(role) = payload.role {
         updated_user = match user_repository.update_user_role(id, role).await {
             Ok(user) => user,
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => return Err(AuthError::InvalidInput("Failed to update user role".to_string())),
         };
     }
 
@@ -221,7 +243,7 @@ async fn update_user(
     if let Some(active) = payload.active {
         updated_user = match user_repository.update_user_status(id, active).await {
             Ok(user) => user,
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => return Err(AuthError::InvalidInput("Failed to update user status".to_string())),
         };
     }
 
@@ -293,12 +315,22 @@ async fn get_user_stats(
     }
 }
 
-fn hash_password(password: &str) -> Result<String> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password(password.as_bytes(), &salt)
-        .map_err(|e| anyhow::anyhow!("Password hashing failed: {}", e))?
-        .to_string();
-    Ok(password_hash)
+async fn verify_password_endpoint(
+    _admin_user: AdminUser, // Require admin authentication
+    axum::Json(payload): axum::Json<VerifyPasswordRequest>,
+) -> Result<Json<VerifyPasswordResponse>, StatusCode> {
+    match verify_password(&payload.password, &payload.hash) {
+        Ok(true) => Ok(Json(VerifyPasswordResponse {
+            matches: true,
+            message: "Password matches the stored hash".to_string(),
+        })),
+        Ok(false) => Ok(Json(VerifyPasswordResponse {
+            matches: false,
+            message: "Password does NOT match the stored hash".to_string(),
+        })),
+        Err(e) => {
+            eprintln!("Error verifying password: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }

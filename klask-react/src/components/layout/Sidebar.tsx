@@ -10,7 +10,7 @@ export const Sidebar: React.FC = () => {
   const isSearchPage = location.pathname.includes('/search');
 
   return (
-    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4 pt-4 border-r border-gray-200">
+    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 px-6 pb-4 pt-4 border-r border-gray-200 dark:border-gray-700">
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7">
           {/* Search Filters */}

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { MagnifyingGlassIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { loginSchema, type LoginForm } from '../../lib/validations';
-import { apiClient } from '../../lib/api';
+import { apiClient, extractFieldErrors } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth-store';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
@@ -18,6 +18,7 @@ const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -50,10 +51,32 @@ const LoginPage: React.FC = () => {
       setServerError(null);
       const response = await apiClient.auth.login(data);
       login(response.token, response.user);
+
+      // Fetch full profile to get avatar_url and other profile fields
+      const fullProfile = await apiClient.auth.getProfile();
+      login(response.token, fullProfile);
+
       navigate('/home');
     } catch (error) {
-      if (error instanceof Error) {
-        setServerError(error.message);
+      // Extract field-specific errors
+      const fieldErrors = extractFieldErrors(error);
+
+      if (Object.keys(fieldErrors).length > 0) {
+        // Apply field errors to form
+        Object.entries(fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof LoginForm, {
+            type: 'server',
+            message,
+          });
+        });
+      } else if (error instanceof Error) {
+        const apiError = error as any;
+        // If we have a detailed error from the API, use that
+        if (apiError.details?.error) {
+          setServerError(apiError.details.error);
+        } else {
+          setServerError(error.message);
+        }
       } else {
         setServerError('An unexpected error occurred');
       }

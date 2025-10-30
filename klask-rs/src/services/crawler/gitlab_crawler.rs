@@ -1,4 +1,5 @@
 use super::branch_processor::CrawlProgress;
+use super::filter::filter_projects;
 use crate::models::{Repository, RepositoryType};
 use crate::repositories::RepositoryRepository;
 use crate::services::encryption::EncryptionService;
@@ -160,23 +161,24 @@ impl GitLabCrawler {
             }
         };
 
-        // Filter out excluded projects using repository-specific exclusions
-        let excluded_projects: Vec<String> = repository
-            .gitlab_excluded_projects
-            .as_ref()
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-            .unwrap_or_default();
-        let excluded_patterns: Vec<String> = repository
-            .gitlab_excluded_patterns
-            .as_ref()
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-            .unwrap_or_default();
+        // Convert GitLab projects to simple string names for filtering
+        let project_paths: Vec<String> = projects.iter().map(|p| p.path_with_namespace.clone()).collect();
 
-        let filtered_projects =
-            gitlab_service.filter_excluded_projects_with_config(projects, &excluded_projects, &excluded_patterns);
+        // Apply filtering logic: included filters first, then exclusions
+        let filtered_project_paths = filter_projects(
+            project_paths,
+            repository.included_projects.as_deref(),
+            repository.included_projects_patterns.as_deref(),
+            repository.gitlab_excluded_projects.as_deref(),
+            repository.gitlab_excluded_patterns.as_deref(),
+        );
+
+        // Map back from filtered paths to GitLab project objects
+        let filtered_projects: Vec<_> =
+            projects.into_iter().filter(|p| filtered_project_paths.contains(&p.path_with_namespace)).collect();
 
         if filtered_projects.is_empty() {
-            let error_msg = "No accessible GitLab projects found after exclusion filtering";
+            let error_msg = "No accessible GitLab projects found after filtering";
             self.progress_tracker.set_error(repository.id, error_msg.to_string()).await;
             // Mark crawl as failed in database
             let _ = repo_repo.fail_crawl(repository.id).await;
@@ -185,7 +187,7 @@ impl GitLabCrawler {
         }
 
         info!(
-            "Discovered {} GitLab projects for repository {} (after exclusion filtering)",
+            "Discovered {} GitLab projects for repository {} after filtering",
             filtered_projects.len(),
             repository.name
         );
@@ -255,6 +257,12 @@ impl GitLabCrawler {
                 crawl_state: repository.crawl_state.clone(),
                 last_processed_project: repository.last_processed_project.clone(),
                 crawl_started_at: repository.crawl_started_at,
+                included_branches: repository.included_branches.clone(),
+                included_branches_patterns: repository.included_branches_patterns.clone(),
+                excluded_branches: repository.excluded_branches.clone(),
+                excluded_branches_patterns: repository.excluded_branches_patterns.clone(),
+                included_projects: repository.included_projects.clone(),
+                included_projects_patterns: repository.included_projects_patterns.clone(),
             };
 
             // Clone this specific project
@@ -473,6 +481,12 @@ impl GitLabCrawler {
                 crawl_state: repository.crawl_state.clone(),
                 last_processed_project: repository.last_processed_project.clone(),
                 crawl_started_at: repository.crawl_started_at,
+                included_branches: repository.included_branches.clone(),
+                included_branches_patterns: repository.included_branches_patterns.clone(),
+                excluded_branches: repository.excluded_branches.clone(),
+                excluded_branches_patterns: repository.excluded_branches_patterns.clone(),
+                included_projects: repository.included_projects.clone(),
+                included_projects_patterns: repository.included_projects_patterns.clone(),
             };
 
             // Clone and process this project

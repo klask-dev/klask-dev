@@ -1,12 +1,8 @@
 use anyhow::Result;
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Argon2,
-};
 use axum::{
     extract::State,
     response::Json,
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -14,8 +10,11 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::auth::{extractors::AppState, AuthError, AuthenticatedUser};
-use crate::models::user::{User, UserRole};
-use crate::repositories::user_repository::UserRepository;
+use crate::models::user::{
+    ChangePasswordRequest, DeleteAccountRequest, UpdateProfileRequest, User, UserActivity, UserProfile, UserRole,
+};
+use crate::repositories::user_repository::{UpdateProfileData, UserRepository};
+use crate::utils::password::{hash_password, verify_password};
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginRequest {
@@ -75,7 +74,11 @@ pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/login", post(login))
         .route("/register", post(register))
-        .route("/profile", get(get_profile))
+        .route("/profile", get(get_profile).put(update_profile))
+        .route("/password", put(change_password))
+        .route("/avatar", post(upload_avatar))
+        .route("/activity", get(get_user_activity))
+        .route("/account", delete(delete_account))
         .route("/setup/check", get(check_setup))
         .route("/setup", post(initial_setup));
 
@@ -156,6 +159,13 @@ async fn register(
         updated_at: chrono::Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: None,
+        phone: None,
+        timezone: Some("UTC".to_string()),
+        preferences: None,
+        login_count: 0,
     };
 
     let user = user_repo.create_user(&new_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
@@ -169,8 +179,8 @@ async fn register(
     Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
 }
 
-async fn get_profile(auth_user: AuthenticatedUser) -> Result<Json<UserInfo>, AuthError> {
-    Ok(Json(UserInfo::from(auth_user.user)))
+async fn get_profile(auth_user: AuthenticatedUser) -> Result<Json<UserProfile>, AuthError> {
+    Ok(Json(UserProfile::from(auth_user.user)))
 }
 
 async fn check_setup(State(app_state): State<AppState>) -> Result<Json<SetupCheckResponse>, AuthError> {
@@ -212,6 +222,13 @@ async fn initial_setup(
         updated_at: chrono::Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: None,
+        phone: None,
+        timezone: Some("UTC".to_string()),
+        preferences: None,
+        login_count: 0,
     };
 
     let user = user_repo.create_user(&admin_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
@@ -225,18 +242,282 @@ async fn initial_setup(
     Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
 }
 
-fn hash_password(password: &str) -> Result<String> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password(password.as_bytes(), &salt)
-        .map_err(|e| anyhow::anyhow!("Password hashing failed: {}", e))?
-        .to_string();
-    Ok(password_hash)
+/// Update user profile with new information
+async fn update_profile(
+    auth_user: AuthenticatedUser,
+    State(app_state): State<AppState>,
+    Json(payload): Json<UpdateProfileRequest>,
+) -> Result<Json<UserProfile>, AuthError> {
+    // Validate inputs
+    if let Some(ref name) = payload.full_name {
+        if name.is_empty() || name.len() > 255 {
+            return Err(AuthError::InvalidInput(
+                "Full name must be 1-255 characters".to_string(),
+            ));
+        }
+    }
+
+    if let Some(ref bio) = payload.bio {
+        if bio.len() > 2000 {
+            return Err(AuthError::InvalidInput(
+                "Bio must be 2000 characters or less".to_string(),
+            ));
+        }
+    }
+
+    if let Some(ref avatar_url) = payload.avatar_url {
+        // Allow large base64 data URIs (typical avatar ~100KB base64 = ~133KB string)
+        if avatar_url.len() > 1_000_000 {
+            return Err(AuthError::InvalidInput("Avatar URL must be 1MB or less".to_string()));
+        }
+    }
+
+    if let Some(ref phone) = payload.phone {
+        if phone.len() > 20 {
+            return Err(AuthError::InvalidInput(
+                "Phone must be 20 characters or less".to_string(),
+            ));
+        }
+    }
+
+    if let Some(ref tz) = payload.timezone {
+        if !validate_timezone(tz) {
+            return Err(AuthError::InvalidInput("Invalid timezone".to_string()));
+        }
+    }
+
+    let user_repo = UserRepository::new(app_state.database.pool().clone());
+
+    // Convert preferences to JSON
+    let preferences_json =
+        payload.preferences.map(|prefs| serde_json::to_value(prefs).unwrap_or(serde_json::json!({})));
+
+    let profile_data = UpdateProfileData {
+        avatar_url: payload.avatar_url,
+        bio: payload.bio,
+        full_name: payload.full_name,
+        phone: payload.phone,
+        timezone: payload.timezone,
+        preferences: preferences_json,
+    };
+
+    let updated_user = user_repo
+        .update_user_profile(auth_user.user.id, profile_data)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+
+    Ok(Json(UserProfile::from(updated_user)))
 }
 
-fn verify_password(password: &str, hash: &str) -> Result<bool> {
-    let parsed_hash = PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Password hash parsing failed: {}", e))?;
-    let argon2 = Argon2::default();
-    Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())
+/// Change user password
+async fn change_password(
+    auth_user: AuthenticatedUser,
+    State(app_state): State<AppState>,
+    Json(payload): Json<ChangePasswordRequest>,
+) -> Result<Json<serde_json::Value>, AuthError> {
+    // Verify passwords match
+    if payload.new_password != payload.new_password_confirm {
+        return Err(AuthError::InvalidInput("Passwords do not match".to_string()));
+    }
+
+    // Validate password strength
+    validate_password_strength(&payload.new_password)?;
+
+    // Verify current password
+    let is_valid = verify_password(&payload.current_password, &auth_user.user.password_hash)
+        .map_err(|_| AuthError::InvalidCredentials)?;
+
+    if !is_valid {
+        return Err(AuthError::InvalidCredentials);
+    }
+
+    // Hash new password
+    let new_password_hash = hash_password(&payload.new_password)
+        .map_err(|_| AuthError::InvalidInput("Password hashing failed".to_string()))?;
+
+    let user_repo = UserRepository::new(app_state.database.pool().clone());
+
+    user_repo
+        .update_user_password(auth_user.user.id, &new_password_hash)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "Password changed successfully"
+    })))
+}
+
+/// Upload avatar image for user
+#[derive(Debug, Serialize)]
+pub struct AvatarUploadResponse {
+    pub avatar_url: String,
+}
+
+async fn upload_avatar(_auth_user: AuthenticatedUser) -> Result<Json<AvatarUploadResponse>, AuthError> {
+    // Avatar is processed in the frontend and sent via PUT /api/auth/profile
+    // This endpoint exists to acknowledge the upload endpoint exists
+    // The frontend handles base64 conversion and storage
+    Ok(Json(AvatarUploadResponse {
+        avatar_url: "avatar_upload_acknowledged".to_string(),
+    }))
+}
+
+/// Get user activity information
+async fn get_user_activity(
+    auth_user: AuthenticatedUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<UserActivity>, AuthError> {
+    let user_repo = UserRepository::new(app_state.database.pool().clone());
+
+    let activity = user_repo
+        .get_user_activity(auth_user.user.id)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
+        .ok_or(AuthError::Forbidden("User not found".to_string()))?;
+
+    Ok(Json(activity))
+}
+
+/// Delete user account with rate limiting for security
+async fn delete_account(
+    auth_user: AuthenticatedUser,
+    State(app_state): State<AppState>,
+    Json(payload): Json<DeleteAccountRequest>,
+) -> Result<Json<serde_json::Value>, AuthError> {
+    const MAX_ATTEMPTS: u32 = 5;
+    const RATE_LIMIT_WINDOW_SECS: u64 = 300; // 5 minutes
+
+    let user_id = auth_user.user.id;
+    let now = std::time::SystemTime::now();
+
+    // Check rate limiting
+    {
+        let mut limiter = app_state.delete_account_rate_limiter.write().await;
+
+        if let Some((attempts, last_reset)) = limiter.get_mut(&user_id) {
+            // Check if we need to reset the counter
+            if let Ok(elapsed) = now.duration_since(*last_reset) {
+                if elapsed.as_secs() > RATE_LIMIT_WINDOW_SECS {
+                    // Reset the counter
+                    *attempts = 0;
+                    *last_reset = now;
+                } else if *attempts >= MAX_ATTEMPTS {
+                    // Too many attempts
+                    let remaining_time = RATE_LIMIT_WINDOW_SECS - elapsed.as_secs();
+                    return Err(AuthError::InvalidInput(format!(
+                        "Too many delete attempts. Please try again in {} seconds",
+                        remaining_time
+                    )));
+                }
+            }
+            // Increment attempt counter
+            *attempts += 1;
+        } else {
+            // First attempt for this user
+            limiter.insert(user_id, (1, now));
+        }
+    }
+
+    // Verify password
+    let is_valid =
+        verify_password(&payload.password, &auth_user.user.password_hash).map_err(|_| AuthError::InvalidCredentials)?;
+
+    if !is_valid {
+        return Err(AuthError::InvalidCredentials);
+    }
+
+    let user_repo = UserRepository::new(app_state.database.pool().clone());
+
+    // Delete the user
+    user_repo.delete_user(auth_user.user.id).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+
+    // Clear rate limiter entry on successful deletion
+    app_state.delete_account_rate_limiter.write().await.remove(&user_id);
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "Account deleted successfully"
+    })))
+}
+
+/// Validate password meets minimum security requirements
+fn validate_password_strength(password: &str) -> Result<(), AuthError> {
+    if password.len() < 8 {
+        return Err(AuthError::InvalidInput(
+            "Password must be at least 8 characters".to_string(),
+        ));
+    }
+
+    if !password.chars().any(|c| c.is_uppercase()) {
+        return Err(AuthError::InvalidInput(
+            "Password must contain at least one uppercase letter".to_string(),
+        ));
+    }
+
+    if !password.chars().any(|c| c.is_lowercase()) {
+        return Err(AuthError::InvalidInput(
+            "Password must contain at least one lowercase letter".to_string(),
+        ));
+    }
+
+    if !password.chars().any(|c| c.is_numeric()) {
+        return Err(AuthError::InvalidInput(
+            "Password must contain at least one number".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate timezone string
+fn validate_timezone(tz: &str) -> bool {
+    // Common valid timezones
+    let valid_timezones = vec![
+        "UTC",
+        "GMT",
+        "Europe/London",
+        "Europe/Paris",
+        "Europe/Berlin",
+        "Europe/Amsterdam",
+        "Europe/Brussels",
+        "Europe/Vienna",
+        "Europe/Prague",
+        "Europe/Warsaw",
+        "Europe/Moscow",
+        "Europe/Istanbul",
+        "Asia/Tokyo",
+        "Asia/Shanghai",
+        "Asia/Hong_Kong",
+        "Asia/Singapore",
+        "Asia/Bangkok",
+        "Asia/Dubai",
+        "Asia/Kolkata",
+        "Asia/Jakarta",
+        "Asia/Manila",
+        "Asia/Seoul",
+        "America/New_York",
+        "America/Chicago",
+        "America/Denver",
+        "America/Los_Angeles",
+        "America/Anchorage",
+        "Pacific/Honolulu",
+        "America/Toronto",
+        "America/Mexico_City",
+        "America/Buenos_Aires",
+        "America/Sao_Paulo",
+        "America/Los_Angeles",
+        "Australia/Sydney",
+        "Australia/Melbourne",
+        "Australia/Brisbane",
+        "Australia/Perth",
+        "Pacific/Auckland",
+        "Pacific/Fiji",
+        "Africa/Cairo",
+        "Africa/Johannesburg",
+        "Africa/Lagos",
+        "Africa/Nairobi",
+    ];
+
+    valid_timezones.contains(&tz) || tz == "UTC"
 }

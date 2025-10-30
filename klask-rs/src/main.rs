@@ -5,6 +5,7 @@ mod database;
 mod models;
 mod repositories;
 mod services;
+mod utils;
 
 use anyhow::Result;
 use auth::{extractors::AppState, jwt::JwtService};
@@ -169,6 +170,7 @@ async fn main() -> Result<()> {
         config: config.clone(),
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time,
+        delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     };
 
     // Build application router
@@ -179,10 +181,41 @@ async fn main() -> Result<()> {
 
     info!("Server listening on http://{}", bind_address);
 
-    // Start server
-    axum::serve(listener, app).await?;
+    // Start server with graceful shutdown
+    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+
+    info!("Server shutdown complete");
 
     Ok(())
+}
+
+/// Graceful shutdown handler that listens for SIGTERM and SIGINT signals
+async fn shutdown_signal() {
+    use tokio::signal;
+
+    let ctrl_c = async {
+        signal::ctrl_c().await.expect("Failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("Failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received Ctrl+C signal, initiating graceful shutdown...");
+        },
+        _ = terminate => {
+            info!("Received SIGTERM signal, initiating graceful shutdown...");
+        },
+    }
 }
 
 async fn create_app(app_state: AppState) -> Result<Router> {

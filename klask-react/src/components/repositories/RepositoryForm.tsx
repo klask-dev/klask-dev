@@ -47,6 +47,25 @@ const createRepositorySchema = (isEditing: boolean, hasExistingToken: boolean) =
   githubExcludedPatterns: z
     .string()
     .optional(),
+  // Enhanced filtering fields for branch and project selection
+  includedBranches: z
+    .string()
+    .optional(),
+  includedBranchesPatterns: z
+    .string()
+    .optional(),
+  excludedBranches: z
+    .string()
+    .optional(),
+  excludedBranchesPatterns: z
+    .string()
+    .optional(),
+  includedProjects: z
+    .string()
+    .optional(),
+  includedProjectsPatterns: z
+    .string()
+    .optional(),
   enabled: z.boolean(),
 }).refine((data) => {
   // For GitLab, accessToken is required only for new repositories
@@ -198,6 +217,12 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       githubNamespace: repository.githubNamespace || '',
       githubExcludedRepositories: repository.githubExcludedRepositories || '',
       githubExcludedPatterns: repository.githubExcludedPatterns || '',
+      includedBranches: repository.includedBranches || '',
+      includedBranchesPatterns: repository.includedBranchesPatterns || '',
+      excludedBranches: repository.excludedBranches || '',
+      excludedBranchesPatterns: repository.excludedBranchesPatterns || '',
+      includedProjects: repository.includedProjects || '',
+      includedProjectsPatterns: repository.includedProjectsPatterns || '',
     } : {
       name: '',
       url: '',
@@ -212,6 +237,12 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       githubNamespace: '',
       githubExcludedRepositories: '',
       githubExcludedPatterns: '',
+      includedBranches: '',
+      includedBranchesPatterns: '',
+      excludedBranches: '',
+      excludedBranchesPatterns: '',
+      includedProjects: '',
+      includedProjectsPatterns: '',
     },
   });
 
@@ -317,14 +348,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
     };
   };
 
-  // Debug: Monitor button state
+  // Monitor button state for validation
   React.useEffect(() => {
-    const shouldDisable = (() => {
-      if (!isValid || isLoading) return true;
-      if (!isEditing) return false;
-      return !isDirty && !hasSchedulingChanged;
-    })();
-
+    // Button state is computed dynamically in the submit button element
   }, [isValid, isLoading, isEditing, isDirty, hasSchedulingChanged, errors]);
 
   // Handle scheduling data changes
@@ -390,6 +416,12 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
           githubNamespace: repository.githubNamespace || '',
           githubExcludedRepositories: repository.githubExcludedRepositories || '',
           githubExcludedPatterns: repository.githubExcludedPatterns || '',
+          includedBranches: repository.includedBranches || '',
+          includedBranchesPatterns: repository.includedBranchesPatterns || '',
+          excludedBranches: repository.excludedBranches || '',
+          excludedBranchesPatterns: repository.excludedBranchesPatterns || '',
+          includedProjects: repository.includedProjects || '',
+          includedProjectsPatterns: repository.includedProjectsPatterns || '',
         };
         reset(formData);
         setSchedulingData({
@@ -411,6 +443,15 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
           gitlabExcludedProjects: '',
           gitlabExcludedPatterns: '',
           isGroup: false,
+          githubNamespace: '',
+          githubExcludedRepositories: '',
+          githubExcludedPatterns: '',
+          includedBranches: '',
+          includedBranchesPatterns: '',
+          excludedBranches: '',
+          excludedBranchesPatterns: '',
+          includedProjects: '',
+          includedProjectsPatterns: '',
         };
         reset(formData);
         setSchedulingData({
@@ -425,10 +466,16 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
   }, [repository?.id, repository, reset, currentRepositoryId]);
 
   const handleFormSubmit = (data: RepositoryFormData) => {
-    // Clean up branch field if empty and merge scheduling data
+    // Clean up empty strings from all filter fields and merge scheduling data
     const submitData: RepositoryFormSubmitData = {
       ...data,
       branch: data.branch?.trim() || undefined,
+      includedBranches: data.includedBranches?.trim() || undefined,
+      includedBranchesPatterns: data.includedBranchesPatterns?.trim() || undefined,
+      excludedBranches: data.excludedBranches?.trim() || undefined,
+      excludedBranchesPatterns: data.excludedBranchesPatterns?.trim() || undefined,
+      includedProjects: data.includedProjects?.trim() || undefined,
+      includedProjectsPatterns: data.includedProjectsPatterns?.trim() || undefined,
       // For GitLab repositories, default to gitlab.com if URL is empty
       url: data.repositoryType === 'GitLab' && (!data.url || data.url.trim() === '')
         ? 'https://gitlab.com'
@@ -499,22 +546,22 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+        <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {formTitle}
             </h3>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
           </div>
 
           {/* Tab Navigation */}
-          <div className="border-b border-gray-200 mb-6">
+          <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
             <nav className="-mb-px flex space-x-8">
               {tabs.map((tab) => {
                 const validation = getTabValidationState(tab.id);
@@ -527,22 +574,22 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                     onClick={() => setActiveTab(tab.id)}
                     className={`group inline-flex items-center py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                       isActive
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     <tab.icon className={`mr-2 h-5 w-5 ${
-                      isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                      isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
                     }`} />
                     {tab.name}
                     {validation.hasErrors && (
-                      <ExclamationTriangleIcon className="ml-2 h-4 w-4 text-red-500" />
+                      <ExclamationTriangleIcon className="ml-2 h-4 w-4 text-red-500 dark:text-red-400" />
                     )}
                     {!validation.hasErrors && validation.hasWarnings && (
-                      <div className="ml-2 h-2 w-2 bg-amber-400 rounded-full" />
+                      <div className="ml-2 h-2 w-2 bg-amber-400 dark:bg-amber-500 rounded-full" />
                     )}
                     {!validation.hasErrors && !validation.hasWarnings && tab.required && (
-                      <CheckCircleIcon className="ml-2 h-4 w-4 text-green-500" />
+                      <CheckCircleIcon className="ml-2 h-4 w-4 text-green-500 dark:text-green-400" />
                     )}
                   </button>
                 );
@@ -559,7 +606,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                 <div className="space-y-6">
                   {/* Repository Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Repository Name *
                     </label>
                     <input
@@ -575,7 +622,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
 
                   {/* Repository Type */}
                   <div>
-                    <label htmlFor="repositoryType" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="repositoryType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Repository Type *
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -584,8 +631,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                           key={type}
                           className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
                             watchedType === type
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 hover:border-gray-400'
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                           }`}
                         >
                           <input
@@ -595,8 +642,10 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                             className="sr-only"
                           />
                           <div className="flex flex-col items-center space-y-1">
-                            {getTypeIcon(type)}
-                            <span className="text-xs font-medium">{type}</span>
+                            <div className={watchedType === type ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}>
+                              {getTypeIcon(type)}
+                            </div>
+                            <span className="text-xs font-medium text-gray-900 dark:text-gray-100">{type}</span>
                           </div>
                         </label>
                       ))}
@@ -609,7 +658,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                   {/* Repository URL - Not for GitLab/GitHub types */}
                   {watchedType !== 'GitLab' && watchedType !== 'GitHub' && (
                     <div>
-                      <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Repository URL *
                       </label>
                       <input
@@ -630,35 +679,14 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                     </div>
                   )}
 
-                  {/* Branch (for Git repositories) */}
-                  {watchedType !== 'FileSystem' && (
-                    <div>
-                      <label htmlFor="branch" className="block text-sm font-medium text-gray-700 mb-1">
-                        Branch (Optional)
-                      </label>
-                      <input
-                        {...register('branch')}
-                        type="text"
-                        className={`input-field ${errors.branch ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                        placeholder="main"
-                      />
-                      {errors.branch && (
-                        <p className="mt-1 text-sm text-red-600">{errors.branch.message}</p>
-                      )}
-                      <p className="mt-1 text-xs text-gray-500">
-                        Leave empty to use the default branch
-                      </p>
-                    </div>
-                  )}
-
                   {/* Enabled Toggle */}
                   <div className="flex items-center">
                     <input
                       {...register('enabled')}
                       type="checkbox"
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded"
                     />
-                    <label htmlFor="enabled" className="ml-2 block text-sm text-gray-900">
+                    <label htmlFor="enabled" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
                       Enable this repository for crawling
                     </label>
                   </div>
@@ -670,14 +698,14 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                 <div className="space-y-6">
                   {watchedType === 'GitLab' && (
                     <>
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-800">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-800/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+                        <p className="text-sm text-blue-800 dark:text-blue-300">
                           GitLab repositories will be automatically discovered and imported using your access token.
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           GitLab Server URL (Optional)
                         </label>
                         <input
@@ -689,27 +717,27 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         {errors.url && (
                           <p className="mt-1 text-sm text-red-600">{errors.url.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Leave empty to use gitlab.com, or enter your self-hosted GitLab URL
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Personal Access Token {!isEditing || !hasExistingToken ? '*' : ''}
                         </label>
 
                         {hasExistingToken && !showTokenField ? (
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-md">
                               <div className="flex items-center">
-                                <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                                <span className="text-sm text-green-700">Access token configured</span>
+                                <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full mr-2"></div>
+                                <span className="text-sm text-green-700 dark:text-green-300">Access token configured</span>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(true)}
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
                               >
                                 Change token
                               </button>
@@ -733,9 +761,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                                 title={showGitLabToken ? 'Hide token' : 'Show token'}
                               >
                                 {showGitLabToken ? (
-                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 ) : (
-                                  <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 )}
                               </button>
                             </div>
@@ -743,7 +771,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(false)}
-                                className="text-sm text-gray-600 hover:text-gray-800 underline"
+                                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 underline"
                               >
                                 Keep existing token
                               </button>
@@ -752,43 +780,26 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         )}
 
                         {errors.accessToken && (
-                          <p className="mt-1 text-sm text-red-600">{errors.accessToken.message}</p>
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accessToken.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Create a token with 'read_repository' scope in GitLab settings
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Create a token with 'read_api' and 'read_repository' scopes in GitLab settings
                         </p>
                       </div>
 
-                      <div>
-                        <label htmlFor="gitlabNamespace" className="block text-sm font-medium text-gray-700 mb-1">
-                          Namespace Filter (Optional)
-                        </label>
-                        <input
-                          {...register('gitlabNamespace')}
-                          type="text"
-                          className={`input-field ${errors.gitlabNamespace ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="username or group-name"
-                        />
-                        {errors.gitlabNamespace && (
-                          <p className="mt-1 text-sm text-red-600">{errors.gitlabNamespace.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Filter to only import repositories from a specific namespace
-                        </p>
-                      </div>
                     </>
                   )}
 
                   {watchedType === 'GitHub' && (
                     <>
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-800">
+                      <div className="p-3 bg-blue-50 dark:bg-blue-800/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+                        <p className="text-sm text-blue-800 dark:text-blue-300">
                           GitHub repositories will be automatically discovered and imported using your Personal Access Token.
                         </p>
                       </div>
 
                       <div>
-                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           GitHub API URL (Optional)
                         </label>
                         <input
@@ -806,21 +817,21 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                       </div>
 
                       <div>
-                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Personal Access Token {!isEditing || !hasExistingToken ? '*' : ''}
                         </label>
 
                         {hasExistingToken && !showTokenField ? (
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-md">
                               <div className="flex items-center">
-                                <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                                <span className="text-sm text-green-700">Access token configured</span>
+                                <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full mr-2"></div>
+                                <span className="text-sm text-green-700 dark:text-green-300">Access token configured</span>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(true)}
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
                               >
                                 Change token
                               </button>
@@ -844,9 +855,9 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                                 title={showGitHubToken ? 'Hide token' : 'Show token'}
                               >
                                 {showGitHubToken ? (
-                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeSlashIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 ) : (
-                                  <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <EyeIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400" />
                                 )}
                               </button>
                             </div>
@@ -854,7 +865,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setShowTokenField(false)}
-                                className="text-sm text-gray-600 hover:text-gray-800 underline"
+                                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 underline"
                               >
                                 Keep existing token
                               </button>
@@ -863,30 +874,13 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         )}
 
                         {errors.accessToken && (
-                          <p className="mt-1 text-sm text-red-600">{errors.accessToken.message}</p>
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accessToken.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Create a token with 'repo' scope in GitHub settings
                         </p>
                       </div>
 
-                      <div>
-                        <label htmlFor="githubNamespace" className="block text-sm font-medium text-gray-700 mb-1">
-                          Organization/User Filter (Optional)
-                        </label>
-                        <input
-                          {...register('githubNamespace')}
-                          type="text"
-                          className={`input-field ${errors.githubNamespace ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="organization-name or username"
-                        />
-                        {errors.githubNamespace && (
-                          <p className="mt-1 text-sm text-red-600">{errors.githubNamespace.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Filter to only import repositories from a specific organization or user
-                        </p>
-                      </div>
                     </>
                   )}
                 </div>
@@ -895,90 +889,204 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
               {/* Filters & Exclusions Tab */}
               {activeTab === 'filters' && (
                 <div className="space-y-6">
-                  {watchedType === 'GitLab' && (
-                    <>
+                  {/* Branch Selection Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Branch Selection</h3>
+                    <div className="space-y-4">
+                      {/* Included Branches */}
                       <div>
-                        <label htmlFor="gitlabExcludedProjects" className="block text-sm font-medium text-gray-700 mb-1">
-                          Excluded Projects (Optional)
+                        <label htmlFor="includedBranches" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Included Branches (Optional)
                         </label>
                         <input
-                          {...register('gitlabExcludedProjects')}
+                          {...register('includedBranches')}
                           type="text"
-                          className={`input-field ${errors.gitlabExcludedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="team/project-archive, old/legacy-system"
+                          className={`input-field ${errors.includedBranches ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="main, develop, release-*"
                         />
-                        {errors.gitlabExcludedProjects && (
-                          <p className="mt-1 text-sm text-red-600">{errors.gitlabExcludedProjects.message}</p>
+                        {errors.includedBranches && (
+                          <p className="mt-1 text-sm text-red-600">{errors.includedBranches.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Comma-separated list of exact project paths to exclude
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Comma-separated list of exact branch names or patterns to include
                         </p>
                       </div>
 
+                      {/* Included Branches Patterns */}
                       <div>
-                        <label htmlFor="gitlabExcludedPatterns" className="block text-sm font-medium text-gray-700 mb-1">
-                          Excluded Patterns (Optional)
+                        <label htmlFor="includedBranchesPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Included Branches Patterns (Optional)
                         </label>
                         <input
-                          {...register('gitlabExcludedPatterns')}
+                          {...register('includedBranchesPatterns')}
                           type="text"
-                          className={`input-field ${errors.gitlabExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="*-archive, test-*, *-temp"
+                          className={`input-field ${errors.includedBranchesPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="release-*, hotfix-*, feature-*"
                         />
-                        {errors.gitlabExcludedPatterns && (
-                          <p className="mt-1 text-sm text-red-600">{errors.gitlabExcludedPatterns.message}</p>
+                        {errors.includedBranchesPatterns && (
+                          <p className="mt-1 text-sm text-red-600">{errors.includedBranchesPatterns.message}</p>
                         )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Comma-separated patterns with wildcards (*) to exclude projects
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Comma-separated list of wildcard patterns (e.g., release-*, hotfix-*)
                         </p>
                       </div>
-                    </>
+
+                      {/* Excluded Branches */}
+                      <div>
+                        <label htmlFor="excludedBranches" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Excluded Branches (Optional)
+                        </label>
+                        <input
+                          {...register('excludedBranches')}
+                          type="text"
+                          className={`input-field ${errors.excludedBranches ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="temp-branch, wip-branch"
+                        />
+                        {errors.excludedBranches && (
+                          <p className="mt-1 text-sm text-red-600">{errors.excludedBranches.message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Comma-separated list of exact branch names to exclude
+                        </p>
+                      </div>
+
+                      {/* Excluded Branches Patterns */}
+                      <div>
+                        <label htmlFor="excludedBranchesPatterns" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Excluded Branches Patterns (Optional)
+                        </label>
+                        <input
+                          {...register('excludedBranchesPatterns')}
+                          type="text"
+                          className={`input-field ${errors.excludedBranchesPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="archive-*, backup-*, test-*"
+                        />
+                        {errors.excludedBranchesPatterns && (
+                          <p className="mt-1 text-sm text-red-600">{errors.excludedBranchesPatterns.message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Comma-separated list of wildcard patterns to exclude
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project/Repository Selection Section - GitLab and GitHub only */}
+                  {(watchedType === 'GitLab' || watchedType === 'GitHub') && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                        {watchedType === 'GitLab' ? 'Project' : 'Repository'} Selection
+                      </h3>
+                      <div className="space-y-4">
+                        {/* Included Projects/Repositories */}
+                        <div>
+                          <label
+                            htmlFor="includedProjects"
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            {watchedType === 'GitLab' ? 'Included Projects' : 'Included Repositories'} (Optional)
+                          </label>
+                          <input
+                            {...register('includedProjects')}
+                            type="text"
+                            className={`input-field ${errors.includedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                            placeholder={watchedType === 'GitLab' ? 'team/project1, org/repo2' : 'org/repo1, user/repo2'}
+                          />
+                          {errors.includedProjects && (
+                            <p className="mt-1 text-sm text-red-600">{errors.includedProjects.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated list of exact {watchedType === 'GitLab' ? 'project' : 'repository'} paths to include
+                          </p>
+                        </div>
+
+                        {/* Included Projects/Repositories Patterns */}
+                        <div>
+                          <label
+                            htmlFor="includedProjectsPatterns"
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            {watchedType === 'GitLab' ? 'Included Projects Patterns' : 'Included Repositories Patterns'} (Optional)
+                          </label>
+                          <input
+                            {...register('includedProjectsPatterns')}
+                            type="text"
+                            className={`input-field ${errors.includedProjectsPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                            placeholder={watchedType === 'GitLab' ? 'team/*, team-*/core-*' : 'org/*, user/core-*'}
+                          />
+                          {errors.includedProjectsPatterns && (
+                            <p className="mt-1 text-sm text-red-600">{errors.includedProjectsPatterns.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated list of wildcard patterns (replaces old namespace filter)
+                          </p>
+                        </div>
+
+                        {/* Excluded Projects/Repositories */}
+                        <div>
+                          <label
+                            htmlFor={watchedType === 'GitLab' ? 'gitlabExcludedProjects' : 'githubExcludedRepositories'}
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            {watchedType === 'GitLab' ? 'Excluded Projects' : 'Excluded Repositories'} (Optional)
+                          </label>
+                          <input
+                            {...register(watchedType === 'GitLab' ? 'gitlabExcludedProjects' : 'githubExcludedRepositories')}
+                            type="text"
+                            className={`input-field ${
+                              watchedType === 'GitLab'
+                                ? errors.gitlabExcludedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                                : errors.githubExcludedRepositories ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                            }`}
+                            placeholder={watchedType === 'GitLab' ? 'team/project-archive, old/legacy-system' : 'org/repo-archive, user/legacy-project'}
+                          />
+                          {watchedType === 'GitLab' && errors.gitlabExcludedProjects && (
+                            <p className="mt-1 text-sm text-red-600">{errors.gitlabExcludedProjects.message}</p>
+                          )}
+                          {watchedType === 'GitHub' && errors.githubExcludedRepositories && (
+                            <p className="mt-1 text-sm text-red-600">{errors.githubExcludedRepositories.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated list of exact {watchedType === 'GitLab' ? 'project' : 'repository'} paths to exclude
+                          </p>
+                        </div>
+
+                        {/* Excluded Patterns */}
+                        <div>
+                          <label
+                            htmlFor={watchedType === 'GitLab' ? 'gitlabExcludedPatterns' : 'githubExcludedPatterns'}
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          >
+                            Excluded Patterns (Optional)
+                          </label>
+                          <input
+                            {...register(watchedType === 'GitLab' ? 'gitlabExcludedPatterns' : 'githubExcludedPatterns')}
+                            type="text"
+                            className={`input-field ${
+                              watchedType === 'GitLab'
+                                ? errors.gitlabExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                                : errors.githubExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                            }`}
+                            placeholder="*-archive, test-*, *-temp"
+                          />
+                          {watchedType === 'GitLab' && errors.gitlabExcludedPatterns && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.gitlabExcludedPatterns.message}</p>
+                          )}
+                          {watchedType === 'GitHub' && errors.githubExcludedPatterns && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.githubExcludedPatterns.message}</p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Comma-separated patterns with wildcards (*) to exclude {watchedType === 'GitLab' ? 'projects' : 'repositories'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
 
-                  {watchedType === 'GitHub' && (
-                    <>
-                      <div>
-                        <label htmlFor="githubExcludedRepositories" className="block text-sm font-medium text-gray-700 mb-1">
-                          Excluded Repositories (Optional)
-                        </label>
-                        <input
-                          {...register('githubExcludedRepositories')}
-                          type="text"
-                          className={`input-field ${errors.githubExcludedRepositories ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="org/repo-archive, user/legacy-project"
-                        />
-                        {errors.githubExcludedRepositories && (
-                          <p className="mt-1 text-sm text-red-600">{errors.githubExcludedRepositories.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Comma-separated list of exact repository paths to exclude
-                        </p>
-                      </div>
-
-                      <div>
-                        <label htmlFor="githubExcludedPatterns" className="block text-sm font-medium text-gray-700 mb-1">
-                          Excluded Patterns (Optional)
-                        </label>
-                        <input
-                          {...register('githubExcludedPatterns')}
-                          type="text"
-                          className={`input-field ${errors.githubExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
-                          placeholder="*-archive, test-*, *-temp"
-                        />
-                        {errors.githubExcludedPatterns && (
-                          <p className="mt-1 text-sm text-red-600">{errors.githubExcludedPatterns.message}</p>
-                        )}
-                        <p className="mt-1 text-xs text-gray-500">
-                          Comma-separated patterns with wildcards (*) to exclude repositories
-                        </p>
-                      </div>
-                    </>
-                  )}
-
-                  {(watchedType === 'Git' || watchedType === 'FileSystem') && (
-                    <div className="text-center py-8 text-gray-500">
-                      <FunnelIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No filter options available for {watchedType} repositories.</p>
+                  {watchedType === 'FileSystem' && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <FunnelIcon className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                      <p>No filter options available for FileSystem repositories.</p>
                     </div>
                   )}
                 </div>
@@ -987,8 +1095,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
               {/* Auto Crawling / Scheduling Tab */}
               {activeTab === 'scheduling' && (
                 <div className="space-y-6">
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <h4 className="text-md font-medium text-gray-900 mb-4">Automatic Crawling Schedule</h4>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Automatic Crawling Schedule</h4>
                     <CronScheduleForm
                       autoCrawlEnabled={schedulingData.autoCrawlEnabled}
                       cronSchedule={schedulingData.cronSchedule}
@@ -1003,7 +1111,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
             </div>
 
             {/* Tab Navigation & Actions */}
-            <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
               {/* Tab Navigation Buttons */}
               <div className="flex space-x-3">
                 {/* Previous Tab Button */}

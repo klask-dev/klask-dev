@@ -13,9 +13,13 @@
 imagePullSecrets: []
 
 ## @param nameOverride String to partially override klask.fullname
+## ⚠️  IMMUTABLE: Changing this after initial deployment will cause StatefulSet upgrade failures!
+## See: charts/klask/IMMUTABLE_FIELDS.md
 nameOverride: ""
 
 ## @param fullnameOverride String to fully override klask.fullname
+## ⚠️  IMMUTABLE: Changing this after initial deployment will cause StatefulSet upgrade failures!
+## See: charts/klask/IMMUTABLE_FIELDS.md
 fullnameOverride: ""
 
 ## @section ServiceAccount parameters
@@ -284,7 +288,7 @@ backend:
   ## @param backend.persistence Persistence configuration for search index
   persistence:
     ## @param backend.persistence.enabled Enable persistent storage for search index
-    ## NOTE: When enabled, deployment strategy is automatically set to "Recreate" 
+    ## NOTE: When enabled, deployment strategy is automatically set to "Recreate"
     ## to avoid Multi-Attach errors with ReadWriteOnce volumes during rolling updates
     enabled: true
 
@@ -412,7 +416,7 @@ postgresql:
   auth:
     ## @param postgresql.auth.existingSecret Use existing secret for credentials
     ## If specified, auth.password and auth.postgresPassword are ignored
-    ## Secret must contain keys: password, postgres-password
+    ## Secret must contain keys: klask-password, postgres-password
     existingSecret: ""
 
     ## @param postgresql.auth.postgresPassword PostgreSQL admin (postgres user) password
@@ -421,6 +425,8 @@ postgresql:
     postgresPassword: ""
 
     ## @param postgresql.auth.username PostgreSQL application username
+    ## ⚠️  WARNING: Changing this value will cause StatefulSet upgrade to fail!
+    ## Use existingSecret instead for immutable configurations.
     username: "klask"
 
     ## @param postgresql.auth.password PostgreSQL application user password
@@ -437,10 +443,15 @@ postgresql:
     enabled: true
 
     ## @param postgresql.persistence.size Persistent Volume size
+    ## ⚠️  IMMUTABLE AFTER FIRST DEPLOYMENT: Can only increase, never decrease
+    ## Changing back to a smaller size will cause upgrade to fail
     size: 2Gi
 
     ## @param postgresql.persistence.storageClass Storage class name
     ## If empty, uses cluster default storage class
+    ## ⚠️  IMMUTABLE AFTER FIRST DEPLOYMENT: Cannot change between upgrades
+    ## If you need a different storage class, recreate the StatefulSet:
+    ## kubectl delete statefulset klask-postgresql --cascade=orphan -n <namespace>
     storageClass: ""
 
     ## @param postgresql.persistence.annotations PVC annotations
@@ -591,22 +602,22 @@ istio:
   egress:
     ## @param istio.egress.enabled Enable egress configuration
     enabled: false
-    
+
     ## @param istio.egress.gitlab GitLab egress configuration
     gitlab:
       ## @param istio.egress.gitlab.enabled Enable GitLab egress
       enabled: false
-      
+
       ## @param istio.egress.gitlab.host GitLab host (e.g., gitlab.example.com)
       host: ""
-      
+
       ## @param istio.egress.gitlab.port GitLab HTTPS port
       port: 443
-      
+
       ## @param istio.egress.gitlab.tls TLS configuration for GitLab
       tls:
         ## @param istio.egress.gitlab.tls.mode TLS mode (SIMPLE, MUTUAL, ISTIO_MUTUAL)
         mode: SIMPLE
-        
+
         ## @param istio.egress.gitlab.tls.sni SNI host for TLS connection
         sni: ""

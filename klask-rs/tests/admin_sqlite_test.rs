@@ -23,6 +23,13 @@ async fn test_sqlite_user_repository() -> Result<()> {
         updated_at: Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: Some("Test User".to_string()),
+        phone: None,
+        timezone: None,
+        preferences: None,
+        login_count: 0,
     };
 
     // Test create
@@ -65,6 +72,13 @@ async fn test_sqlite_isolation() -> Result<()> {
         updated_at: Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: Some("User One".to_string()),
+        phone: None,
+        timezone: None,
+        preferences: None,
+        login_count: 0,
     };
     user_repo1.create_user(&user1).await?;
 
@@ -80,6 +94,13 @@ async fn test_sqlite_isolation() -> Result<()> {
         updated_at: Utc::now(),
         last_login: None,
         last_activity: None,
+        avatar_url: None,
+        bio: None,
+        full_name: Some("User Two".to_string()),
+        phone: None,
+        timezone: None,
+        preferences: None,
+        login_count: 0,
     };
     user_repo2.create_user(&user2).await?;
 
@@ -119,6 +140,13 @@ async fn test_sqlite_concurrent_access() -> Result<()> {
                 updated_at: Utc::now(),
                 last_login: None,
                 last_activity: None,
+                avatar_url: None,
+                bio: None,
+                full_name: Some(format!("User {}", i)),
+                phone: None,
+                timezone: None,
+                preferences: None,
+                login_count: 0,
             };
 
             user_repo.create_user(&user).await?;

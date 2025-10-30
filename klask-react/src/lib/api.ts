@@ -1,13 +1,13 @@
-import type { 
-  ApiResponse, 
-  User, 
-  Repository, 
+import type {
+  ApiResponse,
+  User,
+  Repository,
   RepositoryWithStats,
-  File, 
-  SearchQuery, 
-  SearchResponse, 
-  LoginRequest, 
-  RegisterRequest, 
+  File,
+  SearchQuery,
+  SearchResponse,
+  LoginRequest,
+  RegisterRequest,
   AuthResponse,
   CreateRepositoryRequest,
   CreateUserRequest,
@@ -21,7 +21,10 @@ import type {
   RecentActivity,
   CrawlProgressInfo,
   ScheduleRepositoryRequest,
-  SchedulerStatus
+  SchedulerStatus,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+  UserActivity
 } from '../types';
 
 // API Error class
@@ -37,16 +40,77 @@ export class ApiError extends Error {
   }
 }
 
+// Helper to extract field-specific errors from API responses
+export function extractFieldErrors(error: unknown): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+
+  if (error instanceof ApiError && error.details?.error) {
+    const errorMsg = error.details.error;
+
+    // Map specific error messages to form fields
+    if (errorMsg.toLowerCase().includes('email already exists')) {
+      fieldErrors.email = 'Email already exists';
+    } else if (errorMsg.toLowerCase().includes('username already exists')) {
+      fieldErrors.username = 'Username already exists';
+    }
+  }
+
+  return fieldErrors;
+}
+
 // API Configuration with runtime override support
 import { getApiBaseUrl } from './config';
 
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private csrfToken: string | null = null;
 
   constructor(baseURL?: string) {
     this.baseURL = baseURL || getApiBaseUrl();
     this.token = localStorage.getItem('authToken');
+    this.csrfToken = this.getCsrfToken();
+  }
+
+  /**
+   * Get CSRF token from meta tag or generate a new one
+   */
+  private getCsrfToken(): string | null {
+    try {
+      // First, try to get from meta tag
+      const metaTag = document.querySelector('meta[name="csrf-token"]');
+      if (metaTag) {
+        return metaTag.getAttribute('content');
+      }
+
+      // If not available, check localStorage
+      let token = localStorage.getItem('csrfToken');
+      if (!token) {
+        // Generate a new token (should be validated by backend)
+        token = this.generateToken();
+        localStorage.setItem('csrfToken', token);
+      }
+      return token;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Generate a random token for CSRF protection
+   */
+  private generateToken(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
+   * Refresh CSRF token for security
+   */
+  private refreshCsrfToken(): void {
+    this.csrfToken = this.generateToken();
+    localStorage.setItem('csrfToken', this.csrfToken);
   }
 
   private async request<T>(
@@ -54,7 +118,8 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    
+    const method = (options.method || 'GET').toUpperCase();
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -62,6 +127,11 @@ class ApiClient {
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    // Add CSRF token for state-changing requests (POST, PUT, DELETE, PATCH)
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && this.csrfToken) {
+      headers['X-CSRF-Token'] = this.csrfToken;
     }
 
     const config: RequestInit = {
@@ -121,7 +191,7 @@ class ApiClient {
         method: 'POST',
         body: JSON.stringify(credentials),
       });
-      
+
       this.setToken(response.token);
       return response;
     },
@@ -131,13 +201,67 @@ class ApiClient {
         method: 'POST',
         body: JSON.stringify(data),
       });
-      
+
       this.setToken(response.token);
       return response;
     },
 
     getProfile: async (): Promise<User> => {
       return this.request<User>('/api/auth/profile');
+    },
+
+    updateProfile: async (data: UpdateProfileRequest): Promise<User> => {
+      return this.request<User>('/api/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+
+    uploadAvatar: async (file: globalThis.File): Promise<{ avatar_url: string }> => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const url = `${this.baseURL}/api/auth/avatar`;
+      const headers: Record<string, string> = {};
+
+      if (this.token) {
+        headers['Authorization'] = `Bearer ${this.token}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new ApiError(
+          errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+          response.status,
+          errorData
+        );
+      }
+
+      return await response.json();
+    },
+
+    changePassword: async (data: ChangePasswordRequest): Promise<{ message: string }> => {
+      return this.request<{ message: string }>('/api/auth/password', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+
+    getUserActivity: async (): Promise<UserActivity> => {
+      return this.request<UserActivity>('/api/auth/activity');
+    },
+
+    deleteAccount: async (password: string): Promise<{ message: string }> => {
+      return this.request<{ message: string }>('/api/auth/account', {
+        method: 'DELETE',
+        body: JSON.stringify({ password }),
+      });
     },
 
     logout: () => {
@@ -392,7 +516,22 @@ class ApiClient {
 
 // Create and export the API client instance
 // Lazy instantiation to ensure runtime config is loaded
-export const apiClient = new ApiClient();
+let _apiClient: ApiClient | null = null;
+
+function getApiClient(): ApiClient {
+  if (!_apiClient) {
+    _apiClient = new ApiClient();
+  }
+  return _apiClient;
+}
+
+export const apiClient = new Proxy({} as ApiClient, {
+  get(target, prop) {
+    const client = getApiClient();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
+  }
+});
 
 // Export the class for testing
 export { ApiClient };
@@ -403,6 +542,11 @@ export const api = {
   login: (credentials: LoginRequest) => apiClient.auth.login(credentials),
   register: (data: RegisterRequest) => apiClient.auth.register(data),
   getProfile: () => apiClient.auth.getProfile(),
+  updateProfile: (data: UpdateProfileRequest) => apiClient.auth.updateProfile(data),
+  uploadAvatar: (file: globalThis.File) => apiClient.auth.uploadAvatar(file),
+  changePassword: (data: ChangePasswordRequest) => apiClient.auth.changePassword(data),
+  getUserActivity: () => apiClient.auth.getUserActivity(),
+  deleteAccount: (password: string) => apiClient.auth.deleteAccount(password),
   logout: () => apiClient.auth.logout(),
 
   // Search

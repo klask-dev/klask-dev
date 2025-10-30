@@ -143,6 +143,12 @@ async fn test_github_repository_model_fields() {
         crawl_state: Some("idle".to_string()),
         last_processed_project: None,
         crawl_started_at: None,
+        excluded_branches: None,
+        excluded_branches_patterns: None,
+        included_branches: None,
+        included_branches_patterns: None,
+        included_projects: None,
+        included_projects_patterns: None,
     };
 
     // Verify GitHub fields are set correctly

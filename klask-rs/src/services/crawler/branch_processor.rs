@@ -1,4 +1,5 @@
 use super::file_processing::FileProcessor;
+use super::filter::filter_branches;
 use super::git_tree_walker::GitTreeWalker;
 use crate::models::Repository;
 use crate::services::progress::ProgressTracker;
@@ -57,8 +58,17 @@ impl BranchProcessor {
         })
         .await??;
 
-        if branches.is_empty() {
-            info!("No branches found, using default branch");
+        // Apply branch filtering
+        let filtered_branches = filter_branches(
+            branches.clone(),
+            repository.included_branches.as_deref(),
+            repository.included_branches_patterns.as_deref(),
+            repository.excluded_branches.as_deref(),
+            repository.excluded_branches_patterns.as_deref(),
+        );
+
+        if filtered_branches.is_empty() {
+            info!("No branches matched the filter criteria, using default branch");
             let branch_name = repository.branch.as_deref().unwrap_or("main");
             return self
                 .process_repository_files_internal(
@@ -74,14 +84,15 @@ impl BranchProcessor {
         }
 
         info!(
-            "Found {} branches for repository {}: {:?}",
+            "Found {} branches for repository {}, after filtering: {} branches will be processed: {:?}",
             branches.len(),
             repository.name,
-            branches
+            filtered_branches.len(),
+            filtered_branches
         );
 
         // Process each branch
-        for branch_name in branches {
+        for branch_name in filtered_branches {
             if cancellation_token.is_cancelled() {
                 return Ok(());
             }
@@ -144,8 +155,17 @@ impl BranchProcessor {
         })
         .await??;
 
-        if branches.is_empty() {
-            info!("No branches found, using default branch");
+        // Apply branch filtering
+        let filtered_branches = filter_branches(
+            branches.clone(),
+            repository.included_branches.as_deref(),
+            repository.included_branches_patterns.as_deref(),
+            repository.excluded_branches.as_deref(),
+            repository.excluded_branches_patterns.as_deref(),
+        );
+
+        if filtered_branches.is_empty() {
+            info!("No branches matched the filter criteria, using default branch");
             let branch_name = repository.branch.as_deref().unwrap_or("main");
             return self
                 .process_repository_files_internal(
@@ -161,14 +181,15 @@ impl BranchProcessor {
         }
 
         info!(
-            "Found {} branches for repository {}: {:?}",
+            "Found {} branches for repository {}, after filtering: {} branches will be processed: {:?}",
             branches.len(),
             repository.name,
-            branches
+            filtered_branches.len(),
+            filtered_branches
         );
 
         // Process each branch
-        for branch_name in branches {
+        for branch_name in filtered_branches {
             if cancellation_token.is_cancelled() {
                 return Ok(());
             }

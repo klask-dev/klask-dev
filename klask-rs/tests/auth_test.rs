@@ -78,6 +78,7 @@ async fn create_test_app_state() -> AppState {
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time: Instant::now(),
         encryption_service: Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap()),
+        delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     }
 }
 

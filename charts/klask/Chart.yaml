@@ -1,4 +1,5 @@
 apiVersion: v2
+icon: https://raw.githubusercontent.com/klask-dev/klask-dev/refs/heads/master/resources/images/klask-dev-clean-v2.svg
 name: klask
 description: A Helm chart for Klask - Modern code search engine written in Rust
 type: application

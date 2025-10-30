@@ -19,7 +19,7 @@ const SearchPage: React.FC = () => {
 
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const { filters, setFilters, currentQuery, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
-  
+
   // Function to update URL with current search state
   const updateURL = useCallback((searchQuery: string, searchFilters: any, page: number = 1) => {
     const params = new URLSearchParams();
@@ -44,10 +44,10 @@ const SearchPage: React.FC = () => {
     const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState(null, '', newURL);
   }, []);
-  
+
   // Track if we're initializing to avoid double URL updates
   const [isInitializing, setIsInitializing] = useState(true);
-  
+
   // Initialize from URL parameters
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
@@ -99,7 +99,7 @@ const SearchPage: React.FC = () => {
       updateDynamicFilters(null);
     }
   }, [searchData, currentQuery, updateDynamicFilters]);
-  
+
 
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
@@ -122,7 +122,7 @@ const SearchPage: React.FC = () => {
 
   const handleFileClick = useCallback((result: SearchResult) => {
     navigate(`/files/doc/${result.doc_address}`, {
-      state: { 
+      state: {
         searchQuery: currentQuery,
         searchResult: result,
         // Preserve search state for return navigation
@@ -165,18 +165,18 @@ const SearchPage: React.FC = () => {
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+          <h1 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
             Code Search
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Search through your indexed repositories with powerful filters and real-time results.
           </p>
         </div>
-        
+
         <div className="mt-4 md:mt-0 flex items-center space-x-3">
-          
+
           {totalResults > 0 && (
-            <div className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white text-gray-700">
+            <div className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white text-gray-700 dark:bg-gray-700 dark:text-gray-200">
               <ChartBarIcon className="h-4 w-4 mr-2" />
               {totalResults.toLocaleString()} results
             </div>
@@ -185,7 +185,7 @@ const SearchPage: React.FC = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm  dark:bg-gray-800 dark:border-gray-700">
         <SearchBar
           value={currentQuery}
           onChange={setCurrentQuery}
@@ -196,15 +196,15 @@ const SearchPage: React.FC = () => {
 
         {/* Search History */}
         {!currentQuery && history.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-400">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <ClockIcon className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-700">Recent Searches</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-400">Recent Searches</span>
               </div>
               <button
                 onClick={clearHistory}
-                className="text-xs text-gray-500 hover:text-gray-700"
+                className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400"
               >
                 Clear all
               </button>
@@ -242,14 +242,14 @@ const SearchPage: React.FC = () => {
 
       {/* Search Tips - shown when no query */}
       {!currentQuery.trim() && !isLoading && (
-        <div className="bg-gradient-to-br from-primary-50 to-secondary-50 rounded-lg p-6 border border-primary-100">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="bg-gradient-to-br from-primary-50 to-secondary-50 rounded-lg p-6 border border-primary-100 dark:border-gray-700 dark:bg-slate-900">
+          <h3 className="text-lg font-medium text-gray-900 mb-4 dark:text-white">
             Search Tips
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <h4 className="font-medium text-gray-900 mb-2">Basic Search</h4>
-              <ul className="space-y-1 text-gray-600">
+              <h4 className="font-medium text-gray-900 mb-2 dark:text-blue-200">Basic Search</h4>
+              <ul className="space-y-1 text-gray-600 dark:text-blue-400">
                 <li>• Search for function names, class names, variables</li>
                 <li>• Look for specific strings in comments</li>
                 <li>• Find TODO items and FIXME comments</li>
@@ -257,8 +257,8 @@ const SearchPage: React.FC = () => {
               </ul>
             </div>
             <div>
-              <h4 className="font-medium text-gray-900 mb-2">Advanced Features</h4>
-              <ul className="space-y-1 text-gray-600">
+              <h4 className="font-medium text-gray-900 mb-2 dark:text-blue-200">Advanced Features</h4>
+              <ul className="space-y-1 text-gray-600 dark:text-blue-400">
                 <li>• Filter by project, version, or file type</li>
                 <li>• Results include syntax highlighting</li>
                 <li>• Click any result to view the full file</li>

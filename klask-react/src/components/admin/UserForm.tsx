@@ -19,6 +19,7 @@ interface UserFormProps {
   onSubmit: (data: CreateUserRequest | UpdateUserRequest) => void;
   isLoading?: boolean;
   title?: string;
+  fieldErrors?: Record<string, string>;
 }
 
 export const UserForm: React.FC<UserFormProps> = ({
@@ -28,6 +29,7 @@ export const UserForm: React.FC<UserFormProps> = ({
   onSubmit,
   isLoading = false,
   title,
+  fieldErrors = {},
 }) => {
   const isEditing = !!user;
   const formTitle = title || (isEditing ? 'Edit User' : 'Add User');
@@ -38,6 +40,7 @@ export const UserForm: React.FC<UserFormProps> = ({
     handleSubmit,
     watch,
     reset,
+    setError,
     formState: { errors, isValid },
   } = useForm({
     resolver: zodResolver(isEditing ? updateUserFormSchema : createUserSchema),
@@ -79,6 +82,16 @@ export const UserForm: React.FC<UserFormProps> = ({
     }
   }, [user, reset]);
 
+  // Apply field errors from API responses
+  React.useEffect(() => {
+    Object.entries(fieldErrors).forEach(([field, message]) => {
+      setError(field as keyof (CreateUserForm & UpdateUserFormData), {
+        type: 'server',
+        message,
+      });
+    });
+  }, [fieldErrors, setError]);
+
   const handleFormSubmit = (data: CreateUserForm | UpdateUserFormData) => {
     // Clean up data and submit
     const cleanedData = {
@@ -105,18 +118,18 @@ export const UserForm: React.FC<UserFormProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Backdrop */}
-        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={onClose} />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+        <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {formTitle}
             </h3>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400 transition-colors"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
@@ -126,49 +139,49 @@ export const UserForm: React.FC<UserFormProps> = ({
           <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
             {/* Username */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Username
               </label>
               <input
                 {...register('username')}
                 id="username"
                 type="text"
-                className={`input-field ${errors.username ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                className={`input-field ${errors.username ? 'border-red-300 focus:ring-red-500 focus:border-red-500 dark:border-red-400 dark:focus:ring-red-400 dark:focus:border-red-400' : ''}`}
                 placeholder="Enter username"
               />
               {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.username.message}</p>
               )}
             </div>
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email Address
               </label>
               <input
                 {...register('email')}
                 id="email"
                 type="email"
-                className={`input-field ${errors.email ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                className={`input-field ${errors.email ? 'border-red-300 focus:ring-red-500 focus:border-red-500 dark:border-red-400 dark:focus:ring-red-400 dark:focus:border-red-400' : ''}`}
                 placeholder="Enter email address"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>
               )}
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password {isEditing && <span className="text-gray-500">(leave blank to keep current)</span>}
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Password {isEditing && <span className="text-gray-500 dark:text-gray-400">(leave blank to keep current)</span>}
               </label>
               <div className="relative">
                 <input
                   {...register('password')}
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  className={`input-field pr-10 ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                  className={`input-field pr-10 ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500 dark:border-red-400 dark:focus:ring-red-400 dark:focus:border-red-400' : ''}`}
                   placeholder={isEditing ? "Enter new password (optional)" : "Enter password"}
                 />
                 <button
@@ -177,17 +190,17 @@ export const UserForm: React.FC<UserFormProps> = ({
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                    <EyeSlashIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                   ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
+                    <EyeIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                   )}
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>
               )}
               {!isEditing && (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Password must contain at least 8 characters with uppercase, lowercase, and number
                 </p>
               )}
@@ -195,7 +208,7 @@ export const UserForm: React.FC<UserFormProps> = ({
 
             {/* Role Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                 Role
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -204,8 +217,8 @@ export const UserForm: React.FC<UserFormProps> = ({
                     key={role}
                     className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
                       watchedRole === role
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400 text-blue-700 dark:text-blue-200'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                     }`}
                   >
                     <input
@@ -215,14 +228,16 @@ export const UserForm: React.FC<UserFormProps> = ({
                       className="sr-only"
                     />
                     <div className="flex flex-col items-center space-y-1">
-                      {getRoleIcon(role)}
-                      <span className="text-sm font-medium">{role}</span>
+                      <div className={watchedRole === role ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}>
+                        {getRoleIcon(role)}
+                      </div>
+                      <span className={`text-sm font-medium ${watchedRole === role ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>{role}</span>
                     </div>
                   </label>
                 ))}
               </div>
               {errors.role && (
-                <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.role.message}</p>
               )}
             </div>
 
@@ -232,13 +247,13 @@ export const UserForm: React.FC<UserFormProps> = ({
                 {...register('active')}
                 id="active"
                 type="checkbox"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded"
               />
-              <label htmlFor="active" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="active" className="ml-2 block text-sm text-gray-900 dark:text-white">
                 Active user account
               </label>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Inactive users cannot log in to the system
             </p>
 

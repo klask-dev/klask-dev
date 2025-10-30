@@ -1,0 +1,31 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+    "auto_install_extensions": {
+        "helm": true,
+        "dockerfile": true,
+        "docker-compose": true
+    },
+    "file_types": {
+      "Helm": [
+        "**/charts/**/*.yaml",
+        "**/charts/**/*.yml",
+        "**/charts/**/*.tpl"
+      ],
+      "Dockerfile": [ "Dockerfile.*" ]
+    },
+    "lsp": {
+      "helm_ls": {
+        "settings": {
+          "helm-ls": {
+            "logLevel": "info",
+            "yamlls": {
+              "enabled": true
+            }
+          }
+        }
+      }
+    }
+}
