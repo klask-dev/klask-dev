@@ -5,6 +5,7 @@ mod database;
 mod models;
 mod repositories;
 mod services;
+mod utils;
 
 use anyhow::Result;
 use auth::{extractors::AppState, jwt::JwtService};
