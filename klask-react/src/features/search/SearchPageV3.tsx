@@ -63,18 +63,23 @@ const SearchPageV3: React.FC = () => {
     // Set React state from URL
     setQuery(urlQuery);
 
-    // Handle size filter
+    // Handle size filter - only update the size filter, preserve other filters from context
     const sizeFilterFromUrl = (urlMinSize || urlMaxSize) ? {
       min: urlMinSize ? parseInt(urlMinSize) : undefined,
       max: urlMaxSize ? parseInt(urlMaxSize) : undefined,
     } : undefined;
-    setFilters({
-      size: sizeFilterFromUrl,
-    });
+
+    // Only update filters if size filter from URL differs from current size filter
+    if (JSON.stringify(sizeFilterFromUrl) !== JSON.stringify(sizeFilter)) {
+      setFilters({
+        ...filters,
+        size: sizeFilterFromUrl,
+      });
+    }
 
     setCurrentPage(urlPage);
     setIsInitializing(false);
-  }, [location.search, setFilters]);
+  }, [location.search]);
 
   // Update URL whenever search state changes (only after initialization)
   useEffect(() => {
@@ -89,7 +94,13 @@ const SearchPageV3: React.FC = () => {
     isError,
     error,
     refetch,
-  } = useMultiSelectSearch(query, { sizeRange: sizeFilter }, currentPage, {
+  } = useMultiSelectSearch(query, {
+    project: filters.project,
+    version: filters.version,
+    extension: filters.extension,
+    language: filters.language,
+    sizeRange: filters.size,
+  }, currentPage, {
     enabled: !!query.trim(),
   });
 
