@@ -19,6 +19,7 @@ interface UserFormProps {
   onSubmit: (data: CreateUserRequest | UpdateUserRequest) => void;
   isLoading?: boolean;
   title?: string;
+  fieldErrors?: Record<string, string>;
 }
 
 export const UserForm: React.FC<UserFormProps> = ({
@@ -28,6 +29,7 @@ export const UserForm: React.FC<UserFormProps> = ({
   onSubmit,
   isLoading = false,
   title,
+  fieldErrors = {},
 }) => {
   const isEditing = !!user;
   const formTitle = title || (isEditing ? 'Edit User' : 'Add User');
@@ -38,6 +40,7 @@ export const UserForm: React.FC<UserFormProps> = ({
     handleSubmit,
     watch,
     reset,
+    setError,
     formState: { errors, isValid },
   } = useForm({
     resolver: zodResolver(isEditing ? updateUserFormSchema : createUserSchema),
@@ -78,6 +81,16 @@ export const UserForm: React.FC<UserFormProps> = ({
       reset(formData);
     }
   }, [user, reset]);
+
+  // Apply field errors from API responses
+  React.useEffect(() => {
+    Object.entries(fieldErrors).forEach(([field, message]) => {
+      setError(field as keyof (CreateUserForm & UpdateUserFormData), {
+        type: 'server',
+        message,
+      });
+    });
+  }, [fieldErrors, setError]);
 
   const handleFormSubmit = (data: CreateUserForm | UpdateUserFormData) => {
     // Clean up data and submit

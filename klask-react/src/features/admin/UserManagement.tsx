@@ -22,7 +22,7 @@ import {
   useUserStats,
   useBulkUserOperations,
 } from '../../hooks/useUsers';
-import { getErrorMessage } from '../../lib/api';
+import { getErrorMessage, extractFieldErrors } from '../../lib/api';
 import { formatDateTime } from '../../lib/utils';
 import type { User, CreateUserRequest, UpdateUserRequest, UserRole } from '../../types';
 
@@ -33,6 +33,7 @@ const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
+  const [formFieldErrors, setFormFieldErrors] = useState<Record<string, string>>({});
 
   const { data: users = [], isLoading, error, refetch } = useUsers();
   const { data: stats } = useUserStats();
@@ -60,26 +61,38 @@ const UserManagement: React.FC = () => {
 
   const handleCreate = useCallback(async (data: CreateUserRequest) => {
     try {
+      setFormFieldErrors({});
       await createMutation.mutateAsync(data);
       setShowForm(false);
       toast.success('User created successfully');
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const fieldErrors = extractFieldErrors(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        setFormFieldErrors(fieldErrors);
+      } else {
+        toast.error(getErrorMessage(error));
+      }
     }
   }, [createMutation]);
 
   const handleUpdate = useCallback(async (data: UpdateUserRequest) => {
     if (!editingUser) return;
-    
+
     try {
-      await updateMutation.mutateAsync({ 
-        id: editingUser.id, 
-        data 
+      setFormFieldErrors({});
+      await updateMutation.mutateAsync({
+        id: editingUser.id,
+        data
       });
       setEditingUser(null);
       toast.success('User updated successfully');
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const fieldErrors = extractFieldErrors(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        setFormFieldErrors(fieldErrors);
+      } else {
+        toast.error(getErrorMessage(error));
+      }
     }
   }, [editingUser, updateMutation]);
 
@@ -492,9 +505,11 @@ const UserManagement: React.FC = () => {
         onClose={() => {
           setShowForm(false);
           setEditingUser(null);
+          setFormFieldErrors({});
         }}
         onSubmit={(editingUser ? handleUpdate : handleCreate) as any}
         isLoading={createMutation.isPending || updateMutation.isPending}
+        fieldErrors={formFieldErrors}
       />
     </div>
   );
