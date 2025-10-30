@@ -565,17 +565,6 @@ mod github_filter_integration_tests {
         assert!(filtered.iter().all(|r| r.full_name.starts_with("main-org/sdk-")));
         assert!(!filtered.iter().any(|r| r.full_name.contains("deprecated")));
     }
-
-    // Helper trait for verification
-    trait GitHubFilterHelper {
-        fn contains_string_match(&self, search: &str) -> bool;
-    }
-
-    impl GitHubFilterHelper for Vec<MockGitHubRepository> {
-        fn contains_string_match(&self, search: &str) -> bool {
-            self.iter().any(|r| r.full_name == search)
-        }
-    }
 }
 
 // ============================================================================
