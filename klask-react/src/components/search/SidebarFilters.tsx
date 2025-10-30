@@ -79,7 +79,14 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
   }
 
   const handleFilterChange = (key: keyof SearchFilters, value: string, checked: boolean) => {
-    const currentValues = filters[key] || [];
+    // Type-guard to ensure we're working with string arrays only
+    const filterValue = filters[key];
+    if (key === 'size' || (filterValue && typeof filterValue === 'object' && !Array.isArray(filterValue))) {
+      // This is the size filter or another non-array filter, skip
+      return;
+    }
+
+    const currentValues = (filterValue as string[]) || [];
     let newValues: string[];
 
     if (checked) {
@@ -108,7 +115,8 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
 
   const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
     if (key === 'size') {
-      return value && (value.min !== undefined || value.max !== undefined);
+      const sizeValue = value as { min?: number; max?: number } | undefined;
+      return sizeValue && (sizeValue.min !== undefined || sizeValue.max !== undefined);
     }
     return value && Array.isArray(value) && value.length > 0;
   });
@@ -245,33 +253,37 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         <div className="mb-4">
           <div className="flex flex-wrap gap-1">
             {Object.entries(filters).map(([key, values]) => {
-              if (key === 'size' && values && (values.min !== undefined || values.max !== undefined)) {
-                return (
-                  <div
-                    key={key}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded mr-1 mb-1"
-                  >
-                    <span className="capitalize">Size:</span>
-                    <span className="font-medium truncate max-w-20">
-                      {values.min !== undefined && values.max !== undefined
-                        ? `${values.min}-${values.max} bytes`
-                        : values.min !== undefined
-                        ? `>${values.min} bytes`
-                        : `<${values.max} bytes`}
-                    </span>
-                    <button
-                      onClick={() => {
-                        onFiltersChange({
-                          ...filters,
-                          size: undefined,
-                        });
-                      }}
-                      className="hover:text-blue-600 dark:hover:text-blue-300"
+              if (key === 'size') {
+                const sizeValue = values as { min?: number; max?: number } | undefined;
+                if (sizeValue && (sizeValue.min !== undefined || sizeValue.max !== undefined)) {
+                  return (
+                    <div
+                      key={key}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded mr-1 mb-1"
                     >
-                      <XMarkIcon className="h-3 w-3" />
-                    </button>
-                  </div>
-                );
+                      <span className="capitalize">Size:</span>
+                      <span className="font-medium truncate max-w-20">
+                        {sizeValue.min !== undefined && sizeValue.max !== undefined
+                          ? `${sizeValue.min}-${sizeValue.max} bytes`
+                          : sizeValue.min !== undefined
+                          ? `>${sizeValue.min} bytes`
+                          : `<${sizeValue.max} bytes`}
+                      </span>
+                      <button
+                        onClick={() => {
+                          onFiltersChange({
+                            ...filters,
+                            size: undefined,
+                          });
+                        }}
+                        className="hover:text-blue-600 dark:hover:text-blue-300"
+                      >
+                        <XMarkIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
               }
 
               return values && Array.isArray(values) && values.length > 0 ? (
@@ -285,12 +297,14 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                       <span className="font-medium truncate max-w-20" title={value}>{value}</span>
                       <button
                         onClick={() => {
-                          const currentValues = filters[key as keyof SearchFilters] as string[] || [];
-                          const newValues = currentValues.filter(v => v !== value);
-                          onFiltersChange({
-                            ...filters,
-                            [key]: newValues.length > 0 ? newValues : undefined,
-                          });
+                          const filterValue = filters[key as keyof SearchFilters];
+                          if (Array.isArray(filterValue)) {
+                            const newValues = filterValue.filter(v => v !== value);
+                            onFiltersChange({
+                              ...filters,
+                              [key]: newValues.length > 0 ? newValues : undefined,
+                            });
+                          }
                         }}
                         className="hover:text-blue-600 dark:hover:text-blue-300"
                       >

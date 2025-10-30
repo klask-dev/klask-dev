@@ -68,7 +68,9 @@ const SearchPageV3: React.FC = () => {
       min: urlMinSize ? parseInt(urlMinSize) : undefined,
       max: urlMaxSize ? parseInt(urlMaxSize) : undefined,
     } : undefined;
-    setFilters(prevFilters => ({ ...prevFilters, size: sizeFilterFromUrl }));
+    setFilters({
+      size: sizeFilterFromUrl,
+    });
 
     setCurrentPage(urlPage);
     setIsInitializing(false);
