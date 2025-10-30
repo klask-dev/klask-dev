@@ -40,6 +40,24 @@ export class ApiError extends Error {
   }
 }
 
+// Helper to extract field-specific errors from API responses
+export function extractFieldErrors(error: unknown): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+
+  if (error instanceof ApiError && error.details?.error) {
+    const errorMsg = error.details.error;
+
+    // Map specific error messages to form fields
+    if (errorMsg.toLowerCase().includes('email already exists')) {
+      fieldErrors.email = 'Email already exists';
+    } else if (errorMsg.toLowerCase().includes('username already exists')) {
+      fieldErrors.username = 'Username already exists';
+    }
+  }
+
+  return fieldErrors;
+}
+
 // API Configuration with runtime override support
 import { getApiBaseUrl } from './config';
 
