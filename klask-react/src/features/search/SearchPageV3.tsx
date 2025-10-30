@@ -79,7 +79,7 @@ const SearchPageV3: React.FC = () => {
 
     setCurrentPage(urlPage);
     setIsInitializing(false);
-  }, [location.search]);
+  }, [location.search, setFilters]);
 
   // Update URL whenever search state changes (only after initialization)
   useEffect(() => {
@@ -95,11 +95,11 @@ const SearchPageV3: React.FC = () => {
     error,
     refetch,
   } = useMultiSelectSearch(query, {
-    project: filters.project,
-    version: filters.version,
-    extension: filters.extension,
-    language: filters.language,
-    sizeRange: filters.size,
+    project: filters?.project,
+    version: filters?.version,
+    extension: filters?.extension,
+    language: filters?.language,
+    sizeRange: filters?.size,
   }, currentPage, {
     enabled: !!query.trim(),
   });
