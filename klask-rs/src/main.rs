@@ -28,11 +28,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
+    // Build the filter with quiet modules first, then apply RUST_LOG or defaults
+    let rust_log = std::env::var("RUST_LOG")
+        .unwrap_or_else(|_| "klask_rs=debug,tower_http=debug,tantivy=info,sqlx=warn".to_string());
+    let filter_str = format!("tantivy::directory::managed_directory=off,{}", rust_log);
+
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "klask_rs=debug,tower_http=debug,tantivy=error,git2=warn,sqlx=warn".into()),
-        )
+        .with(tracing_subscriber::EnvFilter::new(filter_str))
         .with(tracing_subscriber::fmt::layer())
         .init();
 

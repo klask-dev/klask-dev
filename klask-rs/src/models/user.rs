@@ -61,6 +61,7 @@ pub struct UserPreferences {
     pub language: Option<String>, // en, fr, es, de, etc.
     pub notifications_email: Option<bool>,
     pub show_activity: Option<bool>,
+    pub size_unit: Option<String>, // bytes, kb, mb - preferred unit for file size display
 }
 
 /// Request payload for updating user profile

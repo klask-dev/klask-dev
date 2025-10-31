@@ -467,15 +467,23 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
 
   const handleFormSubmit = (data: RepositoryFormData) => {
     // Clean up empty strings from all filter fields and merge scheduling data
+    // Note: We convert empty strings to "" (not undefined) so they are serialized in JSON.
+    // The backend will then convert empty strings to NULL in the database.
+    const trimOrEmpty = (value: string | undefined) => value?.trim() || '';
+
     const submitData: RepositoryFormSubmitData = {
       ...data,
-      branch: data.branch?.trim() || undefined,
-      includedBranches: data.includedBranches?.trim() || undefined,
-      includedBranchesPatterns: data.includedBranchesPatterns?.trim() || undefined,
-      excludedBranches: data.excludedBranches?.trim() || undefined,
-      excludedBranchesPatterns: data.excludedBranchesPatterns?.trim() || undefined,
-      includedProjects: data.includedProjects?.trim() || undefined,
-      includedProjectsPatterns: data.includedProjectsPatterns?.trim() || undefined,
+      branch: trimOrEmpty(data.branch),
+      includedBranches: trimOrEmpty(data.includedBranches),
+      includedBranchesPatterns: trimOrEmpty(data.includedBranchesPatterns),
+      excludedBranches: trimOrEmpty(data.excludedBranches),
+      excludedBranchesPatterns: trimOrEmpty(data.excludedBranchesPatterns),
+      includedProjects: trimOrEmpty(data.includedProjects),
+      includedProjectsPatterns: trimOrEmpty(data.includedProjectsPatterns),
+      gitlabExcludedProjects: trimOrEmpty(data.gitlabExcludedProjects),
+      gitlabExcludedPatterns: trimOrEmpty(data.gitlabExcludedPatterns),
+      githubExcludedRepositories: trimOrEmpty(data.githubExcludedRepositories),
+      githubExcludedPatterns: trimOrEmpty(data.githubExcludedPatterns),
       // For GitLab repositories, default to gitlab.com if URL is empty
       url: data.repositoryType === 'GitLab' && (!data.url || data.url.trim() === '')
         ? 'https://gitlab.com'

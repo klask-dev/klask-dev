@@ -75,17 +75,14 @@ export const SearchResult: React.FC<SearchResultProps> = ({
             </div>
           </div>
           
-          {/* Right side: Badges */}
-          <div className="flex flex-col items-end space-y-2">
-            <div className="flex items-center space-x-2 flex-shrink-0">
-              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">
-                {result.extension || 'N/A'}
-              </span>
-              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">
-                {((result.score || 0) * 100).toFixed(0)}%
-              </span>
-            </div>
-            {/* View File button moved here */}
+          {/* Right side: Badges and View File button */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">
+              {result.extension || 'N/A'}
+            </span>
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">
+              {((result.score || 0) * 100).toFixed(0)}%
+            </span>
             <button
               onClick={() => onFileClick(result)}
               className="inline-flex items-center space-x-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"

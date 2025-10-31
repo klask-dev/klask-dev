@@ -28,6 +28,7 @@ export function useTheme() {
           language: 'en', // These will be filled from current user data by the mutation
           notifications_email: true,
           show_activity: true,
+          size_unit: 'kb', // Default size unit
         },
       });
     },

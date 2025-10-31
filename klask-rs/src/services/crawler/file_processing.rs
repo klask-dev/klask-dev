@@ -216,6 +216,7 @@ impl FileProcessor {
                     project: &repository.name,    // Individual project name for facets
                     version: &version,
                     extension: &extension,
+                    size: content.len() as u64, // Calculate size from content length
                 })
                 .await
             {

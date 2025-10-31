@@ -7,6 +7,7 @@ import {
   AdjustmentsHorizontalIcon 
 } from '@heroicons/react/24/outline';
 import { MultiSelectFilter } from './MultiSelectFilter';
+import { SizeRangeFilter } from './SizeRangeFilter';
 
 export interface SearchFiltersV2 {
   projects?: string[];
@@ -14,7 +15,11 @@ export interface SearchFiltersV2 {
   extensions?: string[];
   languages?: string[];
   repositories?: string[];
-  [key: string]: string[] | undefined;
+  sizeRange?: {
+    min?: number; // Size in bytes
+    max?: number; // Size in bytes
+  };
+  [key: string]: string[] | { min?: number; max?: number } | undefined;
 }
 
 interface FilterOption {
@@ -52,9 +57,19 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
 
   // Calculate total active filter count
   const activeFiltersCount = useMemo(() => {
-    return Object.values(filters).reduce((count, filterArray) => 
-      count + (filterArray?.length || 0), 0
-    );
+    let count = 0;
+    Object.entries(filters).forEach(([key, value]) => {
+      if (key === 'sizeRange' && value && typeof value === 'object') {
+        // Count sizeRange as 1 active filter if min or max is set
+        if ((value as { min?: number; max?: number }).min !== undefined ||
+            (value as { min?: number; max?: number }).max !== undefined) {
+          count += 1;
+        }
+      } else if (Array.isArray(value)) {
+        count += value.length;
+      }
+    });
+    return count;
   }, [filters]);
 
   const hasActiveFilters = activeFiltersCount > 0;
@@ -63,6 +78,13 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
     onFiltersChange({
       ...filters,
       [key]: values.length > 0 ? values : undefined,
+    });
+  };
+
+  const handleSizeRangeChange = (sizeRange?: { min?: number; max?: number }) => {
+    onFiltersChange({
+      ...filters,
+      sizeRange: sizeRange,
     });
   };
 
@@ -118,6 +140,10 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
         },
       ],
     },
+    {
+      title: 'File Properties',
+      filters: [], // Size filter will be handled separately
+    },
   ];
 
   const renderActiveFilters = () => {
@@ -126,7 +152,20 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
     const activeFilters: Array<{ key: string; values: string[]; label: string }> = [];
 
     Object.entries(filters).forEach(([key, values]) => {
-      if (values && values.length > 0) {
+      if (key === 'sizeRange' && values && typeof values === 'object') {
+        const sizeRange = values as { min?: number; max?: number };
+        if (sizeRange.min !== undefined || sizeRange.max !== undefined) {
+          // Convert size range to display string
+          const displayValue = `Size: ${sizeRange.min ? `≥${sizeRange.min} bytes` : ''}${
+            sizeRange.min && sizeRange.max ? ' - ' : ''
+          }${sizeRange.max ? `≤${sizeRange.max} bytes` : ''}`;
+          activeFilters.push({
+            key,
+            values: [displayValue],
+            label: 'File Size',
+          });
+        }
+      } else if (Array.isArray(values) && values.length > 0) {
         const filterConfig = filterGroups
           .flatMap(group => group.filters)
           .find(f => f.key === key);
@@ -245,20 +284,34 @@ export const SearchFiltersV2Component: React.FC<SearchFiltersV2Props> = ({
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
               {group.title}
             </h4>
-            <div className={`grid grid-cols-1 gap-4 ${group.filters.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-              {group.filters.map((filterConfig) => (
-                <MultiSelectFilter
-                  key={filterConfig.key}
-                  label={filterConfig.label}
-                  options={filterConfig.options}
-                  selectedValues={filters[filterConfig.key] || []}
-                  onChange={(values) => handleFilterChange(filterConfig.key, values)}
-                  isLoading={isLoading}
-                  searchable={filterConfig.searchable}
-                  showCounts={true}
+
+            {/* Regular multi-select filters */}
+            {group.filters.length > 0 && (
+              <div className={`grid grid-cols-1 gap-4 ${group.filters.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+                {group.filters.map((filterConfig) => (
+                  <MultiSelectFilter
+                    key={filterConfig.key}
+                    label={filterConfig.label}
+                    options={filterConfig.options}
+                    selectedValues={(filters[filterConfig.key] as string[]) || []}
+                    onChange={(values) => handleFilterChange(filterConfig.key, values)}
+                    isLoading={isLoading}
+                    searchable={filterConfig.searchable}
+                    showCounts={true}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Special handling for File Properties group */}
+            {group.title === 'File Properties' && (
+              <div className="max-w-md">
+                <SizeRangeFilter
+                  value={filters.sizeRange}
+                  onChange={handleSizeRangeChange}
                 />
-              ))}
-            </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

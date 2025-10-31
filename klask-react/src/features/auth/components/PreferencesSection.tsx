@@ -13,6 +13,7 @@ const PreferencesSection: React.FC = () => {
       language: 'en',
       notifications_email: true,
       show_activity: true,
+      size_unit: 'kb',
     }
   );
 
@@ -26,6 +27,10 @@ const PreferencesSection: React.FC = () => {
 
   const handleLanguageChange = (language: 'en' | 'fr' | 'es' | 'de') => {
     setPreferences({ ...preferences, language });
+  };
+
+  const handleSizeUnitChange = (size_unit: 'bytes' | 'kb' | 'mb') => {
+    setPreferences({ ...preferences, size_unit });
   };
 
   const handleToggle = (key: 'notifications_email' | 'show_activity') => {
@@ -87,6 +92,26 @@ const PreferencesSection: React.FC = () => {
             <option value="es">Espanol</option>
             <option value="de">Deutsch</option>
           </select>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+        {/* File Size Unit Preference */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">File Size Display</h3>
+          <select
+            value={preferences.size_unit || 'kb'}
+            onChange={(e) => handleSizeUnitChange(e.target.value as 'bytes' | 'kb' | 'mb')}
+            disabled={isUpdating || isSaving}
+            className="w-full max-w-md px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="bytes">Bytes</option>
+            <option value="kb">Kilobytes (KB)</option>
+            <option value="mb">Megabytes (MB)</option>
+          </select>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Choose your preferred unit for displaying file sizes in search filters and results
+          </p>
         </div>
       </div>
 

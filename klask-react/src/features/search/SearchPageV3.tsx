@@ -1,14 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SearchBar } from '../../components/search/SearchBar';
-import { SearchFiltersV2Component, type SearchFiltersV2 } from '../../components/search/SearchFiltersV2';
 import { SearchResults } from '../../components/search/SearchResults';
-import { useMultiSelectSearch, useSearchFilters, useSearchHistory } from '../../hooks/useSearch';
+import { useMultiSelectSearch, useSearchHistory } from '../../hooks/useSearch';
 import { getErrorMessage } from '../../lib/api';
 import type { SearchResult } from '../../types';
+import { useSearchFiltersContext } from '../../contexts/SearchFiltersContext';
 import {
   ClockIcon,
-  Cog6ToothIcon,
   ChartBarIcon,
   DocumentMagnifyingGlassIcon,
   SparklesIcon
@@ -18,48 +17,30 @@ const SearchPageV3: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<SearchFiltersV2>({});
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const { history, addToHistory, clearHistory } = useSearchHistory();
+  const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
+  const sizeFilter = filters.size;
 
   // Function to update URL with current search state
-  const updateURL = useCallback((searchQuery: string, searchFilters: SearchFiltersV2, advanced: boolean, page: number = 1) => {
+  const updateURL = useCallback((searchQuery: string, sizeFilter: { min?: number; max?: number } | undefined, page: number = 1) => {
     const params = new URLSearchParams();
 
     if (searchQuery.trim()) {
       params.set('q', searchQuery.trim());
     }
 
-    // Handle multi-select filters
-    if (searchFilters.projects && searchFilters.projects.length > 0) {
-      searchFilters.projects.forEach(project => {
-        params.append('projects', project);
-      });
+    // Handle size filter
+    if (sizeFilter) {
+      if (sizeFilter.min !== undefined) {
+        params.set('min_size', sizeFilter.min.toString());
+      }
+      if (sizeFilter.max !== undefined) {
+        params.set('max_size', sizeFilter.max.toString());
+      }
     }
 
-    if (searchFilters.versions && searchFilters.versions.length > 0) {
-      searchFilters.versions.forEach(version => {
-        params.append('versions', version);
-      });
-    }
-
-    if (searchFilters.extensions && searchFilters.extensions.length > 0) {
-      searchFilters.extensions.forEach(extension => {
-        params.append('extensions', extension);
-      });
-    }
-
-    if (searchFilters.languages && searchFilters.languages.length > 0) {
-      searchFilters.languages.forEach(language => {
-        params.append('languages', language);
-      });
-    }
-
-    if (advanced) {
-      params.set('advanced', 'true');
-    }
     if (page > 1) {
       params.set('page', page.toString());
     }
@@ -75,37 +56,41 @@ const SearchPageV3: React.FC = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const urlQuery = urlParams.get('q') || '';
-    const urlProjects = urlParams.getAll('projects');
-    const urlVersions = urlParams.getAll('versions');
-    const urlExtensions = urlParams.getAll('extensions');
-    const urlLanguages = urlParams.getAll('languages');
-    const urlAdvanced = urlParams.get('advanced') === 'true';
+    const urlMinSize = urlParams.get('min_size');
+    const urlMaxSize = urlParams.get('max_size');
     const urlPage = parseInt(urlParams.get('page') || '1', 10);
 
     // Set React state from URL
     setQuery(urlQuery);
-    setFilters({
-      projects: urlProjects.length > 0 ? urlProjects : undefined,
-      versions: urlVersions.length > 0 ? urlVersions : undefined,
-      extensions: urlExtensions.length > 0 ? urlExtensions : undefined,
-      languages: urlLanguages.length > 0 ? urlLanguages : undefined,
-    });
-    setShowAdvanced(urlAdvanced);
+
+    // Handle size filter - only update the size filter, preserve other filters from context
+    const sizeFilterFromUrl = (urlMinSize || urlMaxSize) ? {
+      min: urlMinSize ? parseInt(urlMinSize) : undefined,
+      max: urlMaxSize ? parseInt(urlMaxSize) : undefined,
+    } : undefined;
+
+    // Only update filters if size filter from URL differs from current size filter
+    if (JSON.stringify(sizeFilterFromUrl) !== JSON.stringify(sizeFilter)) {
+      setFilters({
+        ...filters,
+        size: sizeFilterFromUrl,
+      });
+    }
+
     setCurrentPage(urlPage);
     setIsInitializing(false);
-  }, [location.search]);
+  }, [location.search, setFilters]);
 
   // Update URL whenever search state changes (only after initialization)
   useEffect(() => {
     if (isInitializing) return;
-    updateURL(query, filters, showAdvanced, currentPage);
-  }, [query, filters, showAdvanced, currentPage, updateURL, isInitializing]);
+    updateURL(query, sizeFilter, currentPage);
+  }, [query, sizeFilter, currentPage, updateURL, isInitializing]);
 
-  const {
-    data: availableFilters,
-    isLoading: filtersLoading,
-    error: filtersError,
-  } = useSearchFilters();
+  // Sync query to context for facet fetching
+  useEffect(() => {
+    setCurrentQuery(query);
+  }, [query, setCurrentQuery]);
 
   const {
     data: searchData,
@@ -114,13 +99,32 @@ const SearchPageV3: React.FC = () => {
     isError,
     error,
     refetch,
-  } = useMultiSelectSearch(query, filters, currentPage, {
+  } = useMultiSelectSearch(query, {
+    projects: filters?.project,     // Map 'project' (singular in context) to 'projects' (plural in API)
+    versions: filters?.version,     // Map 'version' (singular in context) to 'versions' (plural in API)
+    extensions: filters?.extension, // Map 'extension' (singular in context) to 'extensions' (plural in API)
+    languages: filters?.language,   // Map 'language' (singular in context) to 'languages' (plural in API)
+    sizeRange: filters?.size,
+  }, currentPage, {
     enabled: !!query.trim(),
   });
 
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
   const facets = searchData?.facets;
+
+  // Update context with facets from search results
+  useEffect(() => {
+    if (facets) {
+      updateDynamicFilters({
+        projects: facets.projects,
+        versions: facets.versions,
+        extensions: facets.extensions,
+        repositories: facets.repositories,
+        size_ranges: facets.sizeRanges,
+      });
+    }
+  }, [facets, updateDynamicFilters]);
   const pageSize = 20;
   const totalPages = Math.ceil(totalResults / pageSize);
 
@@ -130,10 +134,11 @@ const SearchPageV3: React.FC = () => {
     }
 
     setQuery(searchQuery);
+    setCurrentQuery(searchQuery); // Update context with current query for facet fetching
     if (searchQuery.trim()) {
       addToHistory(searchQuery.trim());
     }
-  }, [addToHistory, query]);
+  }, [addToHistory, query, setCurrentQuery]);
 
   const handleFileClick = useCallback((result: SearchResult) => {
     navigate(`/files/doc/${result.doc_address}`, {
@@ -142,13 +147,12 @@ const SearchPageV3: React.FC = () => {
         searchResult: result,
         searchState: {
           initialQuery: query,
-          filters: filters,
-          showAdvanced: showAdvanced,
+          sizeFilter: sizeFilter,
           page: currentPage
         }
       }
     });
-  }, [navigate, query, filters, showAdvanced, currentPage]);
+  }, [navigate, query, sizeFilter, currentPage]);
 
   const handleHistoryClick = useCallback((historicalQuery: string) => {
     setQuery(historicalQuery);
@@ -169,17 +173,11 @@ const SearchPageV3: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const handleFiltersChange = useCallback((newFilters: SearchFiltersV2) => {
-    setFilters(newFilters);
-    setCurrentPage(1);
-  }, []);
 
   const searchError = isError ? getErrorMessage(error) : null;
 
-  // Count active filters
-  const activeFiltersCount = Object.values(filters).reduce((count, filterArray) =>
-    count + (filterArray?.length || 0), 0
-  );
+  // Count active size filter
+  const activeFiltersCount = sizeFilter && (sizeFilter.min !== undefined || sizeFilter.max !== undefined) ? 1 : 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -198,22 +196,6 @@ const SearchPageV3: React.FC = () => {
         </div>
 
         <div className="mt-4 md:mt-0 flex items-center space-x-3">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className={`inline-flex items-center px-3 py-2 border text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 ${
-              showAdvanced
-                ? 'border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30'
-                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-            }`}
-          >
-            <Cog6ToothIcon className="h-4 w-4 mr-2" />
-            Advanced Filters
-            {activeFiltersCount > 0 && (
-              <span className="ml-2 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs px-2 py-1 rounded-full">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
 
           {totalResults > 0 && (
             <div className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300">
@@ -265,48 +247,10 @@ const SearchPageV3: React.FC = () => {
         )}
       </div>
 
-      {/* Advanced Filters */}
-      {showAdvanced && (
-        <SearchFiltersV2Component
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          availableFilters={{
-            // Use dynamic facets from search results if available, fallback to static filters
-            repositories: facets?.repositories?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.repositories || [],
-            projects: facets?.projects?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.projects || [],
-            versions: facets?.versions?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.versions || [],
-            extensions: facets?.extensions?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.extensions || [],
-            languages: facets?.languages?.map(({ value, count }: { value: string; count: number }) => ({ value, label: value, count })) || availableFilters?.languages || [],
-          }}
-          isLoading={filtersLoading || isFetching}
-          collapsible={false}
-          defaultExpanded={true}
-        />
-      )}
-
-      {/* Error State for Filters */}
-      {filtersError && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <DocumentMagnifyingGlassIcon className="h-5 w-5 text-yellow-400" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-                Filters Unavailable
-              </h3>
-              <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-200">
-                <p>
-                  Unable to load search filters. You can still search, but filtering options may be limited.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search Results */}
-      <SearchResults
+      {/* Main Content */}
+      <div>
+          {/* Search Results */}
+          <SearchResults
         results={results}
         query={query}
         isLoading={isLoading}
@@ -348,6 +292,7 @@ const SearchPageV3: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

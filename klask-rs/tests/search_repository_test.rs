@@ -40,6 +40,7 @@ mod search_repository_tests {
                 project: repo_name,
                 version: "main",
                 extension: "rs",
+                size: 1024,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -57,6 +58,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: true,
@@ -98,6 +101,7 @@ mod search_repository_tests {
                 project: repo_name,
                 version: "main",
                 extension: "rs",
+                size: 512,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -111,6 +115,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -137,6 +143,7 @@ mod search_repository_tests {
             project: repo_name,
             version: "v1.0.0",
             extension: "rs",
+            size: 256,
         };
         service.upsert_file(file_data).await.unwrap();
         service.commit().await.unwrap();
@@ -148,6 +155,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -179,6 +188,7 @@ mod search_repository_tests {
                 project: repo,
                 version: "main",
                 extension: "rs",
+                size: 1024,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -192,6 +202,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -225,6 +237,7 @@ mod search_repository_tests {
             project: "", // Empty repository
             version: "main",
             extension: "rs",
+            size: 768,
         };
         service.upsert_file(file_data).await.unwrap();
         service.commit().await.unwrap();
@@ -236,6 +249,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -262,6 +277,7 @@ mod search_repository_tests {
                 project: "klask-io/klask",
                 version: "main",
                 extension: "rs",
+                size: 2048,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -278,6 +294,7 @@ mod search_repository_tests {
                 project: "rust-lang/rust",
                 version: "main",
                 extension: "rs",
+                size: 1536,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -291,6 +308,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: true,
@@ -333,6 +352,7 @@ mod search_repository_tests {
                     project: &repo_name,
                     version: "main",
                     extension: "rs",
+                    size: 4096,
                 };
                 service.upsert_file(file_data).await.unwrap();
             }
@@ -349,6 +369,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: true,
@@ -389,6 +411,7 @@ mod search_repository_tests {
                     project: repo,
                     version: "main",
                     extension: "rs",
+                    size: 1024,
                 };
                 service.upsert_file(file_data).await.unwrap();
             }
@@ -413,6 +436,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -442,6 +467,7 @@ mod search_repository_tests {
                 project: old_name,
                 version: "main",
                 extension: "rs",
+                size: 2048,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -459,6 +485,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -475,6 +503,8 @@ mod search_repository_tests {
             version_filter: None,
             extension_filter: None,
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,
@@ -508,6 +538,7 @@ mod search_repository_tests {
                 project: repo,
                 version,
                 extension: ext,
+                size: 3072,
             };
             service.upsert_file(file_data).await.unwrap();
         }
@@ -521,6 +552,8 @@ mod search_repository_tests {
             version_filter: Some("v1.0".to_string()),
             extension_filter: Some("rs".to_string()),
             repository_filter: None,
+            min_size: None,
+            max_size: None,
             limit: 10,
             offset: 0,
             include_facets: false,

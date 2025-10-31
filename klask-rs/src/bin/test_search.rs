@@ -102,6 +102,8 @@ async fn main() -> Result<()> {
         project_filter: None,
         version_filter: None,
         extension_filter: None,
+        min_size: None,
+        max_size: None,
         limit: 10,
         offset: 0,
         include_facets: false,

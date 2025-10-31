@@ -238,6 +238,7 @@ async fn test_preferences_serialization() {
         language: Some("en".to_string()),
         notifications_email: Some(true),
         show_activity: Some(false),
+        size_unit: Some("kb".to_string()),
     };
 
     let json = serde_json::to_value(&prefs).unwrap();
@@ -254,6 +255,7 @@ async fn test_partial_preferences() {
         language: None,
         notifications_email: Some(false),
         show_activity: None,
+        size_unit: None,
     };
 
     let json = serde_json::to_value(&partial_prefs).unwrap();

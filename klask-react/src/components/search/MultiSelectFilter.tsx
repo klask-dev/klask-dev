@@ -61,8 +61,11 @@ export const MultiSelectFilter: React.FC<MultiSelectFilterProps> = ({
   }, [isOpen, searchable]);
 
   const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    option.value.toLowerCase().includes(searchTerm.toLowerCase())
+    option &&
+    option.label &&
+    option.value &&
+    (option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     option.value.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleToggleOption = (value: string) => {
