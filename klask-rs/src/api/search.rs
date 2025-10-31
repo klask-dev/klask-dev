@@ -97,6 +97,7 @@ pub struct SearchFacets {
     pub projects: Vec<FacetValue>,
     pub versions: Vec<FacetValue>,
     pub extensions: Vec<FacetValue>,
+    pub size_ranges: Vec<FacetValue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,6 +198,11 @@ async fn search_files(
                     .into_iter()
                     .map(|(value, count)| FacetValue { value, count })
                     .collect(),
+                size_ranges: service_facets
+                    .size_ranges
+                    .into_iter()
+                    .map(|(value, count)| FacetValue { value, count })
+                    .collect(),
             });
 
             let response = SearchResponse { total: search_response.total, results, page, limit, facets };
@@ -287,12 +293,18 @@ async fn get_facets_with_filters(
                         .into_iter()
                         .map(|(value, count)| FacetValue { value, count })
                         .collect(),
+                    size_ranges: service_facets
+                        .size_ranges
+                        .into_iter()
+                        .map(|(value, count)| FacetValue { value, count })
+                        .collect(),
                 })
                 .unwrap_or_else(|| SearchFacets {
                     repositories: vec![],
                     projects: vec![],
                     versions: vec![],
                     extensions: vec![],
+                    size_ranges: vec![],
                 });
 
             Ok(Json(facets))

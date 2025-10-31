@@ -14,6 +14,15 @@ use uuid::Uuid;
 
 use tracing::{debug, warn};
 
+const SIZE_BUCKETS: &[(&str, Option<u64>, Option<u64>)] = &[
+    ("< 1 KB", None, Some(1024)),
+    ("1 KB - 10 KB", Some(1024), Some(10 * 1024)),
+    ("10 KB - 100 KB", Some(10 * 1024), Some(100 * 1024)),
+    ("100 KB - 1 MB", Some(100 * 1024), Some(1024 * 1024)),
+    ("1 MB - 10 MB", Some(1024 * 1024), Some(10 * 1024 * 1024)),
+    ("> 10 MB", Some(10 * 1024 * 1024), None),
+];
+
 #[derive(Debug, Clone)]
 pub struct FileData<'a> {
     pub file_id: Uuid,
@@ -55,6 +64,7 @@ pub struct SearchFacets {
     pub projects: Vec<(String, u64)>,
     pub versions: Vec<(String, u64)>,
     pub extensions: Vec<(String, u64)>,
+    pub size_ranges: Vec<(String, u64)>,
 }
 
 #[derive(Debug, Clone)]
@@ -499,7 +509,7 @@ impl SearchService {
             let max_term = search_query.max_size.map(|size| Term::from_field_u64(self.fields.size, size));
 
             let min_bound = min_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
-            let max_bound = max_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+            let max_bound = max_term.map(Bound::Excluded).unwrap_or(Bound::Unbounded);
 
             let size_range_query = RangeQuery::new(min_bound, max_bound);
 
@@ -934,7 +944,10 @@ impl SearchService {
         extensions.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
         extensions.truncate(50);
 
-        Ok(SearchFacets { repositories, projects, versions, extensions })
+        // For size ranges in legacy method, return empty since this is not commonly used
+        let size_ranges = Vec::new();
+
+        Ok(SearchFacets { repositories, projects, versions, extensions, size_ranges })
     }
 
     /// Collect facets using Tantivy native aggregations API
@@ -1203,11 +1216,265 @@ impl SearchService {
             facets
         };
 
+        // Calculate size range facets (with repository, project, version & extension filters, but NOT size filter)
+        let size_range_facets = {
+            // For size ranges, we should NOT include the size filter from the search query
+            let mut size_clauses = vec![];
+
+            // Always include text query
+            let text_query: Box<dyn tantivy::query::Query> =
+                if search_query.query.trim().is_empty() || search_query.query == "*" {
+                    Box::new(AllQuery)
+                } else {
+                    let query_parser = QueryParser::for_index(
+                        searcher.index(),
+                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                    );
+                    match query_parser.parse_query(&search_query.query) {
+                        Ok(parsed) => parsed,
+                        Err(_) => Box::new(AllQuery),
+                    }
+                };
+            size_clauses.push((Occur::Must, text_query));
+
+            // Add repository filter if present
+            if let Some(ref repository_filter) = search_query.repository_filter {
+                let repositories: Vec<&str> =
+                    repository_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !repositories.is_empty() {
+                    let mut repository_clauses = vec![];
+                    for repository in repositories {
+                        let term = tantivy::Term::from_field_text(self.fields.repository, repository);
+                        repository_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                    size_clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(repository_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+            }
+
+            // Add project filter if present
+            if let Some(ref project_filter) = search_query.project_filter {
+                let projects: Vec<&str> =
+                    project_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !projects.is_empty() {
+                    let mut project_clauses = vec![];
+                    for project in projects {
+                        let term = tantivy::Term::from_field_text(self.fields.project, project);
+                        project_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                    size_clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(project_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+            }
+
+            // Add version filter if present
+            if let Some(ref version_filter) = search_query.version_filter {
+                let versions: Vec<&str> =
+                    version_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !versions.is_empty() {
+                    let mut version_clauses = vec![];
+                    for version in versions {
+                        let term = tantivy::Term::from_field_text(self.fields.version, version);
+                        version_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                    size_clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(version_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+            }
+
+            // Add extension filter if present
+            if let Some(ref extension_filter) = search_query.extension_filter {
+                let extensions: Vec<&str> =
+                    extension_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !extensions.is_empty() {
+                    let mut extension_clauses = vec![];
+                    for extension in extensions {
+                        let term = tantivy::Term::from_field_text(self.fields.extension, extension);
+                        extension_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                    size_clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(extension_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+            }
+
+            // NOTE: We deliberately exclude size filters here, so size ranges show ALL data
+
+            // Count documents for each size bucket using RangeQuery
+            // We need a helper closure to rebuild the base query for each bucket since we can't clone the boxed queries
+            let get_size_bucket_query =
+                |min_size: Option<u64>, max_size: Option<u64>| -> Box<dyn tantivy::query::Query> {
+                    use std::ops::Bound;
+                    use tantivy::query::RangeQuery;
+
+                    let min_term = min_size.map(|size| Term::from_field_u64(self.fields.size, size));
+                    let max_term = max_size.map(|size| Term::from_field_u64(self.fields.size, size));
+
+                    let min_bound = min_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+                    let max_bound = max_term.map(Bound::Excluded).unwrap_or(Bound::Unbounded); // Use Excluded for max to not include boundary
+
+                    let range_query = RangeQuery::new(min_bound, max_bound);
+
+                    // Rebuild the complete query with all filters for this bucket
+                    let mut query_clauses = Vec::new();
+
+                    // Always include text query
+                    let text_query: Box<dyn tantivy::query::Query> =
+                        if search_query.query.trim().is_empty() || search_query.query == "*" {
+                            Box::new(AllQuery)
+                        } else {
+                            let parser = QueryParser::for_index(
+                                searcher.index(),
+                                vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                            );
+                            match parser.parse_query(&search_query.query) {
+                                Ok(parsed) => parsed,
+                                Err(_) => Box::new(AllQuery),
+                            }
+                        };
+                    query_clauses.push((Occur::Must, text_query));
+
+                    // Add repository filter if present
+                    if let Some(ref repository_filter) = search_query.repository_filter {
+                        let repositories: Vec<&str> =
+                            repository_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                        if !repositories.is_empty() {
+                            let mut repository_clauses = vec![];
+                            for repository in repositories {
+                                let term = tantivy::Term::from_field_text(self.fields.repository, repository);
+                                repository_clauses.push((
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                        as Box<dyn tantivy::query::Query>,
+                                ));
+                            }
+                            query_clauses.push((
+                                Occur::Must,
+                                Box::new(BooleanQuery::from(repository_clauses)) as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                    }
+
+                    // Add project filter if present
+                    if let Some(ref project_filter) = search_query.project_filter {
+                        let projects: Vec<&str> =
+                            project_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                        if !projects.is_empty() {
+                            let mut project_clauses = vec![];
+                            for project in projects {
+                                let term = tantivy::Term::from_field_text(self.fields.project, project);
+                                project_clauses.push((
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                        as Box<dyn tantivy::query::Query>,
+                                ));
+                            }
+                            query_clauses.push((
+                                Occur::Must,
+                                Box::new(BooleanQuery::from(project_clauses)) as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                    }
+
+                    // Add version filter if present
+                    if let Some(ref version_filter) = search_query.version_filter {
+                        let versions: Vec<&str> =
+                            version_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                        if !versions.is_empty() {
+                            let mut version_clauses = vec![];
+                            for version in versions {
+                                let term = tantivy::Term::from_field_text(self.fields.version, version);
+                                version_clauses.push((
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                        as Box<dyn tantivy::query::Query>,
+                                ));
+                            }
+                            query_clauses.push((
+                                Occur::Must,
+                                Box::new(BooleanQuery::from(version_clauses)) as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                    }
+
+                    // Add extension filter if present
+                    if let Some(ref extension_filter) = search_query.extension_filter {
+                        let extensions: Vec<&str> =
+                            extension_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                        if !extensions.is_empty() {
+                            let mut extension_clauses = vec![];
+                            for extension in extensions {
+                                let term = tantivy::Term::from_field_text(self.fields.extension, extension);
+                                extension_clauses.push((
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                        as Box<dyn tantivy::query::Query>,
+                                ));
+                            }
+                            query_clauses.push((
+                                Occur::Must,
+                                Box::new(BooleanQuery::from(extension_clauses)) as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                    }
+
+                    // Add the size range query
+                    query_clauses.push((Occur::Must, Box::new(range_query) as Box<dyn tantivy::query::Query>));
+
+                    // Return the combined query
+                    if query_clauses.len() == 1 {
+                        query_clauses.into_iter().next().unwrap().1
+                    } else {
+                        Box::new(BooleanQuery::from(query_clauses))
+                    }
+                };
+
+            let mut size_facets = Vec::new();
+            for (label, min_size, max_size) in SIZE_BUCKETS.iter() {
+                let bucket_query = get_size_bucket_query(*min_size, *max_size);
+                match searcher.search(&*bucket_query, &Count) {
+                    Ok(count) => {
+                        size_facets.push((label.to_string(), count as u64));
+                    }
+                    Err(_) => {
+                        // If there's an error counting for this range, use 0
+                        size_facets.push((label.to_string(), 0));
+                    }
+                }
+            }
+
+            size_facets
+        };
+
         Ok(SearchFacets {
             repositories: repository_facets,
             projects: project_facets,
             versions: version_facets,
             extensions: extension_facets,
+            size_ranges: size_range_facets,
         })
     }
 

@@ -187,6 +187,7 @@ export interface FacetsApiResponse {
   extensions: FacetResponseItem[];
   repositories: FacetResponseItem[];
   languages: FacetResponseItem[];
+  size_ranges?: FacetResponseItem[];
 }
 
 export interface SearchFacets {
@@ -195,6 +196,7 @@ export interface SearchFacets {
   extensions: FacetValue[];
   languages: FacetValue[];
   repositories?: FacetValue[]; // Repository facets for filtering
+  size_ranges?: FacetValue[]; // Size range facets for filtering - matches API response naming
 }
 
 export interface SearchResponse {

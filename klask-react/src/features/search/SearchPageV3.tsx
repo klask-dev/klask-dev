@@ -121,6 +121,7 @@ const SearchPageV3: React.FC = () => {
         versions: facets.versions,
         extensions: facets.extensions,
         repositories: facets.repositories,
+        size_ranges: facets.sizeRanges,
       });
     }
   }, [facets, updateDynamicFilters]);

@@ -43,6 +43,7 @@ interface SidebarFiltersProps {
     versions: FilterOption[];
     extensions: FilterOption[];
     languages: FilterOption[];
+    sizeRanges?: Array<{ value: string; count: number }>;
   };
   isLoading?: boolean;
   currentQuery?: string;
@@ -369,6 +370,8 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
                   size: sizeValue,
                 });
               }}
+              sizeRangeFacets={availableFilters.sizeRanges}
+              isLoading={isLoading}
             />
           </div>
         </>

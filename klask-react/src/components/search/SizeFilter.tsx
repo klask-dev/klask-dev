@@ -6,6 +6,8 @@ interface SizeFilterProps {
   value?: { min?: number; max?: number };
   onChange: (value?: { min?: number; max?: number }) => void;
   className?: string;
+  sizeRangeFacets?: Array<{ value: string; count: number }>;
+  isLoading?: boolean;
 }
 
 // Logarithmic size configuration
@@ -40,9 +42,11 @@ const bytesToLog = (bytes: number): number => {
 };
 
 // Common file size presets in bytes
+// These labels should match the backend facet labels for counter matching
 const SIZE_PRESETS = [
   { label: '< 1 KB', min: undefined, max: 1024 },
-  { label: '1 KB - 100 KB', min: 1024, max: 100 * 1024 },
+  { label: '1 KB - 10 KB', min: 1024, max: 10 * 1024 },
+  { label: '10 KB - 100 KB', min: 10 * 1024, max: 100 * 1024 },
   { label: '100 KB - 1 MB', min: 100 * 1024, max: 1024 * 1024 },
   { label: '1 MB - 10 MB', min: 1024 * 1024, max: 10 * 1024 * 1024 },
   { label: '> 10 MB', min: 10 * 1024 * 1024, max: undefined },
@@ -75,10 +79,22 @@ const formatSizeSmart = (bytes: number): string => {
   }
 };
 
+// Helper function to find facet count for a preset by label
+const getCountForPreset = (
+  label: string,
+  facets?: Array<{ value: string; count: number }>
+): number | undefined => {
+  if (!facets || facets.length === 0) return undefined;
+  const facet = facets.find(f => f.value === label);
+  return facet?.count;
+};
+
 export const SizeFilter: React.FC<SizeFilterProps> = ({
   value,
   onChange,
   className = '',
+  sizeRangeFacets = [],
+  isLoading = false,
 }) => {
   // Add custom CSS for slider thumbs pointer events
   React.useEffect(() => {
@@ -264,17 +280,25 @@ export const SizeFilter: React.FC<SizeFilterProps> = ({
 
       {/* Quick Size Buttons (Presets) */}
       <div className="space-y-1">
-        {SIZE_PRESETS.map((preset, index) => (
-          <button
-            key={index}
-            onClick={() => handlePresetChange(preset)}
-            className="flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors text-sm w-full text-left hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-          >
-            <span className="truncate text-xs min-w-0 flex-1" title={preset.label}>
-              {preset.label}
-            </span>
-          </button>
-        ))}
+        {SIZE_PRESETS.map((preset, index) => {
+          const count = getCountForPreset(preset.label, sizeRangeFacets);
+          return (
+            <button
+              key={index}
+              onClick={() => handlePresetChange(preset)}
+              className="flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors text-sm w-full text-left hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+            >
+              <span className="truncate text-xs min-w-0 flex-1" title={preset.label}>
+                {preset.label}
+              </span>
+              {!isLoading && count !== undefined && (
+                <span className="flex-shrink-0 ml-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                  {count.toLocaleString()}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -8,7 +8,7 @@
  * - Merging of static filter lists with dynamic counts for accurate UI display
  */
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useSearchFilters, useFacetsWithFilters } from '../hooks/useSearch';
 
 export interface SearchFilters {
@@ -32,6 +32,7 @@ interface DynamicFilters {
   versions?: Array<{ value: string; count: number }>;
   extensions?: Array<{ value: string; count: number }>;
   repositories?: Array<{ value: string; count: number }>;
+  size_ranges?: Array<{ value: string; count: number }>;
 }
 
 interface SearchFiltersContextType {
@@ -46,6 +47,7 @@ interface SearchFiltersContextType {
     extensions: FilterOption[];
     languages: FilterOption[];
     repositories: FilterOption[];
+    sizeRanges?: Array<{ value: string; count: number }>;
   };
   isLoading: boolean;
   updateDynamicFilters: (facets: DynamicFilters | null) => void;
@@ -87,11 +89,13 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
       versions: staticFilters.versions,
       extensions: staticFilters.extensions,
       repositories: staticFilters.repositories,
+      size_ranges: staticFilters.size_ranges,
     };
   });
 
   // Track facets from search results when a query is performed
   // These facets are for the current search query and take precedence over filter-based facets
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [searchResultsFacets, setSearchResultsFacets] = React.useState<DynamicFilters | null>(null);
 
   // Use a ref to track whether we need to reset on filter clear
@@ -103,7 +107,7 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
   // Fetch facets when filters change (automatically triggered when filters have values)
   // Pass currentQuery to combine with filters for accurate facet counts
   // No debounce: facet requests are lightweight, caching handles duplication anyway
-  const { data: filterFacets, isLoading: isFacetsLoading } = useFacetsWithFilters(
+  const { data: filterFacets } = useFacetsWithFilters(
     filterParams,
     currentQuery,
     { enabled: true, staleTime: 60000, debounceMs: 0 }
@@ -118,9 +122,11 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
         versions: staticFilters.versions || [],
         extensions: staticFilters.extensions || [],
         repositories: staticFilters.repositories || [],
+        size_ranges: staticFilters.size_ranges || [],
       });
     }
-  }, [staticFilters, lastValidFacets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staticFilters]);
 
   // Update lastValidFacets when new data arrives from API
   React.useEffect(() => {
@@ -139,10 +145,11 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
         versions: staticFilters.versions || [],
         extensions: staticFilters.extensions || [],
         repositories: staticFilters.repositories || [],
+        size_ranges: staticFilters.size_ranges || [],
       });
       shouldResetRef.current = false; // Only reset once per clear
     }
-  }, [hasActiveFilters]);
+  }, [hasActiveFilters, staticFilters]);
 
   const clearFilters = useCallback(() => {
     setFilters({});
@@ -277,6 +284,7 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
     extensions: FilterOption[];
     repositories: FilterOption[];
     languages: FilterOption[];
+    sizeRanges?: Array<{ value: string; count: number }>;
   } = React.useMemo(() => ({
     projects: (hybridFilters.projects || []).map((p: { value: string; count: number }) => ({
       value: p.value,
@@ -299,7 +307,8 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
       count: r.count || 0,
     })),
     languages: [], // Will be derived from extensions in the future
-  }), [hybridFilters]);
+    sizeRanges: lastValidFacets?.size_ranges || [],
+  }), [hybridFilters, lastValidFacets?.size_ranges]);
 
   // Fix 1: Memoize the context value to prevent all consumers from re-rendering
   const value: SearchFiltersContextType = React.useMemo(() => ({
