@@ -152,16 +152,25 @@ export const useMultiSelectSearch = (
       }
       
       // Handle multi-select filters - join with commas
-      if (filters.project && Array.isArray(filters.project) && filters.project.length > 0) {
-        searchParams.set('projects', filters.project.join(','));
+      // Support both singular and plural keys for backward compatibility
+      const projects = filters.projects || filters.project;
+      if (projects && Array.isArray(projects) && projects.length > 0) {
+        searchParams.set('projects', projects.join(','));
       }
 
-      if (filters.version && Array.isArray(filters.version) && filters.version.length > 0) {
-        searchParams.set('versions', filters.version.join(','));
+      const versions = filters.versions || filters.version;
+      if (versions && Array.isArray(versions) && versions.length > 0) {
+        searchParams.set('versions', versions.join(','));
       }
 
-      if (filters.extension && Array.isArray(filters.extension) && filters.extension.length > 0) {
-        searchParams.set('extensions', filters.extension.join(','));
+      const extensions = filters.extensions || filters.extension;
+      if (extensions && Array.isArray(extensions) && extensions.length > 0) {
+        searchParams.set('extensions', extensions.join(','));
+      }
+
+      const languages = filters.languages || filters.language;
+      if (languages && Array.isArray(languages) && languages.length > 0) {
+        searchParams.set('languages', languages.join(','));
       }
 
       // Handle size range filter

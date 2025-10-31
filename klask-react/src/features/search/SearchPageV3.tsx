@@ -20,7 +20,7 @@ const SearchPageV3: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { history, addToHistory, clearHistory } = useSearchHistory();
-  const { filters, setFilters } = useSearchFiltersContext();
+  const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
   const sizeFilter = filters.size;
 
   // Function to update URL with current search state
@@ -87,6 +87,11 @@ const SearchPageV3: React.FC = () => {
     updateURL(query, sizeFilter, currentPage);
   }, [query, sizeFilter, currentPage, updateURL, isInitializing]);
 
+  // Sync query to context for facet fetching
+  useEffect(() => {
+    setCurrentQuery(query);
+  }, [query, setCurrentQuery]);
+
   const {
     data: searchData,
     isLoading,
@@ -95,10 +100,10 @@ const SearchPageV3: React.FC = () => {
     error,
     refetch,
   } = useMultiSelectSearch(query, {
-    project: filters?.project,
-    version: filters?.version,
-    extension: filters?.extension,
-    language: filters?.language,
+    projects: filters?.project,     // Map 'project' (singular in context) to 'projects' (plural in API)
+    versions: filters?.version,     // Map 'version' (singular in context) to 'versions' (plural in API)
+    extensions: filters?.extension, // Map 'extension' (singular in context) to 'extensions' (plural in API)
+    languages: filters?.language,   // Map 'language' (singular in context) to 'languages' (plural in API)
     sizeRange: filters?.size,
   }, currentPage, {
     enabled: !!query.trim(),
@@ -107,6 +112,18 @@ const SearchPageV3: React.FC = () => {
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
   const facets = searchData?.facets;
+
+  // Update context with facets from search results
+  useEffect(() => {
+    if (facets) {
+      updateDynamicFilters({
+        projects: facets.projects,
+        versions: facets.versions,
+        extensions: facets.extensions,
+        repositories: facets.repositories,
+      });
+    }
+  }, [facets, updateDynamicFilters]);
   const pageSize = 20;
   const totalPages = Math.ceil(totalResults / pageSize);
 
@@ -116,10 +133,11 @@ const SearchPageV3: React.FC = () => {
     }
 
     setQuery(searchQuery);
+    setCurrentQuery(searchQuery); // Update context with current query for facet fetching
     if (searchQuery.trim()) {
       addToHistory(searchQuery.trim());
     }
-  }, [addToHistory, query]);
+  }, [addToHistory, query, setCurrentQuery]);
 
   const handleFileClick = useCallback((result: SearchResult) => {
     navigate(`/files/doc/${result.doc_address}`, {
