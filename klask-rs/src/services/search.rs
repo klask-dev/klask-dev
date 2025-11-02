@@ -19,8 +19,7 @@ const SIZE_BUCKETS: &[(&str, Option<u64>, Option<u64>)] = &[
     ("1 KB - 10 KB", Some(1024), Some(10 * 1024)),
     ("10 KB - 100 KB", Some(10 * 1024), Some(100 * 1024)),
     ("100 KB - 1 MB", Some(100 * 1024), Some(1024 * 1024)),
-    ("1 MB - 10 MB", Some(1024 * 1024), Some(10 * 1024 * 1024)),
-    ("> 10 MB", Some(10 * 1024 * 1024), None),
+    ("> 1 MB", Some(1024 * 1024), None),
 ];
 
 #[derive(Debug, Clone)]

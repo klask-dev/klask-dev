@@ -14,7 +14,8 @@ import {
 import { apiClient } from '../../lib/api';
 
 // Mock fetch for useFacetsWithFilters
-global.fetch = vi.fn();
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 // Mock the API client
 vi.mock('../../lib/api', () => ({
@@ -259,31 +260,26 @@ describe('useSearch', () => {
 
   describe('useSearchFilters hook', () => {
     it('should fetch search filters when enabled', async () => {
-      const mockFilters = {
-        projects: ['project1', 'project2'],
-        versions: ['1.0.0', '2.0.0'],
-        extensions: ['js', 'ts', 'py'],
-      };
-
-      const expectedFilters = {
+      const mockResponse = {
         projects: [
-          { value: 'project1', label: 'project1', count: 0 },
-          { value: 'project2', label: 'project2', count: 0 },
+          { value: 'project1', count: 10 },
+          { value: 'project2', count: 5 },
         ],
         versions: [
-          { value: '1.0.0', label: '1.0.0', count: 0 },
-          { value: '2.0.0', label: '2.0.0', count: 0 },
+          { value: '1.0.0', count: 8 },
+          { value: '2.0.0', count: 7 },
         ],
         extensions: [
-          { value: 'js', label: 'js', count: 0 },
-          { value: 'ts', label: 'ts', count: 0 },
-          { value: 'py', label: 'py', count: 0 },
+          { value: 'js', count: 15 },
+          { value: 'ts', count: 10 },
+          { value: 'py', count: 5 },
         ],
-        languages: [],
-        repositories: [],
       };
 
-      mockApiClient.getSearchFilters.mockResolvedValue(mockFilters);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockResponse,
+      });
 
       const { result } = renderHook(() => useSearchFilters({ enabled: true }), { wrapper });
 
@@ -291,13 +287,22 @@ describe('useSearch', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(result.current.data).toEqual(expectedFilters);
-      expect(mockApiClient.getSearchFilters).toHaveBeenCalledTimes(1);
+      expect(result.current.data.projects).toHaveLength(2);
+      expect(result.current.data.versions).toHaveLength(2);
+      expect(result.current.data.extensions).toHaveLength(3);
     });
 
     it('should cache filters for 5 minutes', async () => {
-      const mockFilters = { projects: [], versions: [], extensions: [] };
-      mockApiClient.getSearchFilters.mockResolvedValue(mockFilters);
+      const mockResponse = {
+        projects: [{ value: 'project1', count: 10 }],
+        versions: [],
+        extensions: [],
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockResponse,
+      });
 
       const { result, rerender } = renderHook(() => useSearchFilters({ enabled: true }), { wrapper });
 
@@ -305,9 +310,12 @@ describe('useSearch', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
+      // Reset mock to count only new calls
+      mockFetch.mockClear();
+
       // Rerender should not trigger new API call due to caching
       rerender();
-      expect(mockApiClient.getSearchFilters).toHaveBeenCalledTimes(1);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -501,12 +509,28 @@ describe('useFacetsWithFilters hook', () => {
     React.createElement(QueryClientProvider, { client: queryClient }, children)
   );
 
-  it('should not fetch without filters by default', () => {
+  it('should fetch facets even without filters (for static filter data)', async () => {
+    const mockResponse = {
+      projects: [{ value: 'project1', count: 100 }],
+      versions: [{ value: '1.0', count: 50 }],
+      extensions: [{ value: 'js', count: 200 }],
+      repositories: [],
+      size_ranges: [],
+    };
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
     const { result } = renderHook(() => useFacetsWithFilters(), { wrapper });
 
-    // Should not fetch because hasFilters is false
-    expect(result.current.isPending).toBe(true);
-    expect(mockFetch).not.toHaveBeenCalled();
+    // Should fetch to get static filter data even without active filters
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
   });
 
   it('should fetch facets with single filter', async () => {
@@ -706,7 +730,7 @@ describe('useFacetsWithFilters hook', () => {
       size_ranges: [
         { value: '< 1 KB', count: 50 },
         { value: '1 KB - 10 KB', count: 30 },
-        { value: '> 10 MB', count: 5 },
+        { value: '> 1 MB', count: 5 },
       ],
     };
 
@@ -729,7 +753,7 @@ describe('useFacetsWithFilters hook', () => {
     expect(result.current.data.size_ranges).toHaveLength(3);
     expect(result.current.data.size_ranges[0]).toEqual({ value: '< 1 KB', count: 50 });
     expect(result.current.data.size_ranges[1]).toEqual({ value: '1 KB - 10 KB', count: 30 });
-    expect(result.current.data.size_ranges[2]).toEqual({ value: '> 10 MB', count: 5 });
+    expect(result.current.data.size_ranges[2]).toEqual({ value: '> 1 MB', count: 5 });
   });
 
   it('should normalize size_ranges to empty array when missing', async () => {

@@ -22,8 +22,7 @@ const SIZE_PRESETS = [
   { label: '1 KB - 10 KB', min: 1024, max: 10 * 1024 },
   { label: '10 KB - 100 KB', min: 10 * 1024, max: 100 * 1024 },
   { label: '100 KB - 1 MB', min: 100 * 1024, max: 1024 * 1024 },
-  { label: '1 MB - 10 MB', min: 1024 * 1024, max: 10 * 1024 * 1024 },
-  { label: '> 10 MB', min: 10 * 1024 * 1024, max: undefined },
+  { label: '> 1 MB', min: 1024 * 1024, max: undefined },
 ] as const;
 
 // Helper functions for size conversion

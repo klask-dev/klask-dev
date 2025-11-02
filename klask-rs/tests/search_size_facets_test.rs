@@ -30,8 +30,8 @@ mod search_size_facets_tests {
             ("file2.txt", 2048, "medium file"),       // 1 KB - 10 KB
             ("file3.txt", 50000, "large file"),       // 10 KB - 100 KB
             ("file4.txt", 500000, "very large file"), // 100 KB - 1 MB
-            ("file5.txt", 5000000, "huge file"),      // 1 MB - 10 MB
-            ("file6.txt", 50000000, "enormous file"), // > 10 MB
+            ("file5.txt", 5000000, "huge file"),      // > 1 MB
+            ("file6.txt", 50000000, "enormous file"), // > 1 MB
         ];
 
         for (_i, (name, size, content)) in test_files.iter().enumerate() {
@@ -73,11 +73,11 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
         assert!(!facets.size_ranges.is_empty(), "Size ranges should not be empty");
 
-        // Verify all 6 size buckets exist (even if some are zero)
-        assert_eq!(facets.size_ranges.len(), 6, "Should have exactly 6 size buckets");
+        // Verify all 5 size buckets exist (even if some are zero)
+        assert_eq!(facets.size_ranges.len(), 5, "Should have exactly 5 size buckets");
 
-        // Expected counts: one file in each bucket
-        let expected_counts = vec![1, 1, 1, 1, 1, 1];
+        // Expected counts: one file in each bucket, except last bucket has 2 (merged from old buckets)
+        let expected_counts = vec![1, 1, 1, 1, 2];
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -143,14 +143,13 @@ mod search_size_facets_tests {
         let results = service.search(query).await.unwrap();
         let facets = results.facets.expect("Facets should be present");
 
-        // Expected distribution across buckets
+        // Expected distribution across buckets (now merged into 5 buckets)
         // < 1 KB: files at 0, 1023 = 2 files
         // 1 KB - 10 KB: files at 1024, 10239 = 2 files
         // 10 KB - 100 KB: files at 10240, 102399 = 2 files
         // 100 KB - 1 MB: files at 102400, 1048575 = 2 files
-        // 1 MB - 10 MB: files at 1048576, 10485759 = 2 files
-        // > 10 MB: files at 10485760, 10485761 = 2 files
-        let expected_counts = vec![2, 2, 2, 2, 2, 2];
+        // > 1 MB: files at 1048576, 10485759, 10485760, 10485761 = 4 files (merged old buckets)
+        let expected_counts = vec![2, 2, 2, 2, 4];
 
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
@@ -505,7 +504,7 @@ mod search_size_facets_tests {
         // 100KB-1MB: 1 (500KB)
         // 1-10MB: 1 (5MB)
         // > 10MB: 1 (50MB)
-        let expected_counts = vec![1, 1, 1, 1, 1, 1];
+        let expected_counts = vec![1, 1, 1, 1, 2];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -614,8 +613,8 @@ mod search_size_facets_tests {
         let results = service.search(query).await.unwrap();
         let facets = results.facets.expect("Facets should be present");
 
-        // Expected: 1 file < 1KB, 0 in middle buckets, 1 file > 10MB
-        let expected_counts = vec![1, 0, 0, 0, 0, 1];
+        // Expected: 1 file < 1KB, 0 in middle buckets, 1 file > 1MB (merged buckets)
+        let expected_counts = vec![1, 0, 0, 0, 1];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -743,7 +742,7 @@ mod search_size_facets_tests {
         // 100KB-1MB: 1 (500000 - still shown even though filtered out of results)
         // 1-10MB: 1 (5000000 - still shown even though filtered out of results)
         // > 10MB: 1 (50000000 - still shown even though filtered out of results)
-        let expected_counts = vec![1, 1, 1, 1, 1, 1];
+        let expected_counts = vec![1, 1, 1, 1, 2];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -814,7 +813,7 @@ mod search_size_facets_tests {
         // 100KB-1MB: 1 (500000 - matches and shown)
         // 1-10MB: 1 (5000000 - still shown even though filtered out of results)
         // > 10MB: 1 (50000000 - still shown even though filtered out of results)
-        let expected_counts = vec![1, 1, 1, 1, 1, 1];
+        let expected_counts = vec![1, 1, 1, 1, 2];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -869,8 +868,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // Verify the expected order of buckets
-        let expected_labels =
-            vec!["< 1 KB", "1 KB - 10 KB", "10 KB - 100 KB", "100 KB - 1 MB", "1 MB - 10 MB", "> 10 MB"];
+        let expected_labels = vec!["< 1 KB", "1 KB - 10 KB", "10 KB - 100 KB", "100 KB - 1 MB", "> 1 MB"];
 
         for (i, (actual_label, _count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
@@ -889,9 +887,9 @@ mod search_size_facets_tests {
 
         // Index very large files
         let sizes = vec![
-            100000000,   // 100 MB (> 10 MB)
-            1000000000,  // 1 GB (> 10 MB)
-            10000000000, // 10 GB (> 10 MB)
+            100000000,   // 100 MB (> 1 MB)
+            1000000000,  // 1 GB (> 1 MB)
+            10000000000, // 10 GB (> 1 MB)
         ];
 
         for (i, size) in sizes.iter().enumerate() {
@@ -931,8 +929,8 @@ mod search_size_facets_tests {
 
         let facets = results.facets.expect("Facets should be present");
 
-        // All files should be in > 10 MB bucket
-        let expected_counts = vec![0, 0, 0, 0, 0, 3];
+        // All files should be in > 1 MB bucket (merged buckets)
+        let expected_counts = vec![0, 0, 0, 0, 3];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],

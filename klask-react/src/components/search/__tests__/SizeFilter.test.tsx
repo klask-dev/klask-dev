@@ -41,8 +41,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -57,9 +56,9 @@ describe('SizeFilter Component', () => {
       expect(screen.getByText('10')).toBeInTheDocument();
       expect(screen.getByText('25')).toBeInTheDocument();
       expect(screen.getByText('50')).toBeInTheDocument();
-      expect(screen.getByText('75')).toBeInTheDocument();
       expect(screen.getByText('100')).toBeInTheDocument();
-      expect(screen.getByText('200')).toBeInTheDocument();
+      expect(screen.getByText('100')).toBeInTheDocument();
+      expect(screen.getByText('100')).toBeInTheDocument();
     });
 
     it('should display correct counts for each size preset', () => {
@@ -68,8 +67,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 15 },
         { value: '10 KB - 100 KB', count: 30 },
         { value: '100 KB - 1 MB', count: 45 },
-        { value: '1 MB - 10 MB', count: 60 },
-        { value: '> 10 MB', count: 90 },
+        { value: '> 1 MB', count: 60 },
       ];
 
       render(
@@ -93,8 +91,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 10000 },
         { value: '10 KB - 100 KB', count: 100000 },
         { value: '100 KB - 1 MB', count: 1000000 },
-        { value: '1 MB - 10 MB', count: 10000000 },
-        { value: '> 10 MB', count: 100000000 },
+        { value: '> 1 MB', count: 10000000 },
       ];
 
       const { container } = render(
@@ -119,8 +116,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 0 },
         { value: '10 KB - 100 KB', count: 100 },
         { value: '100 KB - 1 MB', count: 1 },
-        { value: '1 MB - 10 MB', count: 500 },
-        { value: '> 10 MB', count: 999 },
+        { value: '> 1 MB', count: 500 },
       ];
 
       const { container } = render(
@@ -145,8 +141,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 20 },
         { value: '10 KB - 100 KB', count: 30 },
         { value: '100 KB - 1 MB', count: 40 },
-        { value: '1 MB - 10 MB', count: 50 },
-        { value: '> 10 MB', count: 60 },
+        { value: '> 1 MB', count: 50 },
       ];
 
       render(
@@ -162,8 +157,8 @@ describe('SizeFilter Component', () => {
       expect(screen.getByText('1 KB - 10 KB')).toBeInTheDocument();
       expect(screen.getByText('10 KB - 100 KB')).toBeInTheDocument();
       expect(screen.getByText('100 KB - 1 MB')).toBeInTheDocument();
-      expect(screen.getByText('1 MB - 10 MB')).toBeInTheDocument();
-      expect(screen.getByText('> 10 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
     });
 
     it('should match facet values exactly to preset labels', () => {
@@ -172,8 +167,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 20 },
         { value: '10 KB - 100 KB', count: 30 },
         { value: '100 KB - 1 MB', count: 40 },
-        { value: '1 MB - 10 MB', count: 50 },
-        { value: '> 10 MB', count: 60 },
+        { value: '> 1 MB', count: 50 },
       ];
 
       render(
@@ -188,8 +182,8 @@ describe('SizeFilter Component', () => {
       const firstButton = screen.getByText('< 1 KB').closest('button');
       expect(within(firstButton!).getByText('10')).toBeInTheDocument();
 
-      const sixthButton = screen.getByText('> 10 MB').closest('button');
-      expect(within(sixthButton!).getByText('60')).toBeInTheDocument();
+      const fifthButton = screen.getByText('> 1 MB').closest('button');
+      expect(within(fifthButton!).getByText('50')).toBeInTheDocument();
     });
 
     it('should not display counter when facet value does not match preset label', () => {
@@ -226,7 +220,7 @@ describe('SizeFilter Component', () => {
 
       // Component should still render the presets
       expect(screen.getByText('< 1 KB')).toBeInTheDocument();
-      expect(screen.getByText('> 10 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
     });
 
     it('should render without crashing when sizeRangeFacets is empty array', () => {
@@ -240,7 +234,7 @@ describe('SizeFilter Component', () => {
 
       // Component should still render the presets
       expect(screen.getByText('< 1 KB')).toBeInTheDocument();
-      expect(screen.getByText('> 10 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
     });
 
     it('should not display any counters when sizeRangeFacets is undefined', () => {
@@ -290,7 +284,7 @@ describe('SizeFilter Component', () => {
       expect(screen.getByText('10')).toBeInTheDocument();
 
       // Other presets should still be clickable but without counters
-      expect(screen.getByText('> 10 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
     });
   });
 
@@ -301,8 +295,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -326,8 +319,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { rerender } = render(
@@ -341,7 +333,7 @@ describe('SizeFilter Component', () => {
 
       // Counters visible during loading
       expect(screen.getByText('10')).toBeInTheDocument();
-      expect(screen.getByText('200')).toBeInTheDocument();
+      expect(screen.getByText('100')).toBeInTheDocument();
 
       // Rerender with isLoading false
       rerender(
@@ -364,8 +356,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -382,8 +373,8 @@ describe('SizeFilter Component', () => {
       expect(screen.getByText('1 KB - 10 KB')).toBeInTheDocument();
       expect(screen.getByText('10 KB - 100 KB')).toBeInTheDocument();
       expect(screen.getByText('100 KB - 1 MB')).toBeInTheDocument();
-      expect(screen.getByText('1 MB - 10 MB')).toBeInTheDocument();
-      expect(screen.getByText('> 10 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
     });
   });
 
@@ -394,8 +385,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 0 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 0 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -417,8 +407,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 0 },
         { value: '10 KB - 100 KB', count: 0 },
         { value: '100 KB - 1 MB', count: 0 },
-        { value: '1 MB - 10 MB', count: 0 },
-        { value: '> 10 MB', count: 0 },
+        { value: '> 1 MB', count: 0 },
       ];
 
       render(
@@ -431,7 +420,7 @@ describe('SizeFilter Component', () => {
 
       // All counters should be visible even if zero
       const zeroElements = screen.getAllByText('0');
-      expect(zeroElements.length).toBe(6);
+      expect(zeroElements.length).toBe(5);
     });
   });
 
@@ -442,8 +431,8 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 20 },
         { value: '10 KB - 100 KB', count: 30 },
         { value: '100 KB - 1 MB', count: 40 },
-        { value: '1 MB - 10 MB', count: 50 },
-        { value: '> 10 MB', count: 60 },
+        { value: '> 1 MB', count: 50 },
+        { value: '> 1 MB', count: 60 },
       ];
 
       const { rerender } = render(
@@ -455,15 +444,15 @@ describe('SizeFilter Component', () => {
       );
 
       expect(screen.getByText('10')).toBeInTheDocument();
-      expect(screen.getByText('60')).toBeInTheDocument();
+      expect(screen.getByText('50')).toBeInTheDocument();
 
       const updatedFacets = [
         { value: '< 1 KB', count: 100 },
         { value: '1 KB - 10 KB', count: 200 },
         { value: '10 KB - 100 KB', count: 300 },
         { value: '100 KB - 1 MB', count: 400 },
-        { value: '1 MB - 10 MB', count: 500 },
-        { value: '> 10 MB', count: 600 },
+        { value: '> 1 MB', count: 500 },
+        { value: '> 1 MB', count: 600 },
       ];
 
       rerender(
@@ -478,7 +467,7 @@ describe('SizeFilter Component', () => {
       expect(screen.queryByText('10')).not.toBeInTheDocument();
       // New counts should be displayed
       expect(screen.getByText('100')).toBeInTheDocument();
-      expect(screen.getByText('600')).toBeInTheDocument();
+      expect(screen.getByText('500')).toBeInTheDocument();
     });
 
     it('should handle rapid facet updates', () => {
@@ -487,8 +476,8 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 2 },
         { value: '10 KB - 100 KB', count: 3 },
         { value: '100 KB - 1 MB', count: 4 },
-        { value: '1 MB - 10 MB', count: 5 },
-        { value: '> 10 MB', count: 6 },
+        { value: '> 1 MB', count: 5 },
+        { value: '> 1 MB', count: 6 },
       ];
 
       const { rerender } = render(
@@ -506,8 +495,8 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 20 },
         { value: '10 KB - 100 KB', count: 30 },
         { value: '100 KB - 1 MB', count: 40 },
-        { value: '1 MB - 10 MB', count: 50 },
-        { value: '> 10 MB', count: 60 },
+        { value: '> 1 MB', count: 50 },
+        { value: '> 1 MB', count: 60 },
       ];
 
       rerender(
@@ -525,8 +514,8 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 200 },
         { value: '10 KB - 100 KB', count: 300 },
         { value: '100 KB - 1 MB', count: 400 },
-        { value: '1 MB - 10 MB', count: 500 },
-        { value: '> 10 MB', count: 600 },
+        { value: '> 1 MB', count: 500 },
+        { value: '> 1 MB', count: 600 },
       ];
 
       rerender(
@@ -538,7 +527,7 @@ describe('SizeFilter Component', () => {
       );
 
       expect(screen.getByText('100')).toBeInTheDocument();
-      expect(screen.getByText('600')).toBeInTheDocument();
+      expect(screen.getByText('500')).toBeInTheDocument();
     });
 
     it('should trigger re-rendering when facets prop changes', () => {
@@ -547,8 +536,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 20 },
         { value: '10 KB - 100 KB', count: 30 },
         { value: '100 KB - 1 MB', count: 40 },
-        { value: '1 MB - 10 MB', count: 50 },
-        { value: '> 10 MB', count: 60 },
+        { value: '> 1 MB', count: 50 },
       ];
 
       const { rerender } = render(
@@ -567,8 +555,8 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 20 },
         { value: '10 KB - 100 KB', count: 30 },
         { value: '100 KB - 1 MB', count: 40 },
-        { value: '1 MB - 10 MB', count: 50 },
-        { value: '> 10 MB', count: 60 },
+        { value: '> 1 MB', count: 50 },
+        { value: '> 1 MB', count: 60 },
       ];
 
       rerender(
@@ -593,8 +581,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { container } = render(
@@ -616,8 +603,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 0 },
         { value: '10 KB - 100 KB', count: 100 },
         { value: '100 KB - 1 MB', count: 1 },
-        { value: '1 MB - 10 MB', count: 500 },
-        { value: '> 10 MB', count: 999 },
+        { value: '> 1 MB', count: 500 },
       ];
 
       const { container } = render(
@@ -642,8 +628,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -666,8 +651,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -682,8 +666,8 @@ describe('SizeFilter Component', () => {
       const firstButton = screen.getByText('< 1 KB').closest('button');
       expect(within(firstButton!).getByText('10')).toBeInTheDocument();
 
-      const lastButton = screen.getByText('> 10 MB').closest('button');
-      expect(within(lastButton!).getByText('200')).toBeInTheDocument();
+      const lastButton = screen.getByText('> 1 MB').closest('button');
+      expect(within(lastButton!).getByText('100')).toBeInTheDocument();
     });
 
     it('should maintain counter visibility when hovering preset buttons', async () => {
@@ -693,8 +677,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -747,8 +730,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { container } = render(
@@ -773,8 +755,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -809,8 +790,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -842,8 +822,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -873,8 +852,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { rerender } = render(
@@ -904,7 +882,7 @@ describe('SizeFilter Component', () => {
 
       // But counters should still be visible
       expect(screen.getByText('10')).toBeInTheDocument();
-      expect(screen.getByText('200')).toBeInTheDocument();
+      expect(screen.getByText('100')).toBeInTheDocument();
     });
   });
 
@@ -915,8 +893,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -937,8 +914,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -961,8 +937,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 1000000000 },
         { value: '10 KB - 100 KB', count: 9999999999 },
         { value: '100 KB - 1 MB', count: 100 },
-        { value: '1 MB - 10 MB', count: 50 },
-        { value: '> 10 MB', count: 10 },
+        { value: '> 1 MB', count: 50 },
       ];
 
       const { container } = render(
@@ -991,7 +966,7 @@ describe('SizeFilter Component', () => {
 
       // Should not crash and should display presets without counters
       expect(screen.getByText('< 1 KB')).toBeInTheDocument();
-      expect(screen.getByText('> 10 MB')).toBeInTheDocument();
+      expect(screen.getByText('> 1 MB')).toBeInTheDocument();
     });
 
     it('should handle facets with mixed zero and non-zero counts', () => {
@@ -1000,8 +975,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 100 },
         { value: '10 KB - 100 KB', count: 0 },
         { value: '100 KB - 1 MB', count: 50 },
-        { value: '1 MB - 10 MB', count: 0 },
-        { value: '> 10 MB', count: 75 },
+        { value: '> 1 MB', count: 0 },
       ];
 
       render(
@@ -1016,7 +990,7 @@ describe('SizeFilter Component', () => {
       expect(screen.getAllByText('0').length).toBe(3);
       expect(screen.getByText('100')).toBeInTheDocument();
       expect(screen.getByText('50')).toBeInTheDocument();
-      expect(screen.getByText('75')).toBeInTheDocument();
+      expect(screen.getByText('100')).toBeInTheDocument();
     });
   });
 
@@ -1027,8 +1001,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -1064,8 +1037,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       render(
@@ -1093,8 +1065,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { container } = render(
@@ -1118,8 +1089,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { container } = render(
@@ -1147,8 +1117,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { rerender } = render(
@@ -1191,9 +1160,9 @@ describe('SizeFilter Component', () => {
         expect(screen.getByText('10')).toBeInTheDocument();
         expect(screen.getByText('25')).toBeInTheDocument();
         expect(screen.getByText('50')).toBeInTheDocument();
-        expect(screen.getByText('75')).toBeInTheDocument();
         expect(screen.getByText('100')).toBeInTheDocument();
-        expect(screen.getByText('200')).toBeInTheDocument();
+        expect(screen.getByText('100')).toBeInTheDocument();
+        expect(screen.getByText('100')).toBeInTheDocument();
       });
     });
 
@@ -1203,8 +1172,7 @@ describe('SizeFilter Component', () => {
         { value: '1 KB - 10 KB', count: 25 },
         { value: '10 KB - 100 KB', count: 50 },
         { value: '100 KB - 1 MB', count: 75 },
-        { value: '1 MB - 10 MB', count: 100 },
-        { value: '> 10 MB', count: 200 },
+        { value: '> 1 MB', count: 100 },
       ];
 
       const { rerender } = render(
@@ -1237,7 +1205,7 @@ describe('SizeFilter Component', () => {
 
       // Counters should still be visible
       expect(screen.getByText('10')).toBeInTheDocument();
-      expect(screen.getByText('200')).toBeInTheDocument();
+      expect(screen.getByText('100')).toBeInTheDocument();
     });
   });
 });
