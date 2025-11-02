@@ -126,51 +126,77 @@ export const SizeFilter: React.FC<SizeFilterProps> = ({
     value?.max ? logToSlider(bytesToLog(value.max)) : SIZE_CONFIG.SLIDER_MAX
   );
 
+  // Debounce timer ref for onChange calls
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup debounce timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSliderChange = useCallback((newMinPos: number, newMaxPos: number) => {
     // Ensure min <= max
     const actualMinPos = Math.min(newMinPos, newMaxPos);
     const actualMaxPos = Math.max(newMinPos, newMaxPos);
 
+    // Update local state immediately for smooth UI feedback
     setSliderMinPos(actualMinPos);
     setSliderMaxPos(actualMaxPos);
 
-    // Convert slider positions to log scale, then to bytes
-    const minLogValue = sliderToLog(actualMinPos);
-    const maxLogValue = sliderToLog(actualMaxPos);
-    const minBytes = Math.round(logToBytes(minLogValue));
-    const maxBytes = Math.round(logToBytes(maxLogValue));
-
-    const newValue = {
-      min: actualMinPos > SIZE_CONFIG.SLIDER_MIN ? minBytes : undefined,
-      max: actualMaxPos < SIZE_CONFIG.SLIDER_MAX ? maxBytes : undefined,
-    };
-
-    // Si min et max sont undefined, envoyer undefined pour indiquer "pas de filtre"
-    if (newValue.min === undefined && newValue.max === undefined) {
-      onChange(undefined);
-    } else {
-      onChange(newValue);
+    // Debounce the onChange call to parent (300ms) to avoid excessive re-renders
+    // This keeps the slider smooth while dragging, but still updates parent
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
+
+    debounceTimerRef.current = setTimeout(() => {
+      // Convert slider positions to log scale, then to bytes
+      const minLogValue = sliderToLog(actualMinPos);
+      const maxLogValue = sliderToLog(actualMaxPos);
+      const minBytes = Math.round(logToBytes(minLogValue));
+      const maxBytes = Math.round(logToBytes(maxLogValue));
+
+      const newValue = {
+        min: actualMinPos > SIZE_CONFIG.SLIDER_MIN ? minBytes : undefined,
+        max: actualMaxPos < SIZE_CONFIG.SLIDER_MAX ? maxBytes : undefined,
+      };
+
+      // Si min et max sont undefined, envoyer undefined pour indiquer "pas de filtre"
+      if (newValue.min === undefined && newValue.max === undefined) {
+        onChange(undefined);
+      } else {
+        onChange(newValue);
+      }
+    }, 300);
   }, [onChange]);
 
   const handlePresetChange = useCallback((preset: { label: string; min?: number; max?: number }) => {
-    // Convert preset bytes to slider positions
-    const newMinPos = preset.min ? logToSlider(bytesToLog(preset.min)) : SIZE_CONFIG.SLIDER_MIN;
-    const newMaxPos = preset.max ? logToSlider(bytesToLog(preset.max)) : SIZE_CONFIG.SLIDER_MAX;
+    // Check if this preset is already selected - if so, toggle it off (deselect)
+    const isPresetSelected = value?.min === preset.min && value?.max === preset.max;
 
-    setSliderMinPos(newMinPos);
-    setSliderMaxPos(newMaxPos);
-
-    // Si min et max sont undefined, envoyer undefined pour indiquer "pas de filtre"
-    if (preset.min === undefined && preset.max === undefined) {
+    if (isPresetSelected) {
+      // Toggle off: clear the filter
+      setSliderMinPos(SIZE_CONFIG.SLIDER_MIN);
+      setSliderMaxPos(SIZE_CONFIG.SLIDER_MAX);
       onChange(undefined);
     } else {
+      // Toggle on: select the preset
+      const newMinPos = preset.min ? logToSlider(bytesToLog(preset.min)) : SIZE_CONFIG.SLIDER_MIN;
+      const newMaxPos = preset.max ? logToSlider(bytesToLog(preset.max)) : SIZE_CONFIG.SLIDER_MAX;
+
+      setSliderMinPos(newMinPos);
+      setSliderMaxPos(newMaxPos);
+
       onChange({
         min: preset.min,
         max: preset.max,
       });
     }
-  }, [onChange]);
+  }, [onChange, value]);
 
   const handleClear = useCallback(() => {
     setSliderMinPos(SIZE_CONFIG.SLIDER_MIN);
@@ -179,17 +205,26 @@ export const SizeFilter: React.FC<SizeFilterProps> = ({
   }, [onChange]);
 
   // Sync slider positions when value prop changes
+  // BUT: Only sync if the change came from outside (e.g., URL params, preset selection)
+  // Don't sync while user is directly dragging the sliders to avoid jank/stuttering
   useEffect(() => {
-    if (value?.min !== undefined) {
-      setSliderMinPos(logToSlider(bytesToLog(value.min)));
-    } else {
-      setSliderMinPos(SIZE_CONFIG.SLIDER_MIN);
-    }
+    // Only sync if value changed significantly (not just rounding differences)
+    const minFromValue = value?.min !== undefined ? logToSlider(bytesToLog(value.min)) : SIZE_CONFIG.SLIDER_MIN;
+    const maxFromValue = value?.max !== undefined ? logToSlider(bytesToLog(value.max)) : SIZE_CONFIG.SLIDER_MAX;
 
-    if (value?.max !== undefined) {
-      setSliderMaxPos(logToSlider(bytesToLog(value.max)));
-    } else {
-      setSliderMaxPos(SIZE_CONFIG.SLIDER_MAX);
+    // Only update if difference is > 1 (to account for rounding errors)
+    // This prevents syncing back small changes that came from our own onChange
+    const minDiff = Math.abs(sliderMinPos - minFromValue);
+    const maxDiff = Math.abs(sliderMaxPos - maxFromValue);
+
+    if (minDiff > 1 || maxDiff > 1) {
+      // Significant change came from outside, sync it
+      if (minDiff > 1) {
+        setSliderMinPos(minFromValue);
+      }
+      if (maxDiff > 1) {
+        setSliderMaxPos(maxFromValue);
+      }
     }
   }, [value]);
 
@@ -216,17 +251,29 @@ export const SizeFilter: React.FC<SizeFilterProps> = ({
         )}
       </div>
 
-      {/* Range Display */}
+      {/* Range Display - Show local slider positions in real-time while dragging */}
       <div className="text-xs text-gray-600 dark:text-gray-400 text-center mb-3">
-        {isActive ? (() => {
-          const minSize = value?.min !== undefined
-            ? formatSizeSmart(value.min)
+        {(() => {
+          // Calculate bytes from current slider positions (local state)
+          const minLogValue = sliderToLog(sliderMinPos);
+          const maxLogValue = sliderToLog(sliderMaxPos);
+          const minBytes = Math.round(logToBytes(minLogValue));
+          const maxBytes = Math.round(logToBytes(maxLogValue));
+
+          // Show 0B - ∞ if at full range (no filter active)
+          if (sliderMinPos === SIZE_CONFIG.SLIDER_MIN && sliderMaxPos === SIZE_CONFIG.SLIDER_MAX) {
+            return '0 B - ∞';
+          }
+
+          // Show formatted range based on slider positions
+          const minSize = sliderMinPos > SIZE_CONFIG.SLIDER_MIN
+            ? formatSizeSmart(minBytes)
             : '0 B';
-          const maxSize = value?.max !== undefined
-            ? formatSizeSmart(value.max)
+          const maxSize = sliderMaxPos < SIZE_CONFIG.SLIDER_MAX
+            ? formatSizeSmart(maxBytes)
             : '∞';
           return `${minSize} - ${maxSize}`;
-        })() : '0 B - ∞'}
+        })()}
       </div>
 
       {/* Dual Range Slider */}
@@ -281,17 +328,32 @@ export const SizeFilter: React.FC<SizeFilterProps> = ({
       {/* Quick Size Buttons (Presets) */}
       <div className="space-y-1">
         {SIZE_PRESETS.map((preset, index) => {
+          // Helper to check if a preset is selected
+          const isPresetSelected = (): boolean => {
+            if (!value || (value.min === undefined && value.max === undefined)) {
+              return false;
+            }
+            return value.min === preset.min && value.max === preset.max;
+          };
+
           const count = getCountForPreset(preset.label, sizeRangeFacets);
+          const selected = isPresetSelected();
+
           return (
             <button
               key={index}
               onClick={() => handlePresetChange(preset)}
-              className="flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors text-sm w-full text-left hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+              className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors text-sm w-full text-left ${
+                selected
+                  ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+              }`}
+              aria-pressed={selected}
             >
               <span className="truncate text-xs min-w-0 flex-1" title={preset.label}>
                 {preset.label}
               </span>
-              {!isLoading && count !== undefined && (
+              {count !== undefined && (
                 <span className="flex-shrink-0 ml-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
                   {count.toLocaleString()}
                 </span>

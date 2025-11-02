@@ -95,14 +95,14 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Track facets from search results when a query is performed
   // These facets are for the current search query and take precedence over filter-based facets
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [searchResultsFacets, setSearchResultsFacets] = React.useState<DynamicFilters | null>(null);
 
   // Use a ref to track whether we need to reset on filter clear
   const shouldResetRef = React.useRef(false);
 
-  // Check if any filters are active
-  const hasActiveFilters = Object.values(filterParams).some(arr => arr && arr.length > 0);
+  // Check if any filters are active (includes size filter which is an object, not an array)
+  const hasActiveFilters = Object.values(filterParams).some(arr => arr && arr.length > 0) ||
+    (filters.size && (filters.size.min !== undefined || filters.size.max !== undefined));
 
   // Fetch facets when filters change (automatically triggered when filters have values)
   // Pass currentQuery to combine with filters for accurate facet counts
@@ -132,12 +132,19 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
   React.useEffect(() => {
     if (filterFacets) {
       // We have new facets from the API, use them
-      setLastValidFacets(filterFacets);
+      // BUT: Preserve size_ranges from search results (not from filter facets, since size is not sent to the API)
+      // IMPORTANT: Never use filterFacets.size_ranges as it doesn't include the query and will show wrong counts
+      setLastValidFacets({
+        ...filterFacets,
+        size_ranges: lastValidFacets?.size_ranges || [],
+      });
       shouldResetRef.current = true; // Next time filters clear, we should reset
     }
-  }, [filterFacets]);
+  }, [filterFacets, lastValidFacets?.size_ranges]);
 
   // When all filters are cleared, reset to staticFilters to show all options again
+  // Note: size_ranges is NOT reset here because it comes from searchResultsFacets (query-specific)
+  // Resetting it would lose the facet counts for the current search query
   React.useEffect(() => {
     if (!hasActiveFilters && shouldResetRef.current && staticFilters) {
       setLastValidFacets({
@@ -145,11 +152,12 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
         versions: staticFilters.versions || [],
         extensions: staticFilters.extensions || [],
         repositories: staticFilters.repositories || [],
-        size_ranges: staticFilters.size_ranges || [],
+        // Keep existing size_ranges from search results, don't reset to static
+        size_ranges: lastValidFacets?.size_ranges || [],
       });
       shouldResetRef.current = false; // Only reset once per clear
     }
-  }, [hasActiveFilters, staticFilters]);
+  }, [hasActiveFilters, staticFilters, lastValidFacets?.size_ranges]);
 
   const clearFilters = useCallback(() => {
     setFilters({});
@@ -241,41 +249,46 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
   // Smart hybrid strategy:
   // - If no filter selected in a category → show only items with results (dynamic)
   // - If filters selected in a category → show all items (static) with current counts (dynamic)
-  // Use lastValidFacets instead of dynamicFilters to avoid showing zero counts during debounce
-  const hybridFilters: Record<string, Array<{ value: string; count: number }>> = React.useMemo(() => ({
+  // Prioritize searchResultsFacets (from direct search) over lastValidFacets (from /facets API) to avoid flickering
+  const hybridFilters: Record<string, Array<{ value: string; count: number }>> = React.useMemo(() => {
+    // Use search results facets if available (from direct search), otherwise use lastValidFacets
+    const currentFacets = searchResultsFacets || lastValidFacets;
+
+    return {
       projects: (filters.project && filters.project.length > 0)
         ? mergeFiltersWithDynamicCounts(
             (staticFilters?.projects as Array<{ value: string; count: number }>) || [],
-            (lastValidFacets?.projects as Array<{ value: string; count: number }>) || [],
+            (currentFacets?.projects as Array<{ value: string; count: number }>) || [],
             filters.project
           )
-        : (lastValidFacets?.projects as Array<{ value: string; count: number }>) ||
+        : (currentFacets?.projects as Array<{ value: string; count: number }>) ||
           (staticFilters?.projects as Array<{ value: string; count: number }>) || [],
       versions: (filters.version && filters.version.length > 0)
         ? mergeFiltersWithDynamicCounts(
             (staticFilters?.versions as Array<{ value: string; count: number }>) || [],
-            (lastValidFacets?.versions as Array<{ value: string; count: number }>) || [],
+            (currentFacets?.versions as Array<{ value: string; count: number }>) || [],
             filters.version
           )
-        : (lastValidFacets?.versions as Array<{ value: string; count: number }>) ||
+        : (currentFacets?.versions as Array<{ value: string; count: number }>) ||
           (staticFilters?.versions as Array<{ value: string; count: number }>) || [],
       extensions: (filters.extension && filters.extension.length > 0)
         ? mergeFiltersWithDynamicCounts(
             (staticFilters?.extensions as Array<{ value: string; count: number }>) || [],
-            (lastValidFacets?.extensions as Array<{ value: string; count: number }>) || [],
+            (currentFacets?.extensions as Array<{ value: string; count: number }>) || [],
             filters.extension
           )
-        : (lastValidFacets?.extensions as Array<{ value: string; count: number }>) ||
+        : (currentFacets?.extensions as Array<{ value: string; count: number }>) ||
           (staticFilters?.extensions as Array<{ value: string; count: number }>) || [],
       repositories: (filters.repository && filters.repository.length > 0)
         ? mergeFiltersWithDynamicCounts(
             (staticFilters?.repositories as Array<{ value: string; count: number }>) || [],
-            (lastValidFacets?.repositories as Array<{ value: string; count: number }>) || [],
+            (currentFacets?.repositories as Array<{ value: string; count: number }>) || [],
             filters.repository
           )
-        : (lastValidFacets?.repositories as Array<{ value: string; count: number }>) ||
+        : (currentFacets?.repositories as Array<{ value: string; count: number }>) ||
           (staticFilters?.repositories as Array<{ value: string; count: number }>) || [],
-  }), [filters, staticFilters, lastValidFacets, mergeFiltersWithDynamicCounts]);
+    };
+  }, [filters, staticFilters, lastValidFacets, searchResultsFacets, mergeFiltersWithDynamicCounts]);
 
   // Fix 2: Memoize availableFiltersList to prevent .map() recreations every render
   const availableFiltersList: {
@@ -307,8 +320,11 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
       count: r.count || 0,
     })),
     languages: [], // Will be derived from extensions in the future
-    sizeRanges: lastValidFacets?.size_ranges || [],
-  }), [hybridFilters, lastValidFacets?.size_ranges]);
+    // Size ranges should come ONLY from search results facets (query-specific), NOT from filter facets
+    // Filter facets (/facets endpoint) don't include the query, so their size_ranges would be wrong
+    // This ensures counters are accurate for the current search query
+    sizeRanges: searchResultsFacets?.size_ranges || [],
+  }), [hybridFilters, searchResultsFacets?.size_ranges]);
 
   // Fix 1: Memoize the context value to prevent all consumers from re-rendering
   const value: SearchFiltersContextType = React.useMemo(() => ({

@@ -24,20 +24,51 @@ const SearchPageV3: React.FC = () => {
   const sizeFilter = filters.size;
 
   // Function to update URL with current search state
-  const updateURL = useCallback((searchQuery: string, sizeFilter: { min?: number; max?: number } | undefined, page: number = 1) => {
+  const updateURL = useCallback((searchQuery: string, allFilters: typeof filters, page: number = 1) => {
     const params = new URLSearchParams();
 
     if (searchQuery.trim()) {
       params.set('q', searchQuery.trim());
     }
 
+    // Handle multi-select filters
+    if (allFilters.project && allFilters.project.length > 0) {
+      allFilters.project.forEach(project => {
+        params.append('project', project);
+      });
+    }
+
+    if (allFilters.version && allFilters.version.length > 0) {
+      allFilters.version.forEach(version => {
+        params.append('version', version);
+      });
+    }
+
+    if (allFilters.extension && allFilters.extension.length > 0) {
+      allFilters.extension.forEach(extension => {
+        params.append('extension', extension);
+      });
+    }
+
+    if (allFilters.language && allFilters.language.length > 0) {
+      allFilters.language.forEach(language => {
+        params.append('language', language);
+      });
+    }
+
+    if (allFilters.repository && allFilters.repository.length > 0) {
+      allFilters.repository.forEach(repository => {
+        params.append('repository', repository);
+      });
+    }
+
     // Handle size filter
-    if (sizeFilter) {
-      if (sizeFilter.min !== undefined) {
-        params.set('min_size', sizeFilter.min.toString());
+    if (allFilters.size) {
+      if (allFilters.size.min !== undefined) {
+        params.set('min_size', allFilters.size.min.toString());
       }
-      if (sizeFilter.max !== undefined) {
-        params.set('max_size', sizeFilter.max.toString());
+      if (allFilters.size.max !== undefined) {
+        params.set('max_size', allFilters.size.max.toString());
       }
     }
 
@@ -56,6 +87,15 @@ const SearchPageV3: React.FC = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const urlQuery = urlParams.get('q') || '';
+
+    // Parse multi-select filters (can have multiple values with same key)
+    const urlProject = urlParams.getAll('project');
+    const urlVersion = urlParams.getAll('version');
+    const urlExtension = urlParams.getAll('extension');
+    const urlLanguage = urlParams.getAll('language');
+    const urlRepository = urlParams.getAll('repository');
+
+    // Parse size filter
     const urlMinSize = urlParams.get('min_size');
     const urlMaxSize = urlParams.get('max_size');
     const urlPage = parseInt(urlParams.get('page') || '1', 10);
@@ -63,18 +103,25 @@ const SearchPageV3: React.FC = () => {
     // Set React state from URL
     setQuery(urlQuery);
 
-    // Handle size filter - only update the size filter, preserve other filters from context
+    // Build size filter from URL
     const sizeFilterFromUrl = (urlMinSize || urlMaxSize) ? {
       min: urlMinSize ? parseInt(urlMinSize) : undefined,
       max: urlMaxSize ? parseInt(urlMaxSize) : undefined,
     } : undefined;
 
-    // Only update filters if size filter from URL differs from current size filter
-    if (JSON.stringify(sizeFilterFromUrl) !== JSON.stringify(sizeFilter)) {
-      setFilters({
-        ...filters,
-        size: sizeFilterFromUrl,
-      });
+    // Build complete filters object from URL
+    const filtersFromUrl: typeof filters = {
+      ...(urlProject.length > 0 && { project: urlProject }),
+      ...(urlVersion.length > 0 && { version: urlVersion }),
+      ...(urlExtension.length > 0 && { extension: urlExtension }),
+      ...(urlLanguage.length > 0 && { language: urlLanguage }),
+      ...(urlRepository.length > 0 && { repository: urlRepository }),
+      ...(sizeFilterFromUrl && { size: sizeFilterFromUrl }),
+    };
+
+    // Update all filters from URL (only if there are any filters in URL)
+    if (Object.keys(filtersFromUrl).length > 0) {
+      setFilters(filtersFromUrl);
     }
 
     setCurrentPage(urlPage);
@@ -84,8 +131,8 @@ const SearchPageV3: React.FC = () => {
   // Update URL whenever search state changes (only after initialization)
   useEffect(() => {
     if (isInitializing) return;
-    updateURL(query, sizeFilter, currentPage);
-  }, [query, sizeFilter, currentPage, updateURL, isInitializing]);
+    updateURL(query, filters, currentPage);
+  }, [query, filters, currentPage, updateURL, isInitializing]);
 
   // Sync query to context for facet fetching
   useEffect(() => {
@@ -114,6 +161,7 @@ const SearchPageV3: React.FC = () => {
   const facets = searchData?.facets;
 
   // Update context with facets from search results
+  // When query is empty, clear searchResultsFacets to fallback to lastValidFacets
   useEffect(() => {
     if (facets) {
       updateDynamicFilters({
@@ -121,10 +169,14 @@ const SearchPageV3: React.FC = () => {
         versions: facets.versions,
         extensions: facets.extensions,
         repositories: facets.repositories,
-        size_ranges: facets.sizeRanges,
+        // Backend returns size_ranges in snake_case, not camelCase
+        size_ranges: (facets as any).size_ranges || facets.sizeRanges || [],
       });
+    } else if (!query.trim()) {
+      // Query is empty, clear search result facets to use filter-based facets instead
+      updateDynamicFilters(null);
     }
-  }, [facets, updateDynamicFilters]);
+  }, [facets, query, updateDynamicFilters]);
   const pageSize = 20;
   const totalPages = Math.ceil(totalResults / pageSize);
 

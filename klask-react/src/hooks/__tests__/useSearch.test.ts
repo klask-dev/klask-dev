@@ -697,4 +697,65 @@ describe('useFacetsWithFilters hook', () => {
     expect(result.current.data.extensions).toEqual([]);
     expect(result.current.data.repositories).toEqual([]);
   });
+
+  it('should handle size_ranges facets in response', async () => {
+    const mockResponse = {
+      projects: [{ value: 'project1', count: 10 }],
+      versions: [{ value: '1.0', count: 5 }],
+      extensions: [{ value: 'js', count: 8 }],
+      size_ranges: [
+        { value: '< 1 KB', count: 50 },
+        { value: '1 KB - 10 KB', count: 30 },
+        { value: '> 10 MB', count: 5 },
+      ],
+    };
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const { result } = renderHook(
+      () => useFacetsWithFilters({ project: ['project1'] }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Verify size_ranges are properly normalized
+    expect(result.current.data.size_ranges).toBeDefined();
+    expect(result.current.data.size_ranges).toHaveLength(3);
+    expect(result.current.data.size_ranges[0]).toEqual({ value: '< 1 KB', count: 50 });
+    expect(result.current.data.size_ranges[1]).toEqual({ value: '1 KB - 10 KB', count: 30 });
+    expect(result.current.data.size_ranges[2]).toEqual({ value: '> 10 MB', count: 5 });
+  });
+
+  it('should normalize size_ranges to empty array when missing', async () => {
+    const mockResponse = {
+      projects: [{ value: 'project1', count: 10 }],
+      versions: [],
+      extensions: [],
+      // size_ranges is intentionally omitted
+    };
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const { result } = renderHook(
+      () => useFacetsWithFilters({ project: ['project1'] }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Should have an empty array for size_ranges instead of undefined
+    expect(result.current.data.size_ranges).toBeDefined();
+    expect(result.current.data.size_ranges).toEqual([]);
+  });
 });

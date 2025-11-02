@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
 import type {
   SearchQuery,
@@ -198,6 +198,8 @@ export const useMultiSelectSearch = (
     enabled: enabled && !!query.trim(),
     refetchOnWindowFocus,
     staleTime,
+    // Keep previous data while fetching to prevent flickering counters during page refresh or filter changes
+    placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
       if (error && typeof error === 'object' && 'status' in error) {
         const status = (error as any).status;
@@ -402,6 +404,7 @@ const normalizeFacetsResponse = (data: unknown): FacetsApiResponse => {
       extensions: [],
       repositories: [],
       languages: [],
+      size_ranges: [],
     };
   }
 
@@ -430,6 +433,7 @@ const normalizeFacetsResponse = (data: unknown): FacetsApiResponse => {
     extensions: normalizeFacetArray(response.extensions),
     repositories: normalizeFacetArray(response.repositories),
     languages: normalizeFacetArray(response.languages),
+    size_ranges: normalizeFacetArray(response.size_ranges),
   };
 };
 
@@ -553,6 +557,9 @@ export const useFacetsWithFilters = (
     enabled: enabled,
     refetchOnWindowFocus,
     staleTime,
+    // Keep previous data while fetching new facets to avoid flickering counters
+    // This ensures a smooth UX when filter selection triggers a new facet request
+    placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
       // Don't retry on 4xx errors (client errors)
       if (error && typeof error === 'object' && 'status' in error) {

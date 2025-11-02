@@ -295,7 +295,7 @@ describe('SizeFilter Component', () => {
   });
 
   describe('Loading State', () => {
-    it('should hide counters when isLoading is true', () => {
+    it('should display counters even when isLoading is true', () => {
       const mockFacets = [
         { value: '< 1 KB', count: 10 },
         { value: '1 KB - 10 KB', count: 25 },
@@ -305,7 +305,7 @@ describe('SizeFilter Component', () => {
         { value: '> 10 MB', count: 200 },
       ];
 
-      const { container } = render(
+      render(
         <SizeFilter
           value={undefined}
           onChange={mockOnChange}
@@ -314,12 +314,13 @@ describe('SizeFilter Component', () => {
         />
       );
 
-      // Count badges should not be displayed when loading
-      const countElements = container.querySelectorAll('[class*="rounded-full"]');
-      expect(countElements.length).toBe(0);
+      // Counters should still be displayed when loading (to maintain filter context)
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('25')).toBeInTheDocument();
+      expect(screen.getByText('50')).toBeInTheDocument();
     });
 
-    it('should display counters when isLoading transitions from true to false', () => {
+    it('should maintain counter display consistency during isLoading state transitions', () => {
       const mockFacets = [
         { value: '< 1 KB', count: 10 },
         { value: '1 KB - 10 KB', count: 25 },
@@ -329,7 +330,7 @@ describe('SizeFilter Component', () => {
         { value: '> 10 MB', count: 200 },
       ];
 
-      const { rerender, container } = render(
+      const { rerender } = render(
         <SizeFilter
           value={undefined}
           onChange={mockOnChange}
@@ -338,9 +339,9 @@ describe('SizeFilter Component', () => {
         />
       );
 
-      // Initially no counters should be visible
-      let countElements = container.querySelectorAll('[class*="rounded-full"]');
-      expect(countElements.length).toBe(0);
+      // Counters visible during loading
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('200')).toBeInTheDocument();
 
       // Rerender with isLoading false
       rerender(
@@ -352,7 +353,7 @@ describe('SizeFilter Component', () => {
         />
       );
 
-      // Now counters should be visible
+      // Counters remain visible
       expect(screen.getByText('10')).toBeInTheDocument();
       expect(screen.getByText('25')).toBeInTheDocument();
     });
@@ -801,6 +802,110 @@ describe('SizeFilter Component', () => {
         expect(mockOnChange).toHaveBeenCalled();
       });
     });
+
+    it('should highlight selected preset with blue background and text', () => {
+      const mockFacets = [
+        { value: '< 1 KB', count: 10 },
+        { value: '1 KB - 10 KB', count: 25 },
+        { value: '10 KB - 100 KB', count: 50 },
+        { value: '100 KB - 1 MB', count: 75 },
+        { value: '1 MB - 10 MB', count: 100 },
+        { value: '> 10 MB', count: 200 },
+      ];
+
+      render(
+        <SizeFilter
+          value={{ min: undefined, max: 1024 }}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Find the "< 1 KB" preset button (it should be selected)
+      const selectedButton = screen.getByText('< 1 KB').closest('button');
+
+      // Check that it has blue background classes
+      expect(selectedButton).toHaveClass('bg-blue-50');
+      expect(selectedButton).toHaveClass('dark:bg-blue-900');
+
+      // Check that it has blue text classes
+      expect(selectedButton).toHaveClass('text-blue-700');
+      expect(selectedButton).toHaveClass('dark:text-blue-200');
+
+      // Check aria-pressed attribute
+      expect(selectedButton).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('should move selected preset to top and keep counters visible', () => {
+      const mockFacets = [
+        { value: '< 1 KB', count: 10 },
+        { value: '1 KB - 10 KB', count: 25 },
+        { value: '10 KB - 100 KB', count: 50 },
+        { value: '100 KB - 1 MB', count: 75 },
+        { value: '1 MB - 10 MB', count: 100 },
+        { value: '> 10 MB', count: 200 },
+      ];
+
+      render(
+        <SizeFilter
+          value={{ min: 1024, max: 10 * 1024 }}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // The selected preset "1 KB - 10 KB" should be highlighted with blue background
+      const selectedButton = screen.getByText('1 KB - 10 KB').closest('button');
+      expect(selectedButton).toHaveClass('bg-blue-50');
+
+      // Counter should be visible
+      expect(screen.getByText('25')).toBeInTheDocument();
+
+      // All other counters should also be visible
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('50')).toBeInTheDocument();
+    });
+
+    it('should remove blue highlight when preset is deselected via slider', async () => {
+      const user = userEvent.setup();
+      const mockFacets = [
+        { value: '< 1 KB', count: 10 },
+        { value: '1 KB - 10 KB', count: 25 },
+        { value: '10 KB - 100 KB', count: 50 },
+        { value: '100 KB - 1 MB', count: 75 },
+        { value: '1 MB - 10 MB', count: 100 },
+        { value: '> 10 MB', count: 200 },
+      ];
+
+      const { rerender } = render(
+        <SizeFilter
+          value={{ min: undefined, max: 1024 }}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Verify initial selection highlighting
+      let selectedButton = screen.getByText('< 1 KB').closest('button');
+      expect(selectedButton).toHaveClass('bg-blue-50');
+
+      // Simulate changing to custom slider range (not matching any preset)
+      rerender(
+        <SizeFilter
+          value={{ min: 500, max: 5000 }}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Button should no longer have blue background
+      selectedButton = screen.getByText('< 1 KB').closest('button');
+      expect(selectedButton).not.toHaveClass('bg-blue-50');
+
+      // But counters should still be visible
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('200')).toBeInTheDocument();
+    });
   });
 
   describe('Range Display', () => {
@@ -1031,6 +1136,108 @@ describe('SizeFilter Component', () => {
       expect(container.querySelector('.filters-container')).toBeInTheDocument();
       expect(screen.getByText('Other Filter')).toBeInTheDocument();
       expect(screen.getByText('File Size')).toBeInTheDocument();
+    });
+  });
+
+  describe('Counter Persistence After Clear', () => {
+    it('should restore counters after clearing the filter', async () => {
+      const user = userEvent.setup();
+      const mockFacets = [
+        { value: '< 1 KB', count: 10 },
+        { value: '1 KB - 10 KB', count: 25 },
+        { value: '10 KB - 100 KB', count: 50 },
+        { value: '100 KB - 1 MB', count: 75 },
+        { value: '1 MB - 10 MB', count: 100 },
+        { value: '> 10 MB', count: 200 },
+      ];
+
+      const { rerender } = render(
+        <SizeFilter
+          value={undefined}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Verify initial state shows counters
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('25')).toBeInTheDocument();
+      expect(screen.getByText('50')).toBeInTheDocument();
+
+      // Click a preset to activate the filter
+      const firstPreset = screen.getByText('< 1 KB').closest('button');
+      await user.click(firstPreset!);
+
+      // Simulate the prop change after selection (counters should hide when custom range is used)
+      rerender(
+        <SizeFilter
+          value={{ min: undefined, max: 1024 }}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Simulate clearing the filter
+      rerender(
+        <SizeFilter
+          value={undefined}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Verify counters are back after clearing
+      await waitFor(() => {
+        expect(screen.getByText('10')).toBeInTheDocument();
+        expect(screen.getByText('25')).toBeInTheDocument();
+        expect(screen.getByText('50')).toBeInTheDocument();
+        expect(screen.getByText('75')).toBeInTheDocument();
+        expect(screen.getByText('100')).toBeInTheDocument();
+        expect(screen.getByText('200')).toBeInTheDocument();
+      });
+    });
+
+    it('should preserve counters when facets prop remains unchanged after clear', async () => {
+      const mockFacets = [
+        { value: '< 1 KB', count: 10 },
+        { value: '1 KB - 10 KB', count: 25 },
+        { value: '10 KB - 100 KB', count: 50 },
+        { value: '100 KB - 1 MB', count: 75 },
+        { value: '1 MB - 10 MB', count: 100 },
+        { value: '> 10 MB', count: 200 },
+      ];
+
+      const { rerender } = render(
+        <SizeFilter
+          value={undefined}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Initial counters visible
+      expect(screen.getByText('10')).toBeInTheDocument();
+
+      // Simulate filter being set then cleared (facets stay same)
+      rerender(
+        <SizeFilter
+          value={{ min: 1024, max: 100 * 1024 }}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      rerender(
+        <SizeFilter
+          value={undefined}
+          onChange={mockOnChange}
+          sizeRangeFacets={mockFacets}
+        />
+      );
+
+      // Counters should still be visible
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('200')).toBeInTheDocument();
     });
   });
 });
