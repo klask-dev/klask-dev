@@ -46,8 +46,8 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: postgresql
-              app.kubernetes.io/instance: {{ .Release.Name }}
+              {{- include "klask.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgresql
       ports:
         - protocol: TCP
           port: 5432
@@ -140,8 +140,8 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: postgresql
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- include "klask.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgresql
   policyTypes:
     - Ingress
     - Egress
