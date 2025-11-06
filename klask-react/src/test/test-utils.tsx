@@ -4,19 +4,38 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
+// Create a shared QueryClient instance to reduce memory usage
+// This is created once and reused across tests, only clearing the cache
+let sharedQueryClient: QueryClient | null = null;
+
+const getQueryClient = () => {
+  if (!sharedQueryClient) {
+    sharedQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          refetchOnWindowFocus: false,
+          staleTime: 0,
+          gcTime: 0, // Immediately garbage collect unused queries
+        },
+        mutations: {
+          retry: false,
+        },
+      },
+    });
+  }
+  return sharedQueryClient;
+};
+
+// Helper to clear the query client cache between tests
+export const clearQueryClientCache = () => {
+  const client = getQueryClient();
+  client.clear();
+};
+
 // Create a custom render function that includes providers
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        refetchOnWindowFocus: false,
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  });
+  const queryClient = getQueryClient();
 
   return (
     <BrowserRouter>

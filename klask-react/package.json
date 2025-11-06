@@ -11,9 +11,10 @@
     "lint": "eslint .",
     "lint:ci": "eslint . --max-warnings 500",
     "preview": "vite preview",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest",
+    "test:ui": "NODE_OPTIONS='--max-old-space-size=4096' vitest --ui",
+    "test:coverage": "NODE_OPTIONS='--max-old-space-size=4096' vitest --coverage",
+    "test:ci": "NODE_OPTIONS='--max-old-space-size=2048' vitest run"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",

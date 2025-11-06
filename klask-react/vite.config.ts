@@ -53,5 +53,21 @@ export default defineConfig({
       '**/OptimizedSyntaxHighlighter.test.tsx',
       '**/VirtualizedSyntaxHighlighter.test.tsx',
     ],
+    // Performance optimizations
+    maxWorkers: 2,
+    minWorkers: 1,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: false,
+        maxThreads: 2,
+        minThreads: 1,
+      },
+    },
+    // Isolate tests to free memory
+    isolate: true,
+    // Shorter timeouts for stuck tests
+    testTimeout: 10000, // 10s max per test
+    hookTimeout: 5000,  // 5s max per hook
   },
 })
