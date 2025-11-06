@@ -30,6 +30,43 @@ const createWrapper = () => {
   );
 };
 
+// Shared mock data for performance (created once, reused across tests)
+const sharedMockResults: SearchResult[] = [
+  {
+    file_id: '1',
+    doc_address: '0:1',
+    name: 'main.rs',
+    path: 'src/main.rs',
+    content_snippet: 'fn main() { println!("Hello"); }',
+    project: 'klask-io/klask',
+    repository_name: 'klask-io/klask',
+    version: 'main',
+    extension: 'rs',
+    score: 1.5,
+  },
+  {
+    file_id: '2',
+    doc_address: '0:2',
+    name: 'lib.rs',
+    path: 'src/lib.rs',
+    content_snippet: 'pub fn hello() { }',
+    project: 'rust-lang/rust',
+    repository_name: 'rust-lang/rust',
+    version: 'main',
+    extension: 'rs',
+    score: 1.2,
+  },
+];
+
+const sharedFacets = {
+  projects: [
+    { value: 'klask-io/klask', count: 1 },
+    { value: 'rust-lang/rust', count: 1 },
+  ],
+  versions: [{ value: 'main', count: 2 }],
+  extensions: [{ value: 'rs', count: 2 }],
+};
+
 describe('SearchPage - Repository Functionality', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,46 +95,12 @@ describe('SearchPage - Repository Functionality', () => {
   });
 
   it('displays repository/project name in search results', async () => {
-    const mockSearchResults: SearchResult[] = [
-      {
-        file_id: '1',
-        doc_address: '0:1',
-        name: 'main.rs',
-        path: 'src/main.rs',
-        content_snippet: 'fn main() { println!("Hello"); }',
-        project: 'klask-io/klask',
-        repository_name: 'klask-io/klask',
-        version: 'main',
-        extension: 'rs',
-        score: 1.5,
-      },
-      {
-        file_id: '2',
-        doc_address: '0:2',
-        name: 'lib.rs',
-        path: 'src/lib.rs',
-        content_snippet: 'pub fn hello() { }',
-        project: 'rust-lang/rust',
-        repository_name: 'rust-lang/rust',
-        version: 'main',
-        extension: 'rs',
-        score: 1.2,
-      },
-    ];
-
     const mockSearchResponse: SearchResponse = {
-      results: mockSearchResults,
+      results: sharedMockResults,
       total: 2,
       page: 1,
       size: 20,
-      facets: {
-        projects: [
-          { value: 'klask-io/klask', count: 1 },
-          { value: 'rust-lang/rust', count: 1 },
-        ],
-        versions: [{ value: 'main', count: 2 }],
-        extensions: [{ value: 'rs', count: 2 }],
-      },
+      facets: sharedFacets,
     };
 
     vi.mocked(useSearch.useMultiSelectSearch).mockReturnValue({
@@ -117,15 +120,12 @@ describe('SearchPage - Repository Functionality', () => {
 
     render(<SearchPage />, { wrapper: createWrapper() });
 
-    // Type a search query
-    const searchInput = screen.getByPlaceholderText(/search/i);
-    await userEvent.type(searchInput, 'hello');
-
+    // Results already mocked, just check they're displayed
     await waitFor(() => {
       expect(screen.getByText('main.rs')).toBeInTheDocument();
     });
 
-    // Verify repository names are displayed (using getAllByText to handle duplicates)
+    // Verify repository names are displayed
     const klaskElements = screen.getAllByText(/klask-io\/klask/i);
     expect(klaskElements.length).toBeGreaterThan(0);
 

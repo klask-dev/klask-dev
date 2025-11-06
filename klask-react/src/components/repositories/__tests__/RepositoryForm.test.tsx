@@ -24,12 +24,10 @@ describe('RepositoryForm - Filtering Fields', () => {
   });
 
   // ============================================================================
-  // Section 1: Tab Visibility Tests
+  // Section 1: Tab Visibility Tests (Combined for performance)
   // ============================================================================
   describe('Tab Visibility', () => {
-    it('should show "Filters & Exclusions" tab for Git repositories', async () => {
-      const user = userEvent.setup();
-
+    it('should show "Filters & Exclusions" tab for all repository types', () => {
       render(
         <RepositoryForm
           isOpen={true}
@@ -39,77 +37,30 @@ describe('RepositoryForm - Filtering Fields', () => {
         />
       );
 
-      // Git is default, so Filters tab should exist
-      const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
+      // Git is default - Filters tab should exist
+      let filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
       expect(filtersTab).toBeInTheDocument();
-    });
 
-    it('should show "Filters & Exclusions" tab for GitLab repositories', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <RepositoryForm
-          isOpen={true}
-          onClose={mockOnClose}
-          onSubmit={mockOnSubmit}
-          isLoading={false}
-        />
-      );
-
-      // Select GitLab type
+      // Test GitLab
       const gitlabRadio = screen.getByRole('radio', { name: /gitlab/i });
-      await user.click(gitlabRadio);
-
-      // Filters tab should be visible
-      const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
+      gitlabRadio.click();
+      filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
       expect(filtersTab).toBeInTheDocument();
-    });
 
-    it('should show "Filters & Exclusions" tab for GitHub repositories', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <RepositoryForm
-          isOpen={true}
-          onClose={mockOnClose}
-          onSubmit={mockOnSubmit}
-          isLoading={false}
-        />
-      );
-
-      // Select GitHub type
+      // Test GitHub
       const githubRadio = screen.getByRole('radio', { name: /github/i });
-      await user.click(githubRadio);
-
-      // Filters tab should be visible
-      const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
+      githubRadio.click();
+      filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
       expect(filtersTab).toBeInTheDocument();
-    });
 
-    it('should show "Filters & Exclusions" tab for FileSystem repositories', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <RepositoryForm
-          isOpen={true}
-          onClose={mockOnClose}
-          onSubmit={mockOnSubmit}
-          isLoading={false}
-        />
-      );
-
-      // Select FileSystem type
+      // Test FileSystem
       const fileSystemRadio = screen.getByRole('radio', { name: /filesystem/i });
-      await user.click(fileSystemRadio);
-
-      // Filters tab should still be visible (shows "no filters available" message)
-      const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
+      fileSystemRadio.click();
+      filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
       expect(filtersTab).toBeInTheDocument();
     });
 
-    it('should display branch selection section in filters tab', async () => {
-      const user = userEvent.setup();
-
+    it('should display branch selection section in filters tab', () => {
       render(
         <RepositoryForm
           isOpen={true}
@@ -121,18 +72,14 @@ describe('RepositoryForm - Filtering Fields', () => {
 
       // Click Filters tab
       const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
-      await user.click(filtersTab);
+      filtersTab.click();
 
       // Branch Selection section should be visible
-      await waitFor(() => {
-        expect(screen.getByText('Branch Selection')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Branch Selection')).toBeInTheDocument();
     });
 
-    it('should display project selection section only for GitLab', async () => {
-      const user = userEvent.setup();
-
-      render(
+    it('should display type-specific selection sections in filters tab', () => {
+      const { rerender } = render(
         <RepositoryForm
           isOpen={true}
           onClose={mockOnClose}
@@ -141,24 +88,17 @@ describe('RepositoryForm - Filtering Fields', () => {
         />
       );
 
-      // Select GitLab
+      // Test GitLab - should show Project Selection
       const gitlabRadio = screen.getByRole('radio', { name: /gitlab/i });
-      await user.click(gitlabRadio);
+      gitlabRadio.click();
 
-      // Click Filters tab
-      const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
-      await user.click(filtersTab);
+      let filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
+      filtersTab.click();
 
-      // Project Selection section should be visible
-      await waitFor(() => {
-        expect(screen.getByText('Project Selection')).toBeInTheDocument();
-      });
-    });
+      expect(screen.getByText('Project Selection')).toBeInTheDocument();
 
-    it('should display repository selection section only for GitHub', async () => {
-      const user = userEvent.setup();
-
-      render(
+      // Test GitHub - should show Repository Selection
+      rerender(
         <RepositoryForm
           isOpen={true}
           onClose={mockOnClose}
@@ -167,18 +107,13 @@ describe('RepositoryForm - Filtering Fields', () => {
         />
       );
 
-      // Select GitHub
       const githubRadio = screen.getByRole('radio', { name: /github/i });
-      await user.click(githubRadio);
+      githubRadio.click();
 
-      // Click Filters tab
-      const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
-      await user.click(filtersTab);
+      filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
+      filtersTab.click();
 
-      // Repository Selection section should be visible
-      await waitFor(() => {
-        expect(screen.getByText('Repository Selection')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Repository Selection')).toBeInTheDocument();
     });
   });
 
