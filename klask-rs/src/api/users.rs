@@ -189,20 +189,18 @@ async fn update_user(
     }
 
     // Check for username/email conflicts if they're being updated
-    if let Some(ref username) = payload.username {
-        if let Ok(Some(existing_user)) = user_repository.find_by_username(username).await {
-            if existing_user.id != id {
-                return Err(AuthError::UsernameExists);
-            }
-        }
+    if let Some(ref username) = payload.username
+        && let Ok(Some(existing_user)) = user_repository.find_by_username(username).await
+        && existing_user.id != id
+    {
+        return Err(AuthError::UsernameExists);
     }
 
-    if let Some(ref email) = payload.email {
-        if let Ok(Some(existing_user)) = user_repository.find_by_email(email).await {
-            if existing_user.id != id {
-                return Err(AuthError::EmailExists);
-            }
-        }
+    if let Some(ref email) = payload.email
+        && let Ok(Some(existing_user)) = user_repository.find_by_email(email).await
+        && existing_user.id != id
+    {
+        return Err(AuthError::EmailExists);
     }
 
     // Update basic user info if provided

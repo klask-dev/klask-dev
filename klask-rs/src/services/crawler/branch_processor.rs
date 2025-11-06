@@ -457,10 +457,10 @@ impl BranchProcessor {
                 }
 
                 // Check file size
-                if let Ok(metadata) = file_path.metadata() {
-                    if metadata.len() > MAX_FILE_SIZE {
-                        continue;
-                    }
+                if let Ok(metadata) = file_path.metadata()
+                    && metadata.len() > MAX_FILE_SIZE
+                {
+                    continue;
                 }
 
                 total_files += 1;
@@ -498,11 +498,11 @@ impl BranchProcessor {
                 }
 
                 // Check file size
-                if let Ok(metadata) = file_path.metadata() {
-                    if metadata.len() > MAX_FILE_SIZE {
-                        debug!("Skipping large file: {} ({} bytes)", relative_path_str, metadata.len());
-                        continue;
-                    }
+                if let Ok(metadata) = file_path.metadata()
+                    && metadata.len() > MAX_FILE_SIZE
+                {
+                    debug!("Skipping large file: {} ({} bytes)", relative_path_str, metadata.len());
+                    continue;
                 }
 
                 files.push((file_path.to_path_buf(), relative_path_str));

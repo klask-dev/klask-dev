@@ -334,10 +334,9 @@ async fn calculate_directory_size(dir: &PathBuf) -> Result<u64> {
 
             if !dir_name_str.starts_with('.')
                 && !matches!(dir_name_str.as_ref(), "node_modules" | "target" | "build" | "dist")
+                && let Ok(subdir_size) = Box::pin(calculate_directory_size(&entry.path())).await
             {
-                if let Ok(subdir_size) = Box::pin(calculate_directory_size(&entry.path())).await {
-                    total_size += subdir_size;
-                }
+                total_size += subdir_size;
             }
         }
     }
@@ -377,10 +376,10 @@ async fn count_files_in_directory(dir: &PathBuf) -> Result<i64> {
 
         if metadata.is_file() {
             // Check if it's a supported file type
-            if let Some(extension) = entry.path().extension() {
-                if is_supported_extension(extension.to_string_lossy().as_ref()) {
-                    file_count += 1;
-                }
+            if let Some(extension) = entry.path().extension()
+                && is_supported_extension(extension.to_string_lossy().as_ref())
+            {
+                file_count += 1;
             }
         } else if metadata.is_dir() {
             let dir_name = entry.file_name();
@@ -388,10 +387,9 @@ async fn count_files_in_directory(dir: &PathBuf) -> Result<i64> {
 
             if !dir_name_str.starts_with('.')
                 && !matches!(dir_name_str.as_ref(), "node_modules" | "target" | "build" | "dist")
+                && let Ok(subdir_count) = Box::pin(count_files_in_directory(&entry.path())).await
             {
-                if let Ok(subdir_count) = Box::pin(count_files_in_directory(&entry.path())).await {
-                    file_count += subdir_count;
-                }
+                file_count += subdir_count;
             }
         }
     }
@@ -523,11 +521,11 @@ async fn create_repository(
     let repo_repository = RepositoryRepository::new(app_state.database.pool().clone());
 
     // Validate GitHub namespace if provided
-    if let Some(ref github_namespace) = request.github_namespace {
-        if let Err(e) = validate_github_namespace(github_namespace) {
-            error!("Invalid GitHub namespace '{}': {}", github_namespace, e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref github_namespace) = request.github_namespace
+        && let Err(e) = validate_github_namespace(github_namespace)
+    {
+        error!("Invalid GitHub namespace '{}': {}", github_namespace, e);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     // Encrypt access token if provided
@@ -804,17 +802,15 @@ async fn update_repository(
             }
 
             // If scheduling was changed, reschedule the repository
-            if scheduling_changed {
-                if let Some(scheduler) = &app_state.scheduler_service {
-                    // Unschedule first (in case it was already scheduled)
-                    let _ = scheduler.unschedule_repository(id).await;
+            if scheduling_changed && let Some(scheduler) = &app_state.scheduler_service {
+                // Unschedule first (in case it was already scheduled)
+                let _ = scheduler.unschedule_repository(id).await;
 
-                    // Reschedule if auto_crawl is enabled
-                    if updated_repo.auto_crawl_enabled {
-                        if let Err(e) = scheduler.schedule_repository(&updated_repo).await {
-                            warn!("Failed to reschedule repository {}: {}", id, e);
-                        }
-                    }
+                // Reschedule if auto_crawl is enabled
+                if updated_repo.auto_crawl_enabled
+                    && let Err(e) = scheduler.schedule_repository(&updated_repo).await
+                {
+                    warn!("Failed to reschedule repository {}: {}", id, e);
                 }
             }
 
@@ -1007,11 +1003,11 @@ async fn discover_github_repositories(
     );
 
     // Validate GitHub namespace if provided
-    if let Some(ref namespace) = request.namespace {
-        if let Err(e) = validate_github_namespace(namespace) {
-            error!("Invalid GitHub namespace '{}': {}", namespace, e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref namespace) = request.namespace
+        && let Err(e) = validate_github_namespace(namespace)
+    {
+        error!("Invalid GitHub namespace '{}': {}", namespace, e);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     let github_service = GitHubService::new();

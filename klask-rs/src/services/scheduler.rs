@@ -225,10 +225,10 @@ impl SchedulerService {
 
         if let Some(job) = jobs.get(&repository_id) {
             // Parse the cron and get next occurrence
-            if let Ok(cron) = job.cron_expression.parse::<Cron>() {
-                if let Ok(next) = cron.find_next_occurrence(&Utc::now(), false) {
-                    return Some(next);
-                }
+            if let Ok(cron) = job.cron_expression.parse::<Cron>()
+                && let Ok(next) = cron.find_next_occurrence(&Utc::now(), false)
+            {
+                return Some(next);
             }
         }
 
@@ -344,16 +344,16 @@ impl SchedulerService {
                 .map(|r| r.name.clone())
                 .unwrap_or_else(|| format!("Unknown ({})", repo_id));
 
-            if let Ok(cron) = job.cron_expression.parse::<Cron>() {
-                if let Ok(next_run) = cron.find_next_occurrence(&Utc::now(), false) {
-                    next_runs.push(NextRun {
-                        repository_id: *repo_id,
-                        repository_name: repo_name,
-                        next_run_at: next_run,
-                        cron_expression: job.cron_expression.clone(),
-                        schedule_expression: job.cron_expression.clone(),
-                    });
-                }
+            if let Ok(cron) = job.cron_expression.parse::<Cron>()
+                && let Ok(next_run) = cron.find_next_occurrence(&Utc::now(), false)
+            {
+                next_runs.push(NextRun {
+                    repository_id: *repo_id,
+                    repository_name: repo_name,
+                    next_run_at: next_run,
+                    cron_expression: job.cron_expression.clone(),
+                    schedule_expression: job.cron_expression.clone(),
+                });
             }
         }
 

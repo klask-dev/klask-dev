@@ -43,22 +43,21 @@ impl Default for GitHubService {
 impl GitHubService {
     /// Check GitHub API rate limit from response headers and log warnings/errors
     fn check_github_rate_limit(response: &reqwest::Response) {
-        if let Some(remaining) = response.headers().get("x-ratelimit-remaining") {
-            if let Ok(remaining_str) = remaining.to_str() {
-                if let Ok(remaining_count) = remaining_str.parse::<i32>() {
-                    if remaining_count == 0 {
-                        tracing::error!("GitHub rate limit exhausted! Check x-ratelimit-reset header.");
+        if let Some(remaining) = response.headers().get("x-ratelimit-remaining")
+            && let Ok(remaining_str) = remaining.to_str()
+            && let Ok(remaining_count) = remaining_str.parse::<i32>()
+        {
+            if remaining_count == 0 {
+                tracing::error!("GitHub rate limit exhausted! Check x-ratelimit-reset header.");
 
-                        // Try to get reset time for better error message
-                        if let Some(reset) = response.headers().get("x-ratelimit-reset") {
-                            if let Ok(reset_str) = reset.to_str() {
-                                tracing::error!("Rate limit will reset at timestamp: {}", reset_str);
-                            }
-                        }
-                    } else if remaining_count < 100 {
-                        tracing::warn!("GitHub rate limit low: {} requests remaining", remaining_count);
-                    }
+                // Try to get reset time for better error message
+                if let Some(reset) = response.headers().get("x-ratelimit-reset")
+                    && let Ok(reset_str) = reset.to_str()
+                {
+                    tracing::error!("Rate limit will reset at timestamp: {}", reset_str);
                 }
+            } else if remaining_count < 100 {
+                tracing::warn!("GitHub rate limit low: {} requests remaining", remaining_count);
             }
         }
     }
