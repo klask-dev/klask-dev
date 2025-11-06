@@ -5,7 +5,10 @@ on:
   workflow_run:
     workflows: ["1️⃣ Tests"]
     types:
-    - completed
+      - completed
+    branches:
+      - main
+      - master
 
 env:
   REGISTRY: ghcr.io

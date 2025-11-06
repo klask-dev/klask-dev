@@ -2,15 +2,17 @@
 # This workflow publishes the Helm chart to OCI registry
 # Docker images are handled by the main ci.yml workflow
 
-name: Publish Helm Chart
+name: 3️⃣ Publish Helm Chart
 
 on:
+  workflow_dispatch:  # Permettre déclenchement manuel
   workflow_run:
     workflows: ["2️⃣ Build images"]
     types:
       - completed
-    # Déclencher pour toutes les branches qui ont des builds (PR + main/master)
-  workflow_dispatch:  # Permettre déclenchement manuel
+    branches:
+      - main
+      - master
 
 env:
   REGISTRY: ghcr.io
