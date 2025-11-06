@@ -29,10 +29,13 @@ describe('profileValidation', () => {
 
   describe('validatePhone', () => {
     it('should validate phone numbers', () => {
+      // E.164 format requires + prefix
       expect(validatePhone('+1234567890')).toBe(true);
-      expect(validatePhone('(123) 456-7890')).toBe(true);
-      expect(validatePhone('123-456-7890')).toBe(true);
-      expect(validatePhone('1234567890')).toBe(true);
+      expect(validatePhone('+12345678901')).toBe(true);
+      expect(validatePhone('+123456789012')).toBe(true);
+
+      // Formatted numbers are cleaned but still need + prefix
+      expect(validatePhone('+1 (234) 567-890')).toBe(true);
     });
 
     it('should reject invalid phone numbers', () => {
