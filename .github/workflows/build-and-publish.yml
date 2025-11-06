@@ -6,7 +6,7 @@ name: Publish Helm Chart
 
 on:
   workflow_run:
-    workflows: ["CI/CD Pipeline"]
+    workflows: ["2️⃣ Build images"]
     types:
       - completed
     # Déclencher pour toutes les branches qui ont des builds (PR + main/master)
@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-      
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -46,7 +46,7 @@ jobs:
       run: |
         cd charts/klask
         BASE_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
-        
+
         if [[ "${{ github.event_name }}" == "workflow_run" && "${{ github.event.workflow_run.head_branch }}" == "main" ]] || [[ "${{ github.event_name }}" == "workflow_run" && "${{ github.event.workflow_run.head_branch }}" == "master" ]]; then
           # Pour main/master: version stable
           CHART_VERSION="$BASE_VERSION"
@@ -63,7 +63,7 @@ jobs:
             CHART_VERSION="$BASE_VERSION-dev"
           fi
         fi
-        
+
         echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
         echo "📦 Chart version will be: $CHART_VERSION"
 
@@ -83,12 +83,11 @@ jobs:
     - name: Push Helm chart to OCI registry
       run: |
         cd charts
-        
+
         # Login to GHCR for Helm
         echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} --username ${{ github.actor }} --password-stdin
-        
+
         # Push the chart
         helm push klask-${{ steps.chart-version.outputs.version }}.tgz oci://${{ env.REGISTRY }}/${{ github.repository_owner }}
-        
-        echo "🚀 Pushed chart: oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/klask:${{ steps.chart-version.outputs.version }}"
 
+        echo "🚀 Pushed chart: oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/klask:${{ steps.chart-version.outputs.version }}"

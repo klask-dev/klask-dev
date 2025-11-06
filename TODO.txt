@@ -61,3 +61,5 @@ _ parfois j'ai INFO tantivy::indexer::index_writer: Buffer limit reached, flushi
 - on flush pas régulièrement comme avant, lors des longs crawl c'est problèmatique
 - WARN sqlx::pool::acquire: acquired connection, but time to acquire exceeded slow threshold aquired_after_secs=7.390929384 slow_acquire_threshold_secs=2.0
 - cargo tree -e no-dev montre beaucoup de dépendances gix, à voir avec les features si on peut réduire le champ des dépendances
+- lancer les tests front avec --coverage pour augmenter la couverture de tests
+- corriger les tests frontend skipped

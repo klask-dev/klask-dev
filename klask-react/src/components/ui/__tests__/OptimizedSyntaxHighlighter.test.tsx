@@ -99,13 +99,13 @@ describe('OptimizedSyntaxHighlighter', () => {
   });
 
   it('uses virtualized highlighter for large content', async () => {
-    const largeContent = 'line\n'.repeat(2000); // More than maxLines default (1000)
-    
+    const largeContent = 'line\n'.repeat(150); // Reduced from 2000 to 150 for performance
+
     render(
       <OptimizedSyntaxHighlighter
         language="javascript"
         enableVirtualization={true}
-        maxLines={1000}
+        maxLines={100}
       >
         {largeContent}
       </OptimizedSyntaxHighlighter>
@@ -117,8 +117,8 @@ describe('OptimizedSyntaxHighlighter', () => {
   });
 
   it('uses virtualized highlighter for large file size', async () => {
-    const largeContent = 'a'.repeat(150000); // More than 100KB threshold
-    
+    const largeContent = 'a'.repeat(120000); // Reduced from 150000 to 120000 for performance
+
     render(
       <OptimizedSyntaxHighlighter
         language="javascript"
@@ -134,8 +134,8 @@ describe('OptimizedSyntaxHighlighter', () => {
   });
 
   it('does not use virtualization when disabled', () => {
-    const largeContent = 'line\n'.repeat(2000);
-    
+    const largeContent = 'line\n'.repeat(150); // Reduced from 2000 to 150 for performance
+
     render(
       <OptimizedSyntaxHighlighter
         language="javascript"
@@ -152,8 +152,8 @@ describe('OptimizedSyntaxHighlighter', () => {
 
   it('passes correct props to virtualized highlighter', async () => {
     const VirtualizedHighlighter = await import('../VirtualizedSyntaxHighlighter');
-    const largeContent = 'line\n'.repeat(2000);
-    
+    const largeContent = 'line\n'.repeat(150); // Reduced from 2000 to 150 for performance
+
     render(
       <OptimizedSyntaxHighlighter
         language="rust"
@@ -163,7 +163,7 @@ describe('OptimizedSyntaxHighlighter', () => {
         customStyle={{ fontSize: '16px' }}
         lineNumberStyle={{ color: 'red' }}
         className="test-class"
-        maxLines={500}
+        maxLines={100}
       >
         {largeContent}
       </OptimizedSyntaxHighlighter>
@@ -182,7 +182,7 @@ describe('OptimizedSyntaxHighlighter', () => {
         customStyle: { fontSize: '16px' },
         lineNumberStyle: { color: 'red' },
         className: 'test-class',
-        maxLines: 500,
+        maxLines: 100,
         children: largeContent,
       }),
       expect.any(Object)
@@ -353,8 +353,8 @@ describe('OptimizedSyntaxHighlighter', () => {
   });
 
   it('respects custom maxLines prop', async () => {
-    const content = 'line\n'.repeat(200); // More than custom maxLines but less than default
-    
+    const content = 'line\n'.repeat(120); // Reduced from 200 to 120 for performance
+
     render(
       <OptimizedSyntaxHighlighter
         language="javascript"

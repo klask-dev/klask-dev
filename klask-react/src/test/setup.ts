@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { cleanup, configure } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, afterAll, vi } from 'vitest';
 
 // Configure testing-library to be less verbose
 configure({
@@ -15,8 +15,24 @@ configure({
 });
 
 // Cleanup after each test
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  vi.clearAllMocks();
+  vi.clearAllTimers();
+
+  // Clear QueryClient cache to free memory
+  // Dynamically import to avoid issues if not used
+  try {
+    const { clearQueryClientCache } = await import('./test-utils');
+    clearQueryClientCache();
+  } catch (e) {
+    // Ignore if test-utils is not available
+  }
+});
+
+// Restore all mocks after all tests to free memory
+afterAll(() => {
+  vi.restoreAllMocks();
 });
 
 // Mock localStorage

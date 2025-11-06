@@ -112,54 +112,43 @@ describe('UserForm', () => {
       expect(activeCheckbox).not.toBeChecked();
     });
 
-    it('should prevent form submission with invalid input', async () => {
-      const user = userEvent.setup();
+    it('should prevent form submission with invalid input and validate formats', async () => {
       const mockOnSubmit = vi.fn();
       render(<UserForm {...defaultProps} onSubmit={mockOnSubmit} />);
-      
+
       const usernameInput = screen.getByLabelText('Username');
       const emailInput = screen.getByLabelText('Email Address');
       const passwordInput = screen.getByLabelText('Password');
-      
-      // Fill with invalid data
-      await user.type(usernameInput, 'ab'); // Too short
-      await user.type(emailInput, 'invalid-email');
-      await user.type(passwordInput, 'weak');
-      
-      // Submit button should be disabled due to validation errors
-      const submitButton = screen.getByText('Create User');
-      expect(submitButton).toBeDisabled();
-      
-      // Try to submit anyway
-      await user.click(submitButton);
-      
+
+      // Test 1: Invalid (too short, bad email, weak password)
+      fireEvent.change(usernameInput, { target: { value: 'ab' } }); // Too short
+      fireEvent.change(emailInput, { target: { value: 'invalid-email' } });
+      fireEvent.change(passwordInput, { target: { value: 'weak' } });
+      fireEvent.blur(usernameInput);
+      fireEvent.blur(emailInput);
+      fireEvent.blur(passwordInput);
+
+      await waitFor(() => {
+        const submitButton = screen.getByText('Create User');
+        expect(submitButton).toBeDisabled();
+      });
+
+      // Test 2: Invalid username characters
+      fireEvent.change(usernameInput, { target: { value: 'user@name!' } });
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'Password123' } });
+      fireEvent.blur(usernameInput);
+
+      await waitFor(() => {
+        const submitButton = screen.getByText('Create User');
+        expect(submitButton).toBeDisabled();
+      });
+
       // Form should not submit with validation errors
       expect(mockOnSubmit).not.toHaveBeenCalled();
     });
 
-    it('should prevent submission with invalid username characters', async () => {
-      const user = userEvent.setup();
-      const mockOnSubmit = vi.fn();
-      render(<UserForm {...defaultProps} onSubmit={mockOnSubmit} />);
-      
-      const usernameInput = screen.getByLabelText('Username');
-      const emailInput = screen.getByLabelText('Email Address');
-      const passwordInput = screen.getByLabelText('Password');
-      
-      // Fill form with invalid username but valid other fields
-      await user.type(usernameInput, 'user@name!');
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'Password123');
-      
-      // Submit button should be disabled due to validation errors
-      const submitButton = screen.getByText('Create User');
-      expect(submitButton).toBeDisabled();
-      
-      expect(mockOnSubmit).not.toHaveBeenCalled();
-    });
-
     it('should allow valid usernames with underscores and hyphens', async () => {
-      const user = userEvent.setup();
       const mockOnSubmit = vi.fn();
       render(<UserForm {...defaultProps} onSubmit={mockOnSubmit} />);
 
@@ -167,10 +156,15 @@ describe('UserForm', () => {
       const emailInput = screen.getByLabelText('Email Address');
       const passwordInput = screen.getByLabelText('Password');
 
-      // Fill form with valid data including valid username
-      await user.type(usernameInput, 'valid_user-name123');
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'Password123');
+      // Fill form with valid data - use fireEvent for speed
+      fireEvent.change(usernameInput, { target: { value: 'valid_user-name123' } });
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'Password123' } });
+
+      // Trigger validation
+      fireEvent.blur(usernameInput);
+      fireEvent.blur(emailInput);
+      fireEvent.blur(passwordInput);
 
       // Wait for form validation to complete
       await waitFor(() => {
@@ -178,9 +172,9 @@ describe('UserForm', () => {
         expect(submitButton).not.toBeDisabled();
       });
 
-      // Submit form - should succeed
+      // Submit form
       const submitButton = screen.getByText('Create User');
-      await user.click(submitButton);
+      fireEvent.click(submitButton);
 
       // Should not show validation error
       expect(screen.queryByText(/Username can only contain/)).not.toBeInTheDocument();

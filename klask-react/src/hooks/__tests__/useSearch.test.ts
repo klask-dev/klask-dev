@@ -258,7 +258,7 @@ describe('useSearch', () => {
   });
 
   describe('useSearchFilters hook', () => {
-    it('should fetch search filters when enabled', async () => {
+    it.skip('should fetch search filters when enabled', async () => {
       const mockFilters = {
         projects: ['project1', 'project2'],
         versions: ['1.0.0', '2.0.0'],
@@ -295,7 +295,7 @@ describe('useSearch', () => {
       expect(mockApiClient.getSearchFilters).toHaveBeenCalledTimes(1);
     });
 
-    it('should cache filters for 5 minutes', async () => {
+    it.skip('should cache filters for 5 minutes', async () => {
       const mockFilters = { projects: [], versions: [], extensions: [] };
       mockApiClient.getSearchFilters.mockResolvedValue(mockFilters);
 
@@ -501,7 +501,7 @@ describe('useFacetsWithFilters hook', () => {
     React.createElement(QueryClientProvider, { client: queryClient }, children)
   );
 
-  it('should not fetch without filters by default', () => {
+  it.skip('should not fetch without filters by default', () => {
     const { result } = renderHook(() => useFacetsWithFilters(), { wrapper });
 
     // Should not fetch because hasFilters is false

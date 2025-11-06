@@ -1,12 +1,11 @@
-name: CI/CD Pipeline
+name: 2️⃣ Build images
 
 on:
-  push:
-    branches: [ main, master ]  # Seulement les branches principales
-    tags: [ 'v*' ]             # Tags de version (v1.0.0, v2.1.3, etc.)
-  pull_request:
-    branches: [ main, master ]  # Pull requests vers les branches principales
   workflow_dispatch:             # Déclenchement manuel si besoin
+  workflow_run:
+    workflows: ["1️⃣ Tests"]
+    types:
+    - completed
 
 env:
   REGISTRY: ghcr.io
@@ -14,84 +13,12 @@ env:
   BACKEND_IMAGE_NAME: klask-backend
 
 jobs:
-  test-frontend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./klask-react
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: klask-react/package-lock.json
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run type check
-      run: npm run typecheck
-
-    - name: Run tests
-      run: npm test -- --passWithNoTests
-      continue-on-error: true  # Allow tests to fail without failing CI
-
-    - name: Build frontend
-      run: npm run build
-
-  test-backend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./klask-rs
-
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: klask_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
-
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: klask-rs
-
-    - name: Check formatting
-      run: cargo fmt -- --check
-
-    - name: Run clippy
-      run: cargo clippy -- -D warnings
-
-    - name: Run tests
-      run: cargo test
-      env:
-        DATABASE_URL: postgres://postgres:postgres@localhost:5432/klask_test
-
   build-and-push:
-    needs: [test-frontend, test-backend]
+    # Condition pour exécuter ce job seulement si :
+    # - Le workflow précédent a réussi
+    # - Le push vient bien de main ou master
+    if: ${{ github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'main') || startsWith(github.event.workflow_run.head_branch, 'master') }}
     runs-on: ubuntu-latest
-    # Build pour tous les événements (PR, push main/master, tags)
-    # Plus de problème de double build car plus de push sur branches features
 
     permissions:
       contents: read
