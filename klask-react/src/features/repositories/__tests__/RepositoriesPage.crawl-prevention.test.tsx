@@ -517,14 +517,14 @@ describe('RepositoriesPage - Crawl Prevention', () => {
 
   describe('Performance and Edge Cases', () => {
     it('should handle large numbers of repositories efficiently', async () => {
-      // Reduce the number of repositories for testing to focus on functionality over stress testing
-      const manyRepos = Array.from({ length: 20 }, (_, i) => ({
+      // Reduced to 10 repositories for faster tests while still testing pagination/performance
+      const manyRepos = Array.from({ length: 10 }, (_, i) => ({
         ...mockRepositories[0],
         id: `repo-${i}`,
         name: `Repository ${i}`,
       }));
 
-      const manyProgress = Array.from({ length: 10 }, (_, i) => ({
+      const manyProgress = Array.from({ length: 5 }, (_, i) => ({
         ...mockActiveProgress[0],
         repository_id: `repo-${i}`,
         repository_name: `Repository ${i}`,

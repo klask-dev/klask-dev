@@ -54,13 +54,13 @@ export default defineConfig({
       '**/VirtualizedSyntaxHighlighter.test.tsx',
     ],
     // Performance optimizations
-    maxWorkers: 2,
+    maxWorkers: 8,
     minWorkers: 1,
     pool: 'threads',
     poolOptions: {
       threads: {
         singleThread: false,
-        maxThreads: 2,
+        maxThreads: 8,
         minThreads: 1,
       },
     },
