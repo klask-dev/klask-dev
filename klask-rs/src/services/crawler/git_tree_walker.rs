@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Result};
-use gix::bstr::ByteSlice;
+use anyhow::{Result, anyhow};
 use gix::ObjectId;
+use gix::bstr::ByteSlice;
 use tracing::{debug, info};
 
 /// Maximum file size to process (10MB)

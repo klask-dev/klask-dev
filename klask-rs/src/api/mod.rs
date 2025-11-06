@@ -8,7 +8,7 @@ pub mod users;
 
 use crate::auth::extractors::AppState;
 use anyhow::Result;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()

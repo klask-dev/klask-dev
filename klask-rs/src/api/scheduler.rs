@@ -1,6 +1,6 @@
 use crate::auth::extractors::{AdminUser, AppState};
 use anyhow::Result;
-use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
+use axum::{Router, extract::State, http::StatusCode, response::Json, routing::get};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;

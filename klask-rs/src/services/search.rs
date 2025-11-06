@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -6,9 +6,9 @@ use std::sync::Arc;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::directory::MmapDirectory;
 use tantivy::query::{BooleanQuery, QueryParser, TermQuery};
-use tantivy::schema::{Field, Schema, Value, FAST, STORED, STRING, TEXT};
+use tantivy::schema::{FAST, Field, STORED, STRING, Schema, TEXT, Value};
 use tantivy::snippet::SnippetGenerator;
-use tantivy::{doc, Index, IndexReader, IndexWriter, Term};
+use tantivy::{Index, IndexReader, IndexWriter, Term, doc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -292,7 +292,10 @@ impl SearchService {
         let searcher_after = self.reader.searcher();
         let count_after = searcher_after.search(&query_verify, &Count)? as u64;
         if count_after > 0 {
-            warn!("After deletion and reload, still found {} documents for repository='{}' - this suggests Tantivy deletion might not be working as expected", count_after, repository);
+            warn!(
+                "After deletion and reload, still found {} documents for repository='{}' - this suggests Tantivy deletion might not be working as expected",
+                count_after, repository
+            );
         } else {
             debug!(
                 "Verified: 0 documents remain for repository='{}' after deletion",
@@ -957,9 +960,9 @@ impl SearchService {
         _query: &dyn tantivy::query::Query,
         search_query: &SearchQuery,
     ) -> Result<SearchFacets> {
+        use tantivy::aggregation::AggregationCollector;
         use tantivy::aggregation::agg_req::Aggregations;
         use tantivy::aggregation::agg_result::AggregationResults;
-        use tantivy::aggregation::AggregationCollector;
         use tantivy::query::{AllQuery, BooleanQuery, Occur, QueryParser, TermQuery};
 
         // Helper to build query with specific filters
@@ -1538,9 +1541,9 @@ impl SearchService {
     /// Uses Tantivy aggregation API for accurate counts across ALL documents (no limits)
     #[allow(dead_code)]
     pub fn get_advanced_metrics(&self) -> Result<AdvancedIndexMetrics> {
+        use tantivy::aggregation::AggregationCollector;
         use tantivy::aggregation::agg_req::Aggregations;
         use tantivy::aggregation::agg_result::AggregationResults;
-        use tantivy::aggregation::AggregationCollector;
         use tantivy::query::AllQuery;
 
         let searcher = self.reader.searcher();

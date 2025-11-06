@@ -1,9 +1,9 @@
 use anyhow::Result;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::time::Duration;
 
 #[cfg(any(test, debug_assertions))]
-use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+use sqlx::{Pool, Sqlite, sqlite::SqlitePoolOptions};
 #[cfg(any(test, debug_assertions))]
 use std::sync::atomic::{AtomicUsize, Ordering};
 

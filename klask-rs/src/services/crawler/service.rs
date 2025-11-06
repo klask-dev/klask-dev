@@ -8,7 +8,7 @@ use crate::repositories::RepositoryRepository;
 use crate::services::encryption::EncryptionService;
 use crate::services::progress::ProgressTracker;
 use crate::services::search::SearchService;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use sha2::{Digest, Sha256};
 use sqlx::{Pool, Postgres};
 use std::collections::HashMap;

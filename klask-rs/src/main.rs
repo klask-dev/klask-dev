@@ -9,12 +9,12 @@ mod utils;
 
 use anyhow::Result;
 use auth::{extractors::AppState, jwt::JwtService};
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use config::AppConfig;
 use database::Database;
 use services::{
-    crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker, scheduler::SchedulerService,
-    SearchService,
+    SearchService, crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
+    scheduler::SchedulerService,
 };
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -5,12 +5,12 @@ use crate::services::github::{GitHubRepository, GitHubService};
 use crate::services::gitlab::{GitLabProject, GitLabService};
 use anyhow::Result;
 use axum::{
+    Router,
     body::Bytes,
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     routing::{delete, get, post},
-    Router,
 };
 use chrono::Utc;
 use regex::Regex;
@@ -796,7 +796,7 @@ async fn update_repository(
                     }
                     Err(e) => {
                         warn!(
-                            "Failed to update search index for repository name change {} -> {}: {}. Search results may be inconsistent until re-crawling.", 
+                            "Failed to update search index for repository name change {} -> {}: {}. Search results may be inconsistent until re-crawling.",
                             old_name, updated_repo.name, e
                         );
                     }
@@ -849,7 +849,7 @@ async fn delete_repository(
                 }
                 Err(e) => {
                     warn!(
-                        "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.", 
+                        "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.",
                         repository.name, e
                     );
                     // Continue with repository deletion even if index cleanup fails
@@ -1189,7 +1189,7 @@ async fn bulk_delete_repositories(
                     }
                     Err(e) => {
                         warn!(
-                            "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.", 
+                            "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.",
                             repository.name, e
                         );
                         index_cleanup_failures += 1;

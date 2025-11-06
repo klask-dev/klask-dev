@@ -1,13 +1,13 @@
 use axum::http::StatusCode;
 use axum_test::TestServer;
 use klask_rs::services::{
-    crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker, SearchService,
+    SearchService, crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
 };
+use klask_rs::{Database, config::AppConfig};
 use klask_rs::{
     api,
     auth::{extractors::AppState, jwt::JwtService},
 };
-use klask_rs::{config::AppConfig, Database};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;

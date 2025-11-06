@@ -2,7 +2,7 @@ use crate::auth::claims::TokenClaims;
 use crate::config::AuthConfig;
 use anyhow::Result;
 use chrono::Duration;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 
 #[derive(Clone)]
 pub struct JwtService {

@@ -1,15 +1,15 @@
 use anyhow::Result;
 use axum::{
+    Router,
     extract::State,
     response::Json,
     routing::{delete, get, post, put},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::auth::{extractors::AppState, AuthError, AuthenticatedUser};
+use crate::auth::{AuthError, AuthenticatedUser, extractors::AppState};
 use crate::models::user::{
     ChangePasswordRequest, DeleteAccountRequest, UpdateProfileRequest, User, UserActivity, UserProfile, UserRole,
 };

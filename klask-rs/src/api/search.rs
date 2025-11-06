@@ -2,11 +2,11 @@ use crate::auth::extractors::{AppState, AuthenticatedUser};
 use crate::services::SearchQuery;
 use anyhow::Result;
 use axum::{
+    Router,
     extract::{Query, State},
     http::StatusCode,
     response::Json,
     routing::get,
-    Router,
 };
 use serde::{Deserialize, Serialize};
 
