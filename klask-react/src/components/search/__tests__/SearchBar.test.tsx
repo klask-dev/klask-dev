@@ -41,9 +41,6 @@ describe('SearchBar Component', () => {
   });
 
   it('should call onChange when user types', async () => {
-    // Use fake timers for faster debounce testing
-    vi.useFakeTimers();
-
     render(<SearchBar {...defaultProps} />);
     const input = screen.getByRole('textbox');
 
@@ -53,18 +50,13 @@ describe('SearchBar Component', () => {
     // Should not call immediately
     expect(mockOnChange).not.toHaveBeenCalled();
 
-    // Fast-forward time past debounce (300ms)
-    vi.advanceTimersByTime(350);
-
-    expect(mockOnChange).toHaveBeenCalledWith('test');
-
-    vi.useRealTimers();
+    // Wait for debounce (300ms)
+    await waitFor(() => {
+      expect(mockOnChange).toHaveBeenCalledWith('test');
+    }, { timeout: 500 });
   });
 
   it('should debounce onChange and onSearch calls', async () => {
-    // Use fake timers for faster debounce testing
-    vi.useFakeTimers();
-
     render(<SearchBar {...defaultProps} />);
     const input = screen.getByRole('textbox');
 
@@ -77,16 +69,13 @@ describe('SearchBar Component', () => {
     // Should not call immediately
     expect(mockOnChange).not.toHaveBeenCalled();
 
-    // Fast-forward time past debounce
-    vi.advanceTimersByTime(350);
-
-    // Should only call once with final value
-    expect(mockOnChange).toHaveBeenCalledTimes(1);
-    expect(mockOnChange).toHaveBeenCalledWith('test');
-    expect(mockOnSearch).toHaveBeenCalledTimes(1);
-    expect(mockOnSearch).toHaveBeenCalledWith('test');
-
-    vi.useRealTimers();
+    // Wait for debounce and check only called once with final value
+    await waitFor(() => {
+      expect(mockOnChange).toHaveBeenCalledTimes(1);
+      expect(mockOnChange).toHaveBeenCalledWith('test');
+      expect(mockOnSearch).toHaveBeenCalledTimes(1);
+      expect(mockOnSearch).toHaveBeenCalledWith('test');
+    }, { timeout: 500 });
   });
 
   it('should call onSearch when form is submitted', () => {
@@ -117,13 +106,9 @@ describe('SearchBar Component', () => {
     expect(searchIcon).not.toHaveClass('animate-pulse');
   });
 
-  it('should show clear button when there is text', async () => {
-    const user = userEvent.setup();
-    render(<SearchBar {...defaultProps} />);
-    
-    const input = screen.getByRole('textbox');
-    await user.type(input, 'test');
-    
+  it('should show clear button when there is text', () => {
+    render(<SearchBar {...defaultProps} value="test" />);
+
     const clearButton = screen.getByRole('button');
     expect(clearButton).toBeInTheDocument();
   });

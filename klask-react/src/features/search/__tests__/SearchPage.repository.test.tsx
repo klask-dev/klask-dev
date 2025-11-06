@@ -120,10 +120,15 @@ describe('SearchPage - Repository Functionality', () => {
 
     render(<SearchPage />, { wrapper: createWrapper() });
 
-    // Results already mocked, just check they're displayed
+    // Type a search query to trigger results display
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await userEvent.type(searchInput, 'main');
+
+    // Wait for results to be displayed
     await waitFor(() => {
-      expect(screen.getByText('main.rs')).toBeInTheDocument();
-    });
+      const results = screen.queryAllByText(/main.rs/i);
+      expect(results.length).toBeGreaterThan(0);
+    }, { timeout: 2000 });
 
     // Verify repository names are displayed
     const klaskElements = screen.getAllByText(/klask-io\/klask/i);

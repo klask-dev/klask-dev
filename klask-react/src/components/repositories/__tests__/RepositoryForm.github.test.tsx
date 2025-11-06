@@ -44,9 +44,9 @@ describe('RepositoryForm - GitHub Integration', () => {
 
     // Verify placeholders for GitHub fields exist (first check GitHub Settings tab)
     expect(screen.getByPlaceholderText('ghp_...')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('organization-name or username')).toBeInTheDocument();
 
-    // Navigate to Filters tab for exclusion fields
+    // Navigate to Filters tab for repository filtering (namespace has been replaced)
+    // The old "namespace" field has been replaced by includeRepositories/excludeRepositories in Filters tab
     const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
     await user.click(filtersTab);
 
@@ -107,9 +107,8 @@ describe('RepositoryForm - GitHub Integration', () => {
 
     // Fill in GitHub-specific fields
     await user.type(screen.getByPlaceholderText('ghp_...'), 'ghp_test_token');
-    await user.type(screen.getByPlaceholderText('organization-name or username'), 'test-org');
 
-    // Navigate to Filters tab
+    // Navigate to Filters tab (namespace field has been removed, filters are in this tab)
     const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
     await user.click(filtersTab);
 
@@ -128,7 +127,9 @@ describe('RepositoryForm - GitHub Integration', () => {
       expect(submittedData.name).toBe('GitHub Test Repo');
       expect(submittedData.repositoryType).toBe('GitHub');
       expect(submittedData.accessToken).toBe('ghp_test_token');
-      expect(submittedData.githubNamespace).toBe('test-org');
+      // Namespace field has been replaced by filters
+      expect(submittedData.githubExcludedRepositories).toBe('test-org/archive');
+      expect(submittedData.githubExcludedPatterns).toBe('*-temp');
     });
   });
 
@@ -212,12 +213,7 @@ describe('RepositoryForm - GitHub Integration', () => {
     // Verify existing values are populated in Basic tab
     expect(screen.getByDisplayValue('Existing GitHub Repo')).toBeInTheDocument();
 
-    // Navigate to GitHub Settings tab to verify namespace
-    const githubSettingsTab = screen.getByRole('button', { name: /GitHub Settings/i });
-    await user.click(githubSettingsTab);
-    expect(screen.getByDisplayValue('original-org')).toBeInTheDocument();
-
-    // Navigate to Filters tab to verify exclusions
+    // Navigate to Filters tab to verify exclusions (namespace field has been removed)
     const filtersTab = screen.getByRole('button', { name: /Filters & Exclusions/i });
     await user.click(filtersTab);
     expect(screen.getByDisplayValue('original-org/old-repo')).toBeInTheDocument();
@@ -300,7 +296,7 @@ describe('RepositoryForm - GitHub Integration', () => {
     // Check GitHub Settings placeholders
     await waitFor(() => {
       expect(screen.getByPlaceholderText('ghp_...')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('organization-name or username')).toBeInTheDocument();
+      // Namespace field has been removed in favor of filters
     });
 
     // Navigate to Filters tab
