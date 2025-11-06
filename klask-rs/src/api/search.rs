@@ -2,11 +2,11 @@ use crate::auth::extractors::{AppState, AuthenticatedUser};
 use crate::services::SearchQuery;
 use anyhow::Result;
 use axum::{
+    Router,
     extract::{Query, State},
     http::StatusCode,
     response::Json,
     routing::get,
-    Router,
 };
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +62,9 @@ pub struct SearchRequest {
     pub projects: Option<String>,
     pub versions: Option<String>,
     pub extensions: Option<String>,
+    // Size filters in bytes
+    pub min_size: Option<u64>,
+    pub max_size: Option<u64>,
     pub include_facets: Option<bool>,
 }
 
@@ -74,6 +77,9 @@ pub struct FacetsRequest {
     pub projects: Option<String>,
     pub versions: Option<String>,
     pub extensions: Option<String>,
+    // Size filters in bytes
+    pub min_size: Option<u64>,
+    pub max_size: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -91,6 +97,7 @@ pub struct SearchFacets {
     pub projects: Vec<FacetValue>,
     pub versions: Vec<FacetValue>,
     pub extensions: Vec<FacetValue>,
+    pub size_ranges: Vec<FacetValue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,6 +148,8 @@ async fn search_files(
         project_filter: params.projects,
         version_filter: params.versions,
         extension_filter: params.extensions,
+        min_size: params.min_size,
+        max_size: params.max_size,
         limit: limit as usize,
         offset: offset as usize,
         include_facets: params.include_facets.unwrap_or(false),
@@ -186,6 +195,11 @@ async fn search_files(
                     .collect(),
                 extensions: service_facets
                     .extensions
+                    .into_iter()
+                    .map(|(value, count)| FacetValue { value, count })
+                    .collect(),
+                size_ranges: service_facets
+                    .size_ranges
                     .into_iter()
                     .map(|(value, count)| FacetValue { value, count })
                     .collect(),
@@ -246,6 +260,8 @@ async fn get_facets_with_filters(
         project_filter: params.projects,
         version_filter: params.versions,
         extension_filter: params.extensions,
+        min_size: params.min_size,
+        max_size: params.max_size,
         limit: 0, // We only need facets, not results
         offset: 0,
         include_facets: true, // Always include facets for this endpoint
@@ -277,12 +293,18 @@ async fn get_facets_with_filters(
                         .into_iter()
                         .map(|(value, count)| FacetValue { value, count })
                         .collect(),
+                    size_ranges: service_facets
+                        .size_ranges
+                        .into_iter()
+                        .map(|(value, count)| FacetValue { value, count })
+                        .collect(),
                 })
                 .unwrap_or_else(|| SearchFacets {
                     repositories: vec![],
                     projects: vec![],
                     versions: vec![],
                     extensions: vec![],
+                    size_ranges: vec![],
                 });
 
             Ok(Json(facets))

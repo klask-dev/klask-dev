@@ -1,11 +1,11 @@
 use crate::auth::extractors::{AppState, AuthenticatedUser};
 use anyhow::Result;
 use axum::{
+    Router,
     extract::{Path, State},
     http::StatusCode,
     response::Json,
     routing::get,
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

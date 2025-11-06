@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+use sqlx::{Pool, Sqlite, sqlite::SqlitePoolOptions};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 static TEST_DB_COUNTER: AtomicUsize = AtomicUsize::new(0);

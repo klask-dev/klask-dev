@@ -5,12 +5,12 @@ use crate::services::github::{GitHubRepository, GitHubService};
 use crate::services::gitlab::{GitLabProject, GitLabService};
 use anyhow::Result;
 use axum::{
+    Router,
     body::Bytes,
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     routing::{delete, get, post},
-    Router,
 };
 use chrono::Utc;
 use regex::Regex;
@@ -543,39 +543,43 @@ async fn create_repository(
         None
     };
 
+    // Helper function to clean empty strings from optional fields
+    let clean_optional_string =
+        |s: Option<String>| -> Option<String> { s.and_then(|v| if v.trim().is_empty() { None } else { Some(v) }) };
+
     let repository = Repository {
         id: Uuid::new_v4(),
         name: request.name,
         url: request.url,
         repository_type: request.repository_type,
-        branch: request.branch,
+        branch: clean_optional_string(request.branch),
         enabled: request.enabled.unwrap_or(true),
         access_token: encrypted_token,
-        gitlab_namespace: request.gitlab_namespace,
+        gitlab_namespace: clean_optional_string(request.gitlab_namespace),
         is_group: request.is_group.unwrap_or(false),
         last_crawled: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
         auto_crawl_enabled: request.auto_crawl_enabled.unwrap_or(false),
-        cron_schedule: request.cron_schedule,
+        cron_schedule: clean_optional_string(request.cron_schedule),
         next_crawl_at: None,
         crawl_frequency_hours: request.crawl_frequency_hours,
         max_crawl_duration_minutes: request.max_crawl_duration_minutes,
         last_crawl_duration_seconds: None,
-        gitlab_excluded_projects: request.gitlab_excluded_projects,
-        gitlab_excluded_patterns: request.gitlab_excluded_patterns,
-        github_namespace: request.github_namespace,
-        github_excluded_repositories: request.github_excluded_repositories,
-        github_excluded_patterns: request.github_excluded_patterns,
+        gitlab_excluded_projects: clean_optional_string(request.gitlab_excluded_projects),
+        gitlab_excluded_patterns: clean_optional_string(request.gitlab_excluded_patterns),
+        github_namespace: clean_optional_string(request.github_namespace),
+        github_excluded_repositories: clean_optional_string(request.github_excluded_repositories),
+        github_excluded_patterns: clean_optional_string(request.github_excluded_patterns),
         crawl_state: Some("idle".to_string()),
         last_processed_project: None,
         crawl_started_at: None,
-        included_branches: request.included_branches,
-        included_branches_patterns: request.included_branches_patterns,
-        excluded_branches: request.excluded_branches,
-        excluded_branches_patterns: request.excluded_branches_patterns,
-        included_projects: request.included_projects,
-        included_projects_patterns: request.included_projects_patterns,
+        included_branches: clean_optional_string(request.included_branches),
+        included_branches_patterns: clean_optional_string(request.included_branches_patterns),
+        excluded_branches: clean_optional_string(request.excluded_branches),
+        excluded_branches_patterns: clean_optional_string(request.excluded_branches_patterns),
+        included_projects: clean_optional_string(request.included_projects),
+        included_projects_patterns: clean_optional_string(request.included_projects_patterns),
     };
 
     match repo_repository.create_repository(&repository).await {
@@ -687,10 +691,18 @@ async fn update_repository(
         repository.max_crawl_duration_minutes = Some(max_crawl_duration_minutes);
     }
     if let Some(gitlab_excluded_projects) = request.gitlab_excluded_projects {
-        repository.gitlab_excluded_projects = Some(gitlab_excluded_projects);
+        repository.gitlab_excluded_projects = if gitlab_excluded_projects.trim().is_empty() {
+            None
+        } else {
+            Some(gitlab_excluded_projects)
+        };
     }
     if let Some(gitlab_excluded_patterns) = request.gitlab_excluded_patterns {
-        repository.gitlab_excluded_patterns = Some(gitlab_excluded_patterns);
+        repository.gitlab_excluded_patterns = if gitlab_excluded_patterns.trim().is_empty() {
+            None
+        } else {
+            Some(gitlab_excluded_patterns)
+        };
     }
     if let Some(github_namespace) = request.github_namespace {
         // Validate GitHub namespace before updating
@@ -701,28 +713,53 @@ async fn update_repository(
         repository.github_namespace = Some(github_namespace);
     }
     if let Some(github_excluded_repositories) = request.github_excluded_repositories {
-        repository.github_excluded_repositories = Some(github_excluded_repositories);
+        repository.github_excluded_repositories = if github_excluded_repositories.trim().is_empty() {
+            None
+        } else {
+            Some(github_excluded_repositories)
+        };
     }
     if let Some(github_excluded_patterns) = request.github_excluded_patterns {
-        repository.github_excluded_patterns = Some(github_excluded_patterns);
+        repository.github_excluded_patterns = if github_excluded_patterns.trim().is_empty() {
+            None
+        } else {
+            Some(github_excluded_patterns)
+        };
     }
     if let Some(included_branches) = request.included_branches {
-        repository.included_branches = Some(included_branches);
+        repository.included_branches = if included_branches.trim().is_empty() { None } else { Some(included_branches) };
     }
     if let Some(included_branches_patterns) = request.included_branches_patterns {
-        repository.included_branches_patterns = Some(included_branches_patterns);
+        repository.included_branches_patterns = if included_branches_patterns.trim().is_empty() {
+            None
+        } else {
+            Some(included_branches_patterns)
+        };
     }
     if let Some(excluded_branches) = request.excluded_branches {
-        repository.excluded_branches = Some(excluded_branches);
+        repository.excluded_branches = if excluded_branches.trim().is_empty() { None } else { Some(excluded_branches) };
     }
     if let Some(excluded_branches_patterns) = request.excluded_branches_patterns {
-        repository.excluded_branches_patterns = Some(excluded_branches_patterns);
+        repository.excluded_branches_patterns = if excluded_branches_patterns.trim().is_empty() {
+            None
+        } else {
+            Some(excluded_branches_patterns)
+        };
     }
     if let Some(included_projects) = request.included_projects {
-        repository.included_projects = Some(included_projects);
+        repository.included_projects = if included_projects.trim().is_empty() { None } else { Some(included_projects) };
     }
     if let Some(included_projects_patterns) = request.included_projects_patterns {
-        repository.included_projects_patterns = Some(included_projects_patterns);
+        info!(
+            "Updating included_projects_patterns from '{:?}' to '{}'",
+            repository.included_projects_patterns, included_projects_patterns
+        );
+        repository.included_projects_patterns = if included_projects_patterns.trim().is_empty() {
+            info!("Clearing included_projects_patterns (was empty)");
+            None
+        } else {
+            Some(included_projects_patterns)
+        };
     }
 
     // Handle access token update with encryption
@@ -759,7 +796,7 @@ async fn update_repository(
                     }
                     Err(e) => {
                         warn!(
-                            "Failed to update search index for repository name change {} -> {}: {}. Search results may be inconsistent until re-crawling.", 
+                            "Failed to update search index for repository name change {} -> {}: {}. Search results may be inconsistent until re-crawling.",
                             old_name, updated_repo.name, e
                         );
                     }
@@ -812,7 +849,7 @@ async fn delete_repository(
                 }
                 Err(e) => {
                     warn!(
-                        "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.", 
+                        "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.",
                         repository.name, e
                     );
                     // Continue with repository deletion even if index cleanup fails
@@ -1152,7 +1189,7 @@ async fn bulk_delete_repositories(
                     }
                     Err(e) => {
                         warn!(
-                            "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.", 
+                            "Failed to delete search index documents for repository {}: {}. Proceeding with repository deletion.",
                             repository.name, e
                         );
                         index_cleanup_failures += 1;

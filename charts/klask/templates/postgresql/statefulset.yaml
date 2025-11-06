@@ -5,6 +5,12 @@ metadata:
   name: {{ include "klask.postgresql.fullname" . }}
   labels:
     {{- include "klask.postgresql.labels" . | nindent 4 }}
+    {{- with .Values.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.postgresql.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   serviceName: {{ include "klask.postgresql.fullname" . }}-headless
   replicas: 1
@@ -15,6 +21,12 @@ spec:
     metadata:
       labels:
         {{- include "klask.postgresql.labels" . | nindent 8 }}
+        {{- with .Values.extraLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.postgresql.extraLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/postgresql/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/postgresql/secret.yaml") . | sha256sum }}

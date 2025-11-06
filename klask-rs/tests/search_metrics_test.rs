@@ -214,9 +214,9 @@ fn test_identify_warning_segment_count_issue() {
 
     let issues = identify_issues(&checks);
     assert!(!issues.is_empty());
-    assert!(issues
-        .iter()
-        .any(|i| i.severity == IssueSeverity::Medium && i.description.contains("Segment count is high")));
+    assert!(
+        issues.iter().any(|i| i.severity == IssueSeverity::Medium && i.description.contains("Segment count is high"))
+    );
 }
 
 #[test]
@@ -234,9 +234,9 @@ fn test_identify_high_size_issue() {
 
     let issues = identify_issues(&checks);
     assert!(!issues.is_empty());
-    assert!(issues
-        .iter()
-        .any(|i| i.severity == IssueSeverity::High && i.description.contains("Index size is very large")));
+    assert!(
+        issues.iter().any(|i| i.severity == IssueSeverity::High && i.description.contains("Index size is very large"))
+    );
 }
 
 #[test]
@@ -254,9 +254,11 @@ fn test_identify_warning_size_issue() {
 
     let issues = identify_issues(&checks);
     assert!(!issues.is_empty());
-    assert!(issues
-        .iter()
-        .any(|i| i.severity == IssueSeverity::Medium && i.description.contains("Index size is getting large")));
+    assert!(
+        issues
+            .iter()
+            .any(|i| i.severity == IssueSeverity::Medium && i.description.contains("Index size is getting large"))
+    );
 }
 
 // ============================================================================

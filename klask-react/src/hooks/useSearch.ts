@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
 import type {
   SearchQuery,
@@ -129,7 +129,7 @@ export const useSearchFilters = (options?: { enabled?: boolean }) => {
 // Multi-select search hook for new filters
 export const useMultiSelectSearch = (
   query: string,
-  filters: { [key: string]: string[] | undefined },
+  filters: { [key: string]: string[] | { min?: number; max?: number } | undefined },
   currentPage: number = 1,
   options: UseSearchOptions = {}
 ) => {
@@ -152,16 +152,36 @@ export const useMultiSelectSearch = (
       }
       
       // Handle multi-select filters - join with commas
-      if (filters.project && filters.project.length > 0) {
-        searchParams.set('projects', filters.project.join(','));
+      // Support both singular and plural keys for backward compatibility
+      const projects = filters.projects || filters.project;
+      if (projects && Array.isArray(projects) && projects.length > 0) {
+        searchParams.set('projects', projects.join(','));
       }
 
-      if (filters.version && filters.version.length > 0) {
-        searchParams.set('versions', filters.version.join(','));
+      const versions = filters.versions || filters.version;
+      if (versions && Array.isArray(versions) && versions.length > 0) {
+        searchParams.set('versions', versions.join(','));
       }
 
-      if (filters.extension && filters.extension.length > 0) {
-        searchParams.set('extensions', filters.extension.join(','));
+      const extensions = filters.extensions || filters.extension;
+      if (extensions && Array.isArray(extensions) && extensions.length > 0) {
+        searchParams.set('extensions', extensions.join(','));
+      }
+
+      const languages = filters.languages || filters.language;
+      if (languages && Array.isArray(languages) && languages.length > 0) {
+        searchParams.set('languages', languages.join(','));
+      }
+
+      // Handle size range filter
+      if (filters.sizeRange && typeof filters.sizeRange === 'object') {
+        const sizeRange = filters.sizeRange as { min?: number; max?: number };
+        if (sizeRange.min !== undefined) {
+          searchParams.set('min_size', sizeRange.min.toString());
+        }
+        if (sizeRange.max !== undefined) {
+          searchParams.set('max_size', sizeRange.max.toString());
+        }
       }
 
       searchParams.set('limit', pageSize.toString());
@@ -178,6 +198,8 @@ export const useMultiSelectSearch = (
     enabled: enabled && !!query.trim(),
     refetchOnWindowFocus,
     staleTime,
+    // Keep previous data while fetching to prevent flickering counters during page refresh or filter changes
+    placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
       if (error && typeof error === 'object' && 'status' in error) {
         const status = (error as any).status;
@@ -382,6 +404,7 @@ const normalizeFacetsResponse = (data: unknown): FacetsApiResponse => {
       extensions: [],
       repositories: [],
       languages: [],
+      size_ranges: [],
     };
   }
 
@@ -410,6 +433,7 @@ const normalizeFacetsResponse = (data: unknown): FacetsApiResponse => {
     extensions: normalizeFacetArray(response.extensions),
     repositories: normalizeFacetArray(response.repositories),
     languages: normalizeFacetArray(response.languages),
+    size_ranges: normalizeFacetArray(response.size_ranges),
   };
 };
 
@@ -533,6 +557,9 @@ export const useFacetsWithFilters = (
     enabled: enabled,
     refetchOnWindowFocus,
     staleTime,
+    // Keep previous data while fetching new facets to avoid flickering counters
+    // This ensures a smooth UX when filter selection triggers a new facet request
+    placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
       // Don't retry on 4xx errors (client errors)
       if (error && typeof error === 'object' && 'status' in error) {

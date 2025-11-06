@@ -6,6 +6,12 @@ metadata:
   labels:
     {{- include "klask.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
+    {{- with .Values.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.frontend.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.frontend.replicaCount }}
@@ -23,6 +29,12 @@ spec:
       labels:
         {{- include "klask.labels" . | nindent 8 }}
         app.kubernetes.io/component: frontend
+        {{- with .Values.extraLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.frontend.extraLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

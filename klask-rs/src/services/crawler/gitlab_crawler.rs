@@ -6,7 +6,7 @@ use crate::services::encryption::EncryptionService;
 use crate::services::gitlab::GitLabService;
 use crate::services::progress::ProgressTracker;
 use crate::services::search::SearchService;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use sqlx::{Pool, Postgres};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -40,24 +40,28 @@ impl GitLabCrawler {
         repository: &Repository,
         cancellation_token: CancellationToken,
         clone_or_update_fn: impl Fn(
-                &Repository,
-                &std::path::Path,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gix::Repository>> + Send>>
-            + Send
-            + Sync,
+            &Repository,
+            &std::path::Path,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gix::Repository>> + Send>>
+        + Send
+        + Sync,
         process_files_fn: impl Fn(
-                &Repository,
-                &std::path::Path,
-                &mut CrawlProgress,
-                &CancellationToken,
-                Uuid,
-                &str,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
-            + Send
-            + Sync,
-        _update_crawl_time_fn: impl Fn(Uuid, Option<i32>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
-            + Send
-            + Sync,
+            &Repository,
+            &std::path::Path,
+            &mut CrawlProgress,
+            &CancellationToken,
+            Uuid,
+            &str,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        + Send
+        + Sync,
+        _update_crawl_time_fn: impl Fn(
+            Uuid,
+            Option<i32>,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        + Send
+        + Sync,
         cleanup_token_fn: impl Fn(Uuid) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync,
     ) -> Result<()> {
         let _gitlab_crawl_start_time = std::time::Instant::now();
@@ -329,24 +333,28 @@ impl GitLabCrawler {
         &self,
         repository: &Repository,
         clone_or_update_fn: impl Fn(
-                &Repository,
-                &std::path::Path,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gix::Repository>> + Send>>
-            + Send
-            + Sync,
+            &Repository,
+            &std::path::Path,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gix::Repository>> + Send>>
+        + Send
+        + Sync,
         process_files_fn: impl Fn(
-                &Repository,
-                &std::path::Path,
-                &mut CrawlProgress,
-                &CancellationToken,
-                Uuid,
-                &str,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
-            + Send
-            + Sync,
-        _update_crawl_time_fn: impl Fn(Uuid, Option<i32>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
-            + Send
-            + Sync,
+            &Repository,
+            &std::path::Path,
+            &mut CrawlProgress,
+            &CancellationToken,
+            Uuid,
+            &str,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        + Send
+        + Sync,
+        _update_crawl_time_fn: impl Fn(
+            Uuid,
+            Option<i32>,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        + Send
+        + Sync,
         cleanup_token_fn: impl Fn(Uuid) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync,
     ) -> Result<()> {
         let repo_repo = RepositoryRepository::new(self.database.clone());

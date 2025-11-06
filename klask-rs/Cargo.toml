@@ -1,7 +1,7 @@
 [package]
 name = "klask-rs"
-version = "2.1.0"
-edition = "2021"
+version = "2.0.0"
+edition = "2024"
 authors = ["Klask Team"]
 description = "Modern Rust-based code search engine"
 
@@ -47,7 +47,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Repository crawling - using pure Rust gitoxide instead of git2
 # Using reqwest for HTTP transport to avoid OpenSSL dependency
-gix = { version = "0.73", default-features = false, features = ["blocking-http-transport-reqwest", "max-performance"] }
+gix = { version = "0.74", default-features = false, features = ["blocking-http-transport-reqwest", "max-performance"] }
 
 # File processing
 walkdir = "2.5"
@@ -78,4 +78,4 @@ test-utils = []
 tokio-test = "0.4"
 tempfile = "3.0"
 httpmock = "0.8"
-axum-test = "18.0"
+axum-test = "18.2"

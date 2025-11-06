@@ -224,9 +224,11 @@ mod gitlab_filter_integration_tests {
         let filtered = apply_gitlab_filtering(projects, None, Some("team-a/*,team-b/*"), None, None);
 
         assert_eq!(filtered.len(), 4);
-        assert!(filtered
-            .iter()
-            .all(|p| p.path_with_namespace.starts_with("team-a/") || p.path_with_namespace.starts_with("team-b/")));
+        assert!(
+            filtered
+                .iter()
+                .all(|p| p.path_with_namespace.starts_with("team-a/") || p.path_with_namespace.starts_with("team-b/"))
+        );
     }
 
     #[test]

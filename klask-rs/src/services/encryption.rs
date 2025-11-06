@@ -1,9 +1,9 @@
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm,
+    aead::{Aead, AeadCore, KeyInit, OsRng},
 };
 use anyhow::Result;
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 
 pub struct EncryptionService {
     cipher: Aes256Gcm,

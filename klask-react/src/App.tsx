@@ -17,7 +17,7 @@ import { Suspense } from 'react';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
 const HomePage = React.lazy(() => import('./components/home/HomePage'));
-const SearchPage = React.lazy(() => import('./features/search/SearchPage'));
+const SearchPage = React.lazy(() => import('./features/search/SearchPageV3'));
 const FileDetailPage = React.lazy(() => import('./features/files/FileDetailPage'));
 const RepositoriesPage = React.lazy(() => import('./features/repositories/RepositoriesPage'));
 const RepositoryDetailPage = React.lazy(() => import('./features/repositories/RepositoryDetailPage'));

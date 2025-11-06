@@ -113,6 +113,7 @@ async fn main() -> Result<()> {
                             project: &repository.name,
                             version: "HEAD",
                             extension: &extension,
+                            size: content.len() as u64,
                         })
                         .await
                     {

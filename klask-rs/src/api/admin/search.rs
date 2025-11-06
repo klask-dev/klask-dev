@@ -12,11 +12,11 @@ use crate::models::{
 };
 use anyhow::Result;
 use axum::{
+    Router,
     extract::State,
     http::StatusCode,
     response::Json,
     routing::{get, post},
-    Router,
 };
 use tracing::{debug, error, info};
 

@@ -1,13 +1,13 @@
 use axum::http::StatusCode;
 use axum_test::TestServer;
 use klask_rs::services::{
-    crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker, SearchService,
+    SearchService, crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
 };
+use klask_rs::{Database, config::AppConfig};
 use klask_rs::{
     api,
     auth::{extractors::AppState, jwt::JwtService},
 };
-use klask_rs::{config::AppConfig, Database};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -40,6 +40,7 @@ async fn create_test_app_state() -> AppState {
         auth: klask_rs::config::AuthConfig {
             jwt_secret: "test-secret-key-for-jwt-authentication".to_string(),
             jwt_expires_in: "1h".to_string(),
+            allow_registration: true,
         },
     };
 
@@ -189,8 +190,11 @@ async fn test_protected_routes_require_auth() {
 #[tokio::test]
 async fn test_jwt_token_creation() {
     // Test JWT service functionality independently
-    let config =
-        klask_rs::config::AuthConfig { jwt_secret: "test-secret-key".to_string(), jwt_expires_in: "1h".to_string() };
+    let config = klask_rs::config::AuthConfig {
+        jwt_secret: "test-secret-key".to_string(),
+        jwt_expires_in: "1h".to_string(),
+        allow_registration: true,
+    };
 
     let jwt_service = JwtService::new(&config).expect("Failed to create JWT service");
 
@@ -235,5 +239,326 @@ async fn test_public_endpoints_work_without_auth() {
         assert_eq!(search_response.status_code(), StatusCode::OK);
     } else {
         println!("Skipping public endpoints test - database not available");
+    }
+}
+
+// Helper function to create a test app state with custom allow_registration setting
+async fn create_test_app_state_with_registration(allow_registration: bool) -> AppState {
+    // Create test database (skip if not available)
+    let database = Database::new("postgres://test:test@localhost:9999/test", 1)
+        .await
+        .unwrap_or_else(|_| panic!("Database not available for auth testing"));
+
+    // Create test search service
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let search_service = SearchService::new(temp_dir.path()).expect("Failed to create search service");
+
+    // Create test config with custom allow_registration
+    let config = AppConfig {
+        server: klask_rs::config::ServerConfig { host: "127.0.0.1".to_string(), port: 3000 },
+        database: klask_rs::config::DatabaseConfig {
+            url: "postgres://test:test@localhost:9999/test".to_string(),
+            max_connections: 1,
+        },
+        search: klask_rs::config::SearchConfig { index_dir: "./test_index".to_string(), max_results: 1000 },
+        crawler: klask_rs::config::CrawlerConfig {
+            temp_dir: std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
+        },
+        auth: klask_rs::config::AuthConfig {
+            jwt_secret: "test-secret-key-for-jwt-authentication".to_string(),
+            jwt_expires_in: "1h".to_string(),
+            allow_registration,
+        },
+    };
+
+    // Create JWT service
+    let jwt_service = JwtService::new(&config.auth).expect("Failed to create JWT service");
+
+    // Create shared search service
+    let shared_search_service = Arc::new(search_service);
+
+    // Create progress tracker
+    let progress_tracker = Arc::new(ProgressTracker::new());
+
+    // Create encryption service for tests
+    let encryption_service = Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap());
+
+    // Create crawler service
+    let crawler_service = Arc::new(
+        CrawlerService::new(
+            database.pool().clone(),
+            shared_search_service.clone(),
+            progress_tracker.clone(),
+            encryption_service.clone(),
+            std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
+        )
+        .expect("Failed to create crawler service"),
+    );
+
+    AppState {
+        database,
+        search_service: shared_search_service,
+        crawler_service,
+        progress_tracker,
+        scheduler_service: None,
+        jwt_service,
+        config,
+        crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
+        startup_time: Instant::now(),
+        encryption_service,
+        delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+    }
+}
+
+// ============================================================================
+// Configuration Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_allow_registration_true_via_config() {
+    // Test that ALLOW_REGISTRATION=true sets allow_registration to true
+    let config = klask_rs::config::AuthConfig {
+        jwt_secret: "test-secret".to_string(),
+        jwt_expires_in: "1h".to_string(),
+        allow_registration: true,
+    };
+
+    assert_eq!(config.allow_registration, true);
+}
+
+#[tokio::test]
+async fn test_allow_registration_false_via_config() {
+    // Test that ALLOW_REGISTRATION=false sets allow_registration to false
+    let config = klask_rs::config::AuthConfig {
+        jwt_secret: "test-secret".to_string(),
+        jwt_expires_in: "1h".to_string(),
+        allow_registration: false,
+    };
+
+    assert_eq!(config.allow_registration, false);
+}
+
+// ============================================================================
+// Registration Status Endpoint Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_registration_status_when_enabled() {
+    // Test /auth/registration/status returns registration_allowed: true when enabled
+    if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(true))
+    })) {
+        let router = api::create_router().await.expect("Failed to create router");
+        let app = router.with_state(app_state);
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        let response = server.get("/api/auth/registration/status").await;
+
+        assert_eq!(response.status_code(), StatusCode::OK);
+        let body: serde_json::Value = response.json();
+        assert_eq!(body["registration_allowed"], true);
+    } else {
+        println!("Skipping registration status enabled test - database not available");
+    }
+}
+
+#[tokio::test]
+async fn test_registration_status_when_disabled() {
+    // Test /auth/registration/status returns registration_allowed: false when disabled
+    if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(false))
+    })) {
+        let router = api::create_router().await.expect("Failed to create router");
+        let app = router.with_state(app_state);
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        let response = server.get("/api/auth/registration/status").await;
+
+        assert_eq!(response.status_code(), StatusCode::OK);
+        let body: serde_json::Value = response.json();
+        assert_eq!(body["registration_allowed"], false);
+    } else {
+        println!("Skipping registration status disabled test - database not available");
+    }
+}
+
+// ============================================================================
+// Registration Endpoint Blocking Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_registration_blocked_when_disabled() {
+    // Test that registration returns 403 when allow_registration=false
+    if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(false))
+    })) {
+        let router = api::create_router().await.expect("Failed to create router");
+        let app = router.with_state(app_state);
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        let register_request = json!({
+            "username": "testuser",
+            "email": "testuser@example.com",
+            "password": "ValidPassword123"
+        });
+
+        let response = server.post("/api/auth/register").json(&register_request).await;
+
+        // Should return 403 Forbidden
+        assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+
+        let body: serde_json::Value = response.json();
+        assert!(body["error"].as_str().unwrap().contains("Registration is currently disabled"));
+    } else {
+        println!("Skipping registration blocked test - database not available");
+    }
+}
+
+#[tokio::test]
+async fn test_registration_blocked_error_message() {
+    // Test that the error message is correct when registration is disabled
+    if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(false))
+    })) {
+        let router = api::create_router().await.expect("Failed to create router");
+        let app = router.with_state(app_state);
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        let register_request = json!({
+            "username": "anotheruser",
+            "email": "another@example.com",
+            "password": "ValidPassword123"
+        });
+
+        let response = server.post("/api/auth/register").json(&register_request).await;
+
+        assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+        let body: serde_json::Value = response.json();
+
+        // Verify error message and status code
+        assert!(body["error"].as_str().unwrap().to_lowercase().contains("registration is currently disabled"));
+        assert_eq!(body["status"], 403);
+    } else {
+        println!("Skipping registration blocked error message test - database not available");
+    }
+}
+
+#[tokio::test]
+async fn test_registration_allowed_when_enabled() {
+    // Test that registration validation is performed when registration is enabled
+    if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(true))
+    })) {
+        let router = api::create_router().await.expect("Failed to create router");
+        let app = router.with_state(app_state);
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        // Test with invalid data - should fail validation, not registration disabled
+        let invalid_register = json!({
+            "username": "ab", // too short
+            "email": "invalid-email",
+            "password": "123" // too short
+        });
+
+        let response = server.post("/api/auth/register").json(&invalid_register).await;
+
+        // Should fail validation (4xx error) but NOT with registration disabled error
+        assert!(response.status_code().is_client_error());
+        let body: serde_json::Value = response.json();
+
+        // Should NOT contain "Registration is currently disabled" message
+        let error_msg = body["error"].as_str().unwrap().to_lowercase();
+        assert!(
+            !error_msg.contains("registration is currently disabled"),
+            "Got registration disabled error when registration should be enabled"
+        );
+    } else {
+        println!("Skipping registration allowed test - database not available");
+    }
+}
+
+#[tokio::test]
+async fn test_registration_check_happens_before_validation() {
+    // Test that registration disabled check happens before other validations
+    if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(false))
+    })) {
+        let router = api::create_router().await.expect("Failed to create router");
+        let app = router.with_state(app_state);
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        // Even with invalid data, should get registration disabled error
+        let invalid_register = json!({
+            "username": "ab",
+            "email": "invalid",
+            "password": "123"
+        });
+
+        let response = server.post("/api/auth/register").json(&invalid_register).await;
+
+        assert_eq!(response.status_code(), StatusCode::FORBIDDEN);
+        let body: serde_json::Value = response.json();
+        assert!(body["error"].as_str().unwrap().to_lowercase().contains("registration is currently disabled"));
+    } else {
+        println!("Skipping registration check priority test - database not available");
+    }
+}
+
+// ============================================================================
+// Edge Cases and Integration Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_registration_status_is_accurate() {
+    // Test that registration status endpoint accurately reflects the config
+    if let Ok(app_state_disabled) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(false))
+    })) {
+        let router_disabled = api::create_router().await.expect("Failed to create router");
+        let app_disabled = router_disabled.with_state(app_state_disabled);
+        let server_disabled = TestServer::new(app_disabled).expect("Failed to create test server");
+
+        let status_response = server_disabled.get("/api/auth/registration/status").await;
+        assert_eq!(status_response.status_code(), StatusCode::OK);
+
+        let body: serde_json::Value = status_response.json();
+        assert_eq!(
+            body["registration_allowed"], false,
+            "Status endpoint should reflect disabled registration"
+        );
+    } else {
+        println!("Skipping registration status accuracy test - database not available");
+    }
+}
+
+#[tokio::test]
+async fn test_multiple_registration_attempts_when_disabled() {
+    // Test that multiple registration attempts all fail consistently when disabled
+    if let Ok(app_state) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Runtime::new().unwrap().block_on(create_test_app_state_with_registration(false))
+    })) {
+        let router = api::create_router().await.expect("Failed to create router");
+        let app = router.with_state(app_state);
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        // Try multiple registration attempts
+        for i in 0..3 {
+            let register_request = json!({
+                "username": format!("user{}", i),
+                "email": format!("user{}@example.com", i),
+                "password": "ValidPassword123"
+            });
+
+            let response = server.post("/api/auth/register").json(&register_request).await;
+
+            assert_eq!(
+                response.status_code(),
+                StatusCode::FORBIDDEN,
+                "Attempt {} should be blocked",
+                i
+            );
+        }
+    } else {
+        println!("Skipping multiple registration attempts test - database not available");
     }
 }

@@ -4,7 +4,7 @@ use super::git_tree_walker::GitTreeWalker;
 use crate::models::Repository;
 use crate::services::progress::ProgressTracker;
 use crate::services::search::SearchService;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use gix::ObjectId;
 use std::path::Path;
 use std::sync::Arc;
@@ -290,7 +290,13 @@ impl BranchProcessor {
             if idx % 100 == 0 && idx > 0 {
                 debug!(
                     "Progress: {}/{} files in branch '{}' - indexed: {}, skipped_filter: {}, binary/too_large: {}, failed: {}",
-                    idx, total_files, branch_name, files_read_success, files_skipped_by_filter, files_binary_skipped, files_read_failed
+                    idx,
+                    total_files,
+                    branch_name,
+                    files_read_success,
+                    files_skipped_by_filter,
+                    files_binary_skipped,
+                    files_read_failed
                 );
             }
             // Check for cancellation

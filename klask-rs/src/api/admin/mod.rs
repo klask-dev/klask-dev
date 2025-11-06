@@ -1,13 +1,13 @@
 use crate::auth::extractors::{AdminUser, AppState};
-use crate::repositories::{user_repository::UserStats, UserRepository};
+use crate::repositories::{UserRepository, user_repository::UserStats};
 use crate::services::seeding::{SeedingService, SeedingStats};
 use anyhow::Result;
 use axum::{
+    Router,
     extract::State,
     http::StatusCode,
     response::Json,
     routing::{get, post},
-    Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -1,15 +1,15 @@
-use crate::auth::extractors::{AdminUser, AppState};
 use crate::auth::AuthError;
+use crate::auth::extractors::{AdminUser, AppState};
 use crate::models::{User, UserRole};
-use crate::repositories::{user_repository::UserStats, UserRepository};
+use crate::repositories::{UserRepository, user_repository::UserStats};
 use crate::utils::password::{hash_password, verify_password};
 use anyhow::Result;
 use axum::{
+    Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     routing::{get, post, put},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
