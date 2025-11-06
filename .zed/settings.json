@@ -6,7 +6,8 @@
     "auto_install_extensions": {
         "helm": true,
         "dockerfile": true,
-        "docker-compose": true
+        "docker-compose": true,
+        "toml": true
     },
     "file_types": {
       "Helm": [
