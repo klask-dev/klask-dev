@@ -127,6 +127,7 @@ describe('useTheme Hook', () => {
           language: 'en',
           notifications_email: true,
           show_activity: true,
+          size_unit: 'kb',
         },
       });
     });
@@ -384,6 +385,7 @@ describe('useTheme Hook', () => {
         language: 'en',
         notifications_email: true,
         show_activity: true,
+        size_unit: 'kb',
       });
     });
   });

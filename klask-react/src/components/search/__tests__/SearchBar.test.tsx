@@ -41,47 +41,53 @@ describe('SearchBar Component', () => {
   });
 
   it('should call onChange when user types', async () => {
-    const user = userEvent.setup();
     render(<SearchBar {...defaultProps} />);
-
     const input = screen.getByRole('textbox');
-    await user.type(input, 'test');
 
-    // Wait for debounced onChange call (300ms debounce)
+    // Use fireEvent instead of userEvent for speed
+    fireEvent.change(input, { target: { value: 'test' } });
+
+    // Should not call immediately
+    expect(mockOnChange).not.toHaveBeenCalled();
+
+    // Wait for debounce (300ms)
     await waitFor(() => {
       expect(mockOnChange).toHaveBeenCalledWith('test');
     }, { timeout: 500 });
   });
 
   it('should debounce onChange and onSearch calls', async () => {
-    const user = userEvent.setup();
     render(<SearchBar {...defaultProps} />);
-    
     const input = screen.getByRole('textbox');
-    
-    // Type quickly
-    await user.type(input, 'test');
-    
+
+    // Type multiple times quickly (simulating rapid typing)
+    fireEvent.change(input, { target: { value: 't' } });
+    fireEvent.change(input, { target: { value: 'te' } });
+    fireEvent.change(input, { target: { value: 'tes' } });
+    fireEvent.change(input, { target: { value: 'test' } });
+
     // Should not call immediately
-    expect(mockOnChange).not.toHaveBeenCalledWith('test');
-    
-    // Wait for debounce
+    expect(mockOnChange).not.toHaveBeenCalled();
+
+    // Wait for debounce and check only called once with final value
     await waitFor(() => {
+      expect(mockOnChange).toHaveBeenCalledTimes(1);
       expect(mockOnChange).toHaveBeenCalledWith('test');
+      expect(mockOnSearch).toHaveBeenCalledTimes(1);
       expect(mockOnSearch).toHaveBeenCalledWith('test');
     }, { timeout: 500 });
   });
 
-  it('should call onSearch when form is submitted', async () => {
-    const user = userEvent.setup();
+  it('should call onSearch when form is submitted', () => {
     render(<SearchBar {...defaultProps} />);
-    
+
     const input = screen.getByRole('textbox');
     const form = input.closest('form');
-    
-    await user.type(input, 'submit test');
+
+    // Use fireEvent instead of userEvent for speed
+    fireEvent.change(input, { target: { value: 'submit test' } });
     fireEvent.submit(form!);
-    
+
     expect(mockOnSearch).toHaveBeenCalledWith('submit test');
   });
 
@@ -100,13 +106,9 @@ describe('SearchBar Component', () => {
     expect(searchIcon).not.toHaveClass('animate-pulse');
   });
 
-  it('should show clear button when there is text', async () => {
-    const user = userEvent.setup();
-    render(<SearchBar {...defaultProps} />);
-    
-    const input = screen.getByRole('textbox');
-    await user.type(input, 'test');
-    
+  it('should show clear button when there is text', () => {
+    render(<SearchBar {...defaultProps} value="test" />);
+
     const clearButton = screen.getByRole('button');
     expect(clearButton).toBeInTheDocument();
   });
