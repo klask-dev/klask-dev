@@ -17,6 +17,16 @@ spec:
     - Ingress
     - Egress
   ingress:
+    {{- if .Values.networkPolicy.backend.allowHealthChecks }}
+    # Allow health checks from Kubernetes nodes (kubelet)
+    - from:
+        {{- range .Values.networkPolicy.backend.healthCheckSources }}
+        - {{ . | toYaml | nindent 10 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.service.targetPort }}
+    {{- end }}
     # Allow from frontend
     - from:
         - podSelector:
@@ -87,6 +97,16 @@ spec:
     - Ingress
     - Egress
   ingress:
+    {{- if .Values.networkPolicy.frontend.allowHealthChecks }}
+    # Allow health checks from Kubernetes nodes (kubelet)
+    - from:
+        {{- range .Values.networkPolicy.frontend.healthCheckSources }}
+        - {{ . | toYaml | nindent 10 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.targetPort }}
+    {{- end }}
     {{- if .Values.ingress.enabled }}
     # Allow from ingress controller
     - from:

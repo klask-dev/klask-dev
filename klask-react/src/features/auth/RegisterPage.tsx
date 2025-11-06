@@ -14,6 +14,8 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isCheckingRegistrationStatus, setIsCheckingRegistrationStatus] = useState(true);
+  const [registrationDisabledMessage, setRegistrationDisabledMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -24,6 +26,33 @@ const RegisterPage: React.FC = () => {
     resolver: zodResolver(registerSchema),
   });
 
+  // Check if registration is allowed on component mount
+  React.useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const status = await apiClient.auth.checkRegistrationStatus();
+
+        if (!status.registration_allowed) {
+          setRegistrationDisabledMessage(
+            'Registration is currently disabled. Please contact the administrator.'
+          );
+          // Redirect to login after a delay to let the message be read
+          setTimeout(() => {
+            navigate('/login');
+          }, 3000);
+        } else {
+          setIsCheckingRegistrationStatus(false);
+        }
+      } catch (error) {
+        console.error('Failed to check registration status:', error);
+        // If we can't determine status, allow registration to proceed
+        setIsCheckingRegistrationStatus(false);
+      }
+    };
+
+    checkRegistrationStatus();
+  }, [navigate]);
+
   const onSubmit = async (data: RegisterForm) => {
     try {
       setServerError(null);
@@ -31,6 +60,19 @@ const RegisterPage: React.FC = () => {
       login(response.token, response.user);
       navigate('/home');
     } catch (error) {
+      // Check for 403 Forbidden error (registration disabled)
+      const apiError = error as any;
+      if (apiError.status === 403) {
+        setRegistrationDisabledMessage(
+          'Registration is currently disabled. Please contact the administrator.'
+        );
+        // Redirect to login after a delay
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
+        return;
+      }
+
       // Extract field-specific errors
       const fieldErrors = extractFieldErrors(error);
 
@@ -43,7 +85,6 @@ const RegisterPage: React.FC = () => {
           });
         });
       } else if (error instanceof Error) {
-        const apiError = error as any;
         // If we have a detailed error from the API, use that
         if (apiError.details?.error) {
           setServerError(apiError.details.error);
@@ -55,6 +96,44 @@ const RegisterPage: React.FC = () => {
       }
     }
   };
+
+  // Show loading spinner while checking registration status
+  if (isCheckingRegistrationStatus && !registrationDisabledMessage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  // Show disabled message if registration is not allowed
+  if (registrationDisabledMessage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <div className="flex justify-center">
+              <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center">
+                <MagnifyingGlassIcon className="w-10 h-10 text-white" />
+              </div>
+            </div>
+            <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+              Registration Disabled
+            </h2>
+          </div>
+
+          <div className="bg-white py-8 px-6 shadow-lg rounded-lg">
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-6">
+              <p className="text-yellow-800 text-sm">{registrationDisabledMessage}</p>
+            </div>
+            <p className="text-center text-sm text-gray-600">
+              Redirecting to login page...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

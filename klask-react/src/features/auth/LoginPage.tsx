@@ -14,6 +14,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
+  const [registrationAllowed, setRegistrationAllowed] = useState(false);
 
   const {
     register,
@@ -36,6 +37,16 @@ const LoginPage: React.FC = () => {
           navigate('/setup');
         } else {
           setIsCheckingSetup(false);
+
+          // Also check registration status
+          try {
+            const registrationStatus = await apiClient.auth.checkRegistrationStatus();
+            setRegistrationAllowed(registrationStatus.registration_allowed);
+          } catch (error) {
+            console.error('Failed to check registration status:', error);
+            // Default to showing the link if we can't determine status
+            setRegistrationAllowed(true);
+          }
         }
       } catch (error) {
         console.error('Failed to check setup status:', error);
@@ -103,15 +114,17 @@ const LoginPage: React.FC = () => {
           <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
             Sign in to Klask
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link
-              to="/register"
-              className="font-medium text-blue-600 hover:text-primary-500"
-            >
-              create a new account
-            </Link>
-          </p>
+          {registrationAllowed && (
+            <p className="mt-2 text-center text-sm text-gray-600">
+              Or{' '}
+              <Link
+                to="/register"
+                className="font-medium text-blue-600 hover:text-primary-500"
+              >
+                create a new account
+              </Link>
+            </p>
+          )}
         </div>
 
         <div className="bg-white py-8 px-6 shadow-lg rounded-lg">

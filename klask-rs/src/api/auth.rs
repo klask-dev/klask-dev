@@ -50,6 +50,11 @@ pub struct SetupCheckResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct RegistrationStatusResponse {
+    pub registration_allowed: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResponse {
     pub token: String,
     pub user: UserInfo,
@@ -74,6 +79,7 @@ pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/login", post(login))
         .route("/register", post(register))
+        .route("/registration/status", get(get_registration_status))
         .route("/profile", get(get_profile).put(update_profile))
         .route("/password", put(change_password))
         .route("/avatar", post(upload_avatar))
@@ -129,6 +135,11 @@ async fn register(
     State(app_state): State<AppState>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<Json<AuthResponse>, AuthError> {
+    // Check if registration is allowed
+    if !app_state.config.auth.allow_registration {
+        return Err(AuthError::RegistrationDisabled);
+    }
+
     // Validate request
     req.validate().map_err(|_| AuthError::InvalidCredentials)?;
 
@@ -189,6 +200,14 @@ async fn check_setup(State(app_state): State<AppState>) -> Result<Json<SetupChec
     let user_count = user_repo.count_users().await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
     Ok(Json(SetupCheckResponse { needs_setup: user_count == 0 }))
+}
+
+async fn get_registration_status(
+    State(app_state): State<AppState>,
+) -> Result<Json<RegistrationStatusResponse>, AuthError> {
+    Ok(Json(RegistrationStatusResponse {
+        registration_allowed: app_state.config.auth.allow_registration,
+    }))
 }
 
 async fn initial_setup(

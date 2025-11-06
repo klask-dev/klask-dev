@@ -247,6 +247,10 @@ export interface TokenClaims {
   exp: number;
 }
 
+export interface RegistrationStatus {
+  registration_allowed: boolean;
+}
+
 // API Response Types
 export interface ApiResponse<T> {
   data: T;

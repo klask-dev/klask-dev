@@ -34,6 +34,8 @@ pub enum AuthError {
     Forbidden(String),
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+    #[error("Registration is currently disabled")]
+    RegistrationDisabled,
 }
 
 impl IntoResponse for AuthError {
@@ -55,6 +57,9 @@ impl IntoResponse for AuthError {
             AuthError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
             AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
             AuthError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            AuthError::RegistrationDisabled => {
+                (StatusCode::FORBIDDEN, "Registration is currently disabled".to_string())
+            }
         };
 
         let body = Json(json!({

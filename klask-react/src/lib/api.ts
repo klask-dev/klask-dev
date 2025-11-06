@@ -24,7 +24,8 @@ import type {
   SchedulerStatus,
   UpdateProfileRequest,
   ChangePasswordRequest,
-  UserActivity
+  UserActivity,
+  RegistrationStatus
 } from '../types';
 
 // API Error class
@@ -266,6 +267,10 @@ class ApiClient {
 
     logout: () => {
       this.setToken(null);
+    },
+
+    checkRegistrationStatus: async (): Promise<RegistrationStatus> => {
+      return this.request<RegistrationStatus>('/api/auth/registration/status');
     }
   };
 
@@ -548,6 +553,7 @@ export const api = {
   getUserActivity: () => apiClient.auth.getUserActivity(),
   deleteAccount: (password: string) => apiClient.auth.deleteAccount(password),
   logout: () => apiClient.auth.logout(),
+  checkRegistrationStatus: () => apiClient.auth.checkRegistrationStatus(),
 
   // Search
   search: (query: SearchQuery) => apiClient.search(query),

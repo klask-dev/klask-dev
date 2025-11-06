@@ -37,6 +37,7 @@ pub struct CrawlerConfig {
 pub struct AuthConfig {
     pub jwt_secret: String,
     pub jwt_expires_in: String,
+    pub allow_registration: bool,
 }
 
 impl AppConfig {
@@ -72,6 +73,10 @@ impl AppConfig {
             auth: AuthConfig {
                 jwt_secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string()),
                 jwt_expires_in: std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "24h".to_string()),
+                allow_registration: std::env::var("ALLOW_REGISTRATION")
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
             },
         };
 
