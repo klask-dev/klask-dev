@@ -1,6 +1,7 @@
 use crate::models::Repository;
 use crate::services::encryption::EncryptionService;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use gix::open::Options;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -30,11 +31,9 @@ impl GitOperations {
                 std::time::Duration::from_secs(180),
                 tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
                     // Disable ALL interactive prompts for server-mode operation
-                    std::env::set_var("GIT_TERMINAL_PROMPT", "0");
-                    std::env::set_var("GIT_ASKPASS", "");
-                    std::env::set_var("SSH_ASKPASS", "");
+                    let opts = Options::isolated().config_overrides(["gitoxide.credentials.terminalPrompt=0"]);
 
-                    let git_repo = gix::open(&repo_path_owned)?;
+                    let git_repo = gix::open_opts(&repo_path_owned, opts)?;
 
                     info!("Fetching latest changes from remote");
 
@@ -99,9 +98,12 @@ impl GitOperations {
             std::time::Duration::from_secs(300),
             tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
                 // Disable ALL interactive prompts for server-mode operation
-                std::env::set_var("GIT_TERMINAL_PROMPT", "0");
-                std::env::set_var("GIT_ASKPASS", "");
-                std::env::set_var("SSH_ASKPASS", "");
+                // SAFETY: Setting environment variables is safe in this single-threaded spawn_blocking context
+                unsafe {
+                    std::env::set_var("GIT_TERMINAL_PROMPT", "0");
+                    std::env::set_var("GIT_ASKPASS", "");
+                    std::env::set_var("SSH_ASKPASS", "");
+                }
 
                 let mut prep = gix::prepare_clone(clone_url, &repo_path_owned)
                     .map_err(|e| anyhow!("prepare_clone failed: {}", e))?;
