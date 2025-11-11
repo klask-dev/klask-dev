@@ -71,9 +71,9 @@ ENV RUST_LOG=info
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/status || exit 1
+# Health check - test if port 3000 is listening using /dev/tcp
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+  CMD timeout 2 bash -c '</dev/tcp/localhost/3000' > /dev/null 2>&1 || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]

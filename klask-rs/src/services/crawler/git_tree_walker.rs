@@ -102,11 +102,11 @@ impl GitTreeWalker {
                 branch_set.insert(branch_name.to_string());
             }
             // Check for remote branches (refs/remotes/origin/*)
-            else if let Some(branch_name) = name.strip_prefix("refs/remotes/origin/") {
-                if branch_name != "HEAD" {
-                    info!("Found remote branch: {}", branch_name);
-                    branch_set.insert(branch_name.to_string());
-                }
+            else if let Some(branch_name) = name.strip_prefix("refs/remotes/origin/")
+                && branch_name != "HEAD"
+            {
+                info!("Found remote branch: {}", branch_name);
+                branch_set.insert(branch_name.to_string());
             }
         }
 

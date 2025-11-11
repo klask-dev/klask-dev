@@ -268,20 +268,20 @@ async fn update_profile(
     Json(payload): Json<UpdateProfileRequest>,
 ) -> Result<Json<UserProfile>, AuthError> {
     // Validate inputs
-    if let Some(ref name) = payload.full_name {
-        if name.is_empty() || name.len() > 255 {
-            return Err(AuthError::InvalidInput(
-                "Full name must be 1-255 characters".to_string(),
-            ));
-        }
+    if let Some(ref name) = payload.full_name
+        && (name.is_empty() || name.len() > 255)
+    {
+        return Err(AuthError::InvalidInput(
+            "Full name must be 1-255 characters".to_string(),
+        ));
     }
 
-    if let Some(ref bio) = payload.bio {
-        if bio.len() > 2000 {
-            return Err(AuthError::InvalidInput(
-                "Bio must be 2000 characters or less".to_string(),
-            ));
-        }
+    if let Some(ref bio) = payload.bio
+        && bio.len() > 2000
+    {
+        return Err(AuthError::InvalidInput(
+            "Bio must be 2000 characters or less".to_string(),
+        ));
     }
 
     if let Some(ref avatar_url) = payload.avatar_url {
@@ -291,18 +291,18 @@ async fn update_profile(
         }
     }
 
-    if let Some(ref phone) = payload.phone {
-        if phone.len() > 20 {
-            return Err(AuthError::InvalidInput(
-                "Phone must be 20 characters or less".to_string(),
-            ));
-        }
+    if let Some(ref phone) = payload.phone
+        && phone.len() > 20
+    {
+        return Err(AuthError::InvalidInput(
+            "Phone must be 20 characters or less".to_string(),
+        ));
     }
 
-    if let Some(ref tz) = payload.timezone {
-        if !validate_timezone(tz) {
-            return Err(AuthError::InvalidInput("Invalid timezone".to_string()));
-        }
+    if let Some(ref tz) = payload.timezone
+        && !validate_timezone(tz)
+    {
+        return Err(AuthError::InvalidInput("Invalid timezone".to_string()));
     }
 
     let user_repo = UserRepository::new(app_state.database.pool().clone());

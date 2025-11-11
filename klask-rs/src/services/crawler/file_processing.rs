@@ -288,14 +288,13 @@ impl FileProcessor {
 
             if path.is_dir() {
                 // Skip hidden directories and common ignore patterns
-                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if dir_name.starts_with('.')
+                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str())
+                    && (dir_name.starts_with('.')
                         || dir_name == "node_modules"
                         || dir_name == "target"
-                        || dir_name == "__pycache__"
-                    {
-                        continue;
-                    }
+                        || dir_name == "__pycache__")
+                {
+                    continue;
                 }
                 Self::collect_files_recursive(&path, files)?;
             } else if path.is_file() {

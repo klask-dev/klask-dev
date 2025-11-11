@@ -80,11 +80,11 @@ async fn main() -> Result<()> {
             }
 
             // Skip large files
-            if let Ok(metadata) = file_path.metadata() {
-                if metadata.len() > 10 * 1024 * 1024 {
-                    // 10MB
-                    continue;
-                }
+            if let Ok(metadata) = file_path.metadata()
+                && metadata.len() > 10 * 1024 * 1024
+            {
+                // 10MB
+                continue;
             }
 
             progress.files_processed += 1;

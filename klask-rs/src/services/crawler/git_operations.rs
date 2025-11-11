@@ -37,15 +37,14 @@ impl GitOperations {
 
                     info!("Fetching latest changes from remote");
 
-                    if let Ok(remote) = git_repo.find_remote("origin") {
-                        if let Ok(conn) = remote.connect(gix::remote::Direction::Fetch) {
-                            if let Ok(prep) = conn.prepare_fetch(gix::progress::Discard, Default::default()) {
-                                if let Err(e) = prep.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED) {
-                                    warn!("Failed to receive fetch: {}", e);
-                                } else {
-                                    info!("Successfully fetched latest changes");
-                                }
-                            }
+                    if let Ok(remote) = git_repo.find_remote("origin")
+                        && let Ok(conn) = remote.connect(gix::remote::Direction::Fetch)
+                        && let Ok(prep) = conn.prepare_fetch(gix::progress::Discard, Default::default())
+                    {
+                        if let Err(e) = prep.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED) {
+                            warn!("Failed to receive fetch: {}", e);
+                        } else {
+                            info!("Successfully fetched latest changes");
                         }
                     }
 

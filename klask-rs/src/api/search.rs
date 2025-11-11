@@ -224,32 +224,32 @@ async fn get_facets_with_filters(
     tracing::debug!("Facets request params: {:?}", params);
 
     // Validate filter parameters
-    if let Some(ref repos) = params.repositories {
-        if let Err(e) = validate_filter_param("repositories", repos) {
-            tracing::warn!("Invalid filter parameter - repositories: {}", e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref repos) = params.repositories
+        && let Err(e) = validate_filter_param("repositories", repos)
+    {
+        tracing::warn!("Invalid filter parameter - repositories: {}", e);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
-    if let Some(ref projects) = params.projects {
-        if let Err(e) = validate_filter_param("projects", projects) {
-            tracing::warn!("Invalid filter parameter - projects: {}", e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref projects) = params.projects
+        && let Err(e) = validate_filter_param("projects", projects)
+    {
+        tracing::warn!("Invalid filter parameter - projects: {}", e);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
-    if let Some(ref versions) = params.versions {
-        if let Err(e) = validate_filter_param("versions", versions) {
-            tracing::warn!("Invalid filter parameter - versions: {}", e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref versions) = params.versions
+        && let Err(e) = validate_filter_param("versions", versions)
+    {
+        tracing::warn!("Invalid filter parameter - versions: {}", e);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
-    if let Some(ref extensions) = params.extensions {
-        if let Err(e) = validate_filter_param("extensions", extensions) {
-            tracing::warn!("Invalid filter parameter - extensions: {}", e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref extensions) = params.extensions
+        && let Err(e) = validate_filter_param("extensions", extensions)
+    {
+        tracing::warn!("Invalid filter parameter - extensions: {}", e);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     // Build search query with optional search query and filters

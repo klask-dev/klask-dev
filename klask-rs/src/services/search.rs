@@ -635,11 +635,11 @@ impl SearchService {
         // Adjust snippet to only include complete lines (start after first newline, end at last newline)
         if let Some(first_newline_pos) = highlighted_html.find('\n') {
             // Find the last newline in the snippet
-            if let Some(last_newline_pos) = highlighted_html.rfind('\n') {
-                if last_newline_pos > first_newline_pos {
-                    // Trim to only include complete lines (after first \n, up to last \n)
-                    highlighted_html = highlighted_html[first_newline_pos + 1..last_newline_pos].to_string();
-                }
+            if let Some(last_newline_pos) = highlighted_html.rfind('\n')
+                && last_newline_pos > first_newline_pos
+            {
+                // Trim to only include complete lines (after first \n, up to last \n)
+                highlighted_html = highlighted_html[first_newline_pos + 1..last_newline_pos].to_string();
             }
         }
 
@@ -899,17 +899,17 @@ impl SearchService {
             let doc = searcher.doc::<tantivy::TantivyDocument>(doc_address)?;
 
             // Count repository facets
-            if let Some(repository) = doc.get_first(self.fields.repository).and_then(|v| v.as_str()) {
-                if !repository.is_empty() {
-                    *repository_counts.entry(repository.to_string()).or_insert(0) += 1;
-                }
+            if let Some(repository) = doc.get_first(self.fields.repository).and_then(|v| v.as_str())
+                && !repository.is_empty()
+            {
+                *repository_counts.entry(repository.to_string()).or_insert(0) += 1;
             }
 
             // Count project facets
-            if let Some(project) = doc.get_first(self.fields.project).and_then(|v| v.as_str()) {
-                if !project.is_empty() {
-                    *project_counts.entry(project.to_string()).or_insert(0) += 1;
-                }
+            if let Some(project) = doc.get_first(self.fields.project).and_then(|v| v.as_str())
+                && !project.is_empty()
+            {
+                *project_counts.entry(project.to_string()).or_insert(0) += 1;
             }
 
             // Count version facets (don't skip empty ones, use "main" as default)
@@ -922,10 +922,10 @@ impl SearchService {
             }
 
             // Count extension facets
-            if let Some(extension) = doc.get_first(self.fields.extension).and_then(|v| v.as_str()) {
-                if !extension.is_empty() {
-                    *extension_counts.entry(extension.to_string()).or_insert(0) += 1;
-                }
+            if let Some(extension) = doc.get_first(self.fields.extension).and_then(|v| v.as_str())
+                && !extension.is_empty()
+            {
+                *extension_counts.entry(extension.to_string()).or_insert(0) += 1;
             }
         }
 
@@ -990,94 +990,86 @@ impl SearchService {
             clauses.push((Occur::Must, text_query));
 
             // Add repository filter if requested
-            if include_repository {
-                if let Some(ref repository_filter) = search_query.repository_filter {
-                    let repositories: Vec<&str> =
-                        repository_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                    if !repositories.is_empty() {
-                        let mut repository_clauses = vec![];
-                        for repository in repositories {
-                            let term = tantivy::Term::from_field_text(self.fields.repository, repository);
-                            repository_clauses.push((
-                                Occur::Should,
-                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                    as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
-                        clauses.push((
-                            Occur::Must,
-                            Box::new(BooleanQuery::from(repository_clauses)) as Box<dyn tantivy::query::Query>,
+            if include_repository && let Some(ref repository_filter) = search_query.repository_filter {
+                let repositories: Vec<&str> =
+                    repository_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !repositories.is_empty() {
+                    let mut repository_clauses = vec![];
+                    for repository in repositories {
+                        let term = tantivy::Term::from_field_text(self.fields.repository, repository);
+                        repository_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
                         ));
                     }
+                    clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(repository_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
                 }
             }
 
             // Add project filter if requested
-            if include_project {
-                if let Some(ref project_filter) = search_query.project_filter {
-                    let projects: Vec<&str> =
-                        project_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                    if !projects.is_empty() {
-                        let mut project_clauses = vec![];
-                        for project in projects {
-                            let term = tantivy::Term::from_field_text(self.fields.project, project);
-                            project_clauses.push((
-                                Occur::Should,
-                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                    as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
-                        clauses.push((
-                            Occur::Must,
-                            Box::new(BooleanQuery::from(project_clauses)) as Box<dyn tantivy::query::Query>,
+            if include_project && let Some(ref project_filter) = search_query.project_filter {
+                let projects: Vec<&str> =
+                    project_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !projects.is_empty() {
+                    let mut project_clauses = vec![];
+                    for project in projects {
+                        let term = tantivy::Term::from_field_text(self.fields.project, project);
+                        project_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
                         ));
                     }
+                    clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(project_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
                 }
             }
 
             // Add version filter if requested
-            if include_version {
-                if let Some(ref version_filter) = search_query.version_filter {
-                    let versions: Vec<&str> =
-                        version_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                    if !versions.is_empty() {
-                        let mut version_clauses = vec![];
-                        for version in versions {
-                            let term = tantivy::Term::from_field_text(self.fields.version, version);
-                            version_clauses.push((
-                                Occur::Should,
-                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                    as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
-                        clauses.push((
-                            Occur::Must,
-                            Box::new(BooleanQuery::from(version_clauses)) as Box<dyn tantivy::query::Query>,
+            if include_version && let Some(ref version_filter) = search_query.version_filter {
+                let versions: Vec<&str> =
+                    version_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !versions.is_empty() {
+                    let mut version_clauses = vec![];
+                    for version in versions {
+                        let term = tantivy::Term::from_field_text(self.fields.version, version);
+                        version_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
                         ));
                     }
+                    clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(version_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
                 }
             }
 
             // Add extension filter if requested
-            if include_extension {
-                if let Some(ref extension_filter) = search_query.extension_filter {
-                    let extensions: Vec<&str> =
-                        extension_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                    if !extensions.is_empty() {
-                        let mut extension_clauses = vec![];
-                        for extension in extensions {
-                            let term = tantivy::Term::from_field_text(self.fields.extension, extension);
-                            extension_clauses.push((
-                                Occur::Should,
-                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                    as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
-                        clauses.push((
-                            Occur::Must,
-                            Box::new(BooleanQuery::from(extension_clauses)) as Box<dyn tantivy::query::Query>,
+            if include_extension && let Some(ref extension_filter) = search_query.extension_filter {
+                let extensions: Vec<&str> =
+                    extension_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                if !extensions.is_empty() {
+                    let mut extension_clauses = vec![];
+                    for extension in extensions {
+                        let term = tantivy::Term::from_field_text(self.fields.extension, extension);
+                        extension_clauses.push((
+                            Occur::Should,
+                            Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                as Box<dyn tantivy::query::Query>,
                         ));
                     }
+                    clauses.push((
+                        Occur::Must,
+                        Box::new(BooleanQuery::from(extension_clauses)) as Box<dyn tantivy::query::Query>,
+                    ));
                 }
             }
 
