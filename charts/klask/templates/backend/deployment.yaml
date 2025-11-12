@@ -102,6 +102,16 @@ spec:
                   name: {{ include "klask.backend.secretName" . }}
                   key: database-url
             {{- end }}
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "klask.backend.secretName" . }}-auth
+                  key: ENCRYPTION_KEY
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "klask.backend.secretName" . }}-auth
+                  key: JWT_SECRET
             {{- range $key, $value := .Values.backend.env.customVars }}
             - name: {{ $key }}
               value: {{ $value | quote }}
