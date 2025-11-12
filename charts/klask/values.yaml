@@ -201,15 +201,29 @@ backend:
     ## @param backend.image.pullPolicy Backend image pull policy
     pullPolicy: IfNotPresent
 
-  ## @param backend.existingSecret Name of existing secret containing backend credentials
-  ## If not specified, a secret will be created
+  ## @param backend.existingSecret Name of existing secret containing backend database credentials
+  ## If not specified, a secret will be created (for external database URL)
   existingSecret: ""
 
-  ## @param backend.secrets Additional secrets to store in backend secret
-  ## Example:
-  ## secrets:
-  ##   API_KEY: "my-secret-api-key"
-  secrets: {}
+  ## @param backend.existingAuthSecret Name of existing secret containing auth credentials
+  ## If not specified, a secret will be created
+  existingAuthSecret: ""
+
+  ## @param backend.auth Authentication and encryption secrets configuration
+  auth:
+    ## @param backend.auth.encryptionKey Encryption key for sensitive data at rest (e.g., OAuth tokens)
+    ## If not provided, a random 32-character value will be auto-generated on first install
+    ## WARNING: Auto-generated values are preserved across upgrades via lookup()
+    ## To regenerate: kubectl delete secret klask-backend-auth -n <namespace>
+    ## Generate custom key with: openssl rand -hex 32
+    encryptionKey: ""
+
+    ## @param backend.auth.jwtSecret Secret key for JWT token signing and validation
+    ## If not provided, a random 32-character value will be auto-generated on first install
+    ## WARNING: Auto-generated values are preserved across upgrades via lookup()
+    ## To regenerate: kubectl delete secret klask-backend-auth -n <namespace>
+    ## Generate custom key with: openssl rand -hex 32
+    jwtSecret: ""
 
   ## @param backend.config Backend configuration (non-sensitive)
   config:

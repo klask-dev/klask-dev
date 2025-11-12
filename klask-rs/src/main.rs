@@ -86,13 +86,8 @@ async fn main() -> Result<()> {
     };
 
     // Initialize encryption service
-    let encryption_key =
-        std::env::var("ENCRYPTION_KEY").unwrap_or_else(|_| "your-secret-encryption-key-32bytes".to_string());
-    let encryption_service = match EncryptionService::new(&encryption_key) {
-        Ok(service) => {
-            info!("Encryption service initialized successfully");
-            Arc::new(service)
-        }
+    let encryption_service = match EncryptionService::new_from_env(database.pool()).await {
+        Ok(service) => Arc::new(service),
         Err(e) => {
             error!("Failed to initialize encryption service: {}", e);
             return Err(e);

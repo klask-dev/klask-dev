@@ -111,6 +111,115 @@ The following table lists the configurable parameters and their default values:
 | `ingress.enabled` | Enable ingress | `false` |
 | `ingress.hosts[0].host` | Hostname | `klask.local` |
 
+## Secrets Configuration
+
+The chart manages sensitive data using Kubernetes Secret objects, with **separate secrets for infrastructure and application concerns**:
+
+1. **Infrastructure Secrets** (Database):
+   - PostgreSQL credentials (`klask-postgresql`)
+   - External database URLs (`klask-backend`)
+
+2. **Application Secrets** (Authentication):
+   - Encryption key (`klask-backend-auth`)
+   - JWT secret (`klask-backend-auth`)
+
+This separation allows for:
+- Independent rotation policies
+- Different access control (DBAs vs. DevOps)
+- Clearer security boundaries
+- Integration with different secret managers per concern
+
+### Application Authentication Secrets
+
+The backend requires two critical secrets for authentication and encryption, managed in a **separate** Kubernetes Secret:
+
+- **`ENCRYPTION_KEY`**: Used for encrypting sensitive data at rest (e.g., OAuth tokens)
+- **`JWT_SECRET`**: Used for signing and validating JWT authentication tokens
+
+**Secret name**: `klask-backend-auth`
+
+**Auto-generation behavior**: If `ENCRYPTION_KEY` or `JWT_SECRET` are not provided, they will be automatically generated with random 32-character values on first deployment. These auto-generated values are **preserved across Helm upgrades** via `lookup()` function.
+
+#### Method 1: Auto-generated (Default - Recommended for Most Cases)
+
+Simply deploy without providing secrets - they will be auto-generated:
+
+```bash
+# Just install the chart, secrets will be auto-generated
+helm install klask ./helm/klask
+```
+
+The secrets are generated with random 32-character values and preserved across upgrades. To regenerate them:
+
+```bash
+# Delete the auth secret to regenerate on next deployment
+kubectl delete secret klask-backend-auth -n <namespace>
+helm upgrade klask ./helm/klask
+```
+
+#### Method 2: Custom Generated Keys (Development/Testing)
+
+Provide your own randomly generated keys via values file:
+
+```bash
+# Generate random 32-byte hex strings
+ENCRYPTION_KEY=$(openssl rand -hex 32)
+JWT_SECRET=$(openssl rand -hex 32)
+
+# Create/update your custom-values.yaml
+cat > custom-values.yaml << EOF
+backend:
+  auth:
+    encryptionKey: "$ENCRYPTION_KEY"
+    jwtSecret: "$JWT_SECRET"
+EOF
+
+# Install the chart with custom values
+helm install klask ./helm/klask -f custom-values.yaml
+```
+
+Or directly via CLI:
+
+```bash
+helm install klask ./helm/klask \
+  --set backend.auth.encryptionKey="$(openssl rand -hex 32)" \
+  --set backend.auth.jwtSecret="$(openssl rand -hex 32)"
+```
+
+#### Method 3: External Secret Management (Recommended for Production with HSM/Vault)
+
+Use existing Kubernetes Secrets created by external systems (HashiCorp Vault, Sealed Secrets, etc.):
+
+```bash
+# Create the secret manually or via your secret management system
+kubectl create secret generic klask-backend-auth \
+  --from-literal=ENCRYPTION_KEY="your-key-here" \
+  --from-literal=JWT_SECRET="your-secret-here"
+
+# Configure the chart to use the existing secret
+cat > custom-values.yaml << EOF
+backend:
+  existingAuthSecret: "klask-backend-auth"
+EOF
+
+helm install klask ./helm/klask -f custom-values.yaml
+```
+
+### PostgreSQL Passwords
+
+Similarly, PostgreSQL passwords can be managed via:
+
+```yaml
+postgresql:
+  auth:
+    # Auto-generated if empty (recommended for production)
+    postgresPassword: ""
+    password: ""
+
+    # OR use existing secret
+    existingSecret: "postgres-credentials"
+```
+
 ## Usage
 
 After installation, you can access the application:
