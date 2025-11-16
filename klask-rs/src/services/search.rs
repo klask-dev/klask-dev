@@ -137,7 +137,9 @@ struct SearchFields {
     project: Field,    // Individual project name
     version: Field,
     extension: Field,
-    size: Field, // File content size in bytes
+    size: Field,          // File content size in bytes
+    file_name_raw: Field, // Non-tokenized file_name for regex search
+    file_path_raw: Field, // Non-tokenized file_path for regex search
 }
 
 impl SearchService {
@@ -196,7 +198,7 @@ impl SearchService {
         schema_builder.add_text_field("file_name", TEXT | STORED);
         schema_builder.add_text_field("file_path", TEXT | STORED);
 
-        // Content field cargo clippy -- -D warningswith custom analyzer for code search
+        // Content field with custom analyzer for code search
         schema_builder.add_text_field("content", TEXT | STORED);
 
         // Filter fields - use STRING for exact matching, not TEXT which tokenizes
@@ -207,6 +209,11 @@ impl SearchService {
 
         // Size field for filtering by file content size (in bytes)
         schema_builder.add_u64_field("size", FAST | STORED);
+
+        // Raw (non-tokenized) versions of file_name and file_path for regex search
+        // These allow RegexQuery to match partial strings instead of just complete tokens
+        schema_builder.add_text_field("file_name_raw", STRING | STORED);
+        schema_builder.add_text_field("file_path_raw", STRING | STORED);
 
         schema_builder.build()
     }
@@ -222,6 +229,8 @@ impl SearchService {
             version: schema.get_field("version").expect("version field should exist"),
             extension: schema.get_field("extension").expect("extension field should exist"),
             size: schema.get_field("size").expect("size field should exist"),
+            file_name_raw: schema.get_field("file_name_raw").expect("file_name_raw field should exist"),
+            file_path_raw: schema.get_field("file_path_raw").expect("file_path_raw field should exist"),
         }
     }
 
@@ -239,6 +248,8 @@ impl SearchService {
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
             self.fields.size => file_data.size,
+            self.fields.file_name_raw => file_data.file_name,
+            self.fields.file_path_raw => file_data.file_path,
         );
 
         writer.add_document(doc)?;
@@ -273,6 +284,8 @@ impl SearchService {
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
             self.fields.size => file_data.size,
+            self.fields.file_name_raw => file_data.file_name,
+            self.fields.file_path_raw => file_data.file_path,
         );
 
         writer.add_document(doc)?;
@@ -382,6 +395,8 @@ impl SearchService {
                     self.fields.version => version,
                     self.fields.extension => extension,
                     self.fields.size => size,
+                    self.fields.file_name_raw => file_name,
+                    self.fields.file_path_raw => file_path,
                 );
 
                 writer.add_document(new_doc)?;
@@ -438,7 +453,34 @@ impl SearchService {
 
             let mut regex_clauses = Vec::new();
 
-            // Try to compile and apply regex query to content field
+            // Try to apply regex query to file_name_raw field (non-tokenized for complete matching)
+            match RegexQuery::from_pattern(&search_query.query, self.fields.file_name_raw) {
+                Ok(regex_q) => {
+                    regex_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Regex pattern doesn't match file_name_raw: {}", e);
+                }
+            }
+
+            // Try to apply regex query to file_path_raw field (non-tokenized for complete matching)
+            match RegexQuery::from_pattern(&search_query.query, self.fields.file_path_raw) {
+                Ok(regex_q) => {
+                    regex_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Regex pattern doesn't match file_path_raw: {}", e);
+                }
+            }
+
+            // For content, use content field (tokenized) with OR - better than nothing
+            // Note: Regex on content will only match complete tokens
             match RegexQuery::from_pattern(&search_query.query, self.fields.content) {
                 Ok(regex_q) => {
                     regex_clauses.push((
@@ -446,32 +488,8 @@ impl SearchService {
                         Box::new(regex_q) as Box<dyn tantivy::query::Query>,
                     ));
                 }
-                Err(e) => return Err(anyhow!("Invalid regex pattern '{}': {}", search_query.query, e)),
-            }
-
-            // Try to apply regex query to file_name field
-            match RegexQuery::from_pattern(&search_query.query, self.fields.file_name) {
-                Ok(regex_q) => {
-                    regex_clauses.push((
-                        tantivy::query::Occur::Should,
-                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
-                    ));
-                }
-                Err(_) => {
-                    // Silently skip if regex doesn't match this field type
-                }
-            }
-
-            // Try to apply regex query to file_path field
-            match RegexQuery::from_pattern(&search_query.query, self.fields.file_path) {
-                Ok(regex_q) => {
-                    regex_clauses.push((
-                        tantivy::query::Occur::Should,
-                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
-                    ));
-                }
-                Err(_) => {
-                    // Silently skip if regex doesn't match this field type
+                Err(e) => {
+                    debug!("Regex pattern doesn't match content: {}", e);
                 }
             }
 
