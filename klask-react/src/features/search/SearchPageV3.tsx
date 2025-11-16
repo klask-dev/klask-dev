@@ -19,8 +19,11 @@ const SearchPageV3: React.FC = () => {
   const location = useLocation();
   const [query, setQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [fuzzySearch, setFuzzySearch] = useState(false);
-  const [regexSearch, setRegexSearch] = useState(false);
+  const [searchMode, setSearchMode] = useState<'normal' | 'fuzzy' | 'regex'>('normal');
+
+  // Derive boolean flags from searchMode for backward compatibility
+  const fuzzySearch = searchMode === 'fuzzy';
+  const regexSearch = searchMode === 'regex';
 
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
@@ -231,6 +234,14 @@ const SearchPageV3: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Toggle handlers with mutual exclusivity logic
+  const handleFuzzyToggle = useCallback(() => {
+    setSearchMode(prev => (prev === 'fuzzy' ? 'normal' : 'fuzzy'));
+  }, []);
+
+  const handleRegexToggle = useCallback(() => {
+    setSearchMode(prev => (prev === 'regex' ? 'normal' : 'regex'));
+  }, []);
 
   const searchError = isError ? getErrorMessage(error) : null;
 
@@ -279,8 +290,10 @@ const SearchPageV3: React.FC = () => {
           
           {/* Fuzzy Search Toggle */}
           <button
-            onClick={() => setFuzzySearch(!fuzzySearch)}
-            title={fuzzySearch ? "Fuzzy search enabled (edit distance 1)" : "Enable fuzzy search"}
+            onClick={handleFuzzyToggle}
+            title={fuzzySearch
+              ? "Disable fuzzy search (1-character edit distance)"
+              : "Enable fuzzy search (1-character edit distance)"}
             className={`px-4 py-3 rounded-lg border-2 font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
               fuzzySearch
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
@@ -293,16 +306,18 @@ const SearchPageV3: React.FC = () => {
 
           {/* Regex Search Toggle */}
           <button
-            onClick={() => setRegexSearch(!regexSearch)}
-            title={regexSearch ? "Regex mode enabled - enter regex patterns like ^Crawler.*" : "Enable regex pattern matching"}
-            className={`px-4 py-3 rounded-lg border-2 font-mono font-bold transition-colors whitespace-nowrap ${
+            onClick={handleRegexToggle}
+            title={regexSearch
+              ? "Disable regex search - use patterns like ^test.*, [a-z]+\\.rs$"
+              : "Enable regex search - use patterns like ^test.*, [a-z]+\\.rs$"}
+            className={`px-4 py-3 rounded-lg border-2 font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
               regexSearch
                 ? 'border-purple-500 bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200'
                 : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
             }`}
           >
+            <span className="text-lg">/</span>
             <span className="hidden sm:inline">Regex</span>
-            <span className="sm:hidden">/.*</span>
           </button>
         </div>
 
