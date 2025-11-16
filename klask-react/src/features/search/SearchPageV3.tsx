@@ -10,7 +10,8 @@ import {
   ClockIcon,
   ChartBarIcon,
   DocumentMagnifyingGlassIcon,
-  SparklesIcon
+  SparklesIcon,
+  BoltIcon
 } from '@heroicons/react/24/outline';
 
 const SearchPageV3: React.FC = () => {
@@ -18,6 +19,8 @@ const SearchPageV3: React.FC = () => {
   const location = useLocation();
   const [query, setQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [fuzzySearch, setFuzzySearch] = useState(false);
+  const [regexSearch, setRegexSearch] = useState(false);
 
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
@@ -154,7 +157,7 @@ const SearchPageV3: React.FC = () => {
     sizeRange: filters?.size,
   }, currentPage, {
     enabled: !!query.trim(),
-  });
+  }, fuzzySearch, regexSearch);
 
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
@@ -163,7 +166,11 @@ const SearchPageV3: React.FC = () => {
   // Update context with facets from search results
   // When query is empty, clear searchResultsFacets to fallback to lastValidFacets
   useEffect(() => {
-    if (facets) {
+    if (!query.trim()) {
+      // Query is empty, clear search result facets to use filter-based facets instead
+      updateDynamicFilters(null);
+    } else if (facets) {
+      // Query exists and we have facets - use them (even if search returned 0 results)
       updateDynamicFilters({
         projects: facets.projects,
         versions: facets.versions,
@@ -172,10 +179,9 @@ const SearchPageV3: React.FC = () => {
         // Backend returns size_ranges in snake_case, not camelCase
         size_ranges: (facets as any).size_ranges || facets.sizeRanges || [],
       });
-    } else if (!query.trim()) {
-      // Query is empty, clear search result facets to use filter-based facets instead
-      updateDynamicFilters(null);
     }
+    // If query exists but facets is still loading/undefined, keep existing filters
+    // Don't clear them - wait for the facets to arrive
   }, [facets, query, updateDynamicFilters]);
   const pageSize = 20;
   const totalPages = Math.ceil(totalResults / pageSize);
@@ -260,13 +266,45 @@ const SearchPageV3: React.FC = () => {
 
       {/* Search Bar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-        <SearchBar
-          value={query}
-          onChange={setQuery}
-          onSearch={handleSearch}
-          placeholder="Search functions, classes, variables, comments..."
-          isLoading={isLoading || isFetching}
-        />
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <SearchBar
+              value={query}
+              onChange={setQuery}
+              onSearch={handleSearch}
+              placeholder="Search functions, classes, variables, comments..."
+              isLoading={isLoading || isFetching}
+            />
+          </div>
+          
+          {/* Fuzzy Search Toggle */}
+          <button
+            onClick={() => setFuzzySearch(!fuzzySearch)}
+            title={fuzzySearch ? "Fuzzy search enabled (edit distance 1)" : "Enable fuzzy search"}
+            className={`px-4 py-3 rounded-lg border-2 font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+              fuzzySearch
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+            }`}
+          >
+            <BoltIcon className="h-5 w-5" />
+            <span className="hidden sm:inline">Fuzzy</span>
+          </button>
+
+          {/* Regex Search Toggle */}
+          <button
+            onClick={() => setRegexSearch(!regexSearch)}
+            title={regexSearch ? "Regex mode enabled - enter regex patterns like ^Crawler.*" : "Enable regex pattern matching"}
+            className={`px-4 py-3 rounded-lg border-2 font-mono font-bold transition-colors whitespace-nowrap ${
+              regexSearch
+                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200'
+                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+            }`}
+          >
+            <span className="hidden sm:inline">Regex</span>
+            <span className="sm:hidden">/.*</span>
+          </button>
+        </div>
 
         {/* Search History */}
         {!query && history.length > 0 && (

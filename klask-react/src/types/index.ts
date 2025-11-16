@@ -155,6 +155,8 @@ export interface SearchQuery {
   extension?: string;
   maxResults?: number;
   offset?: number;
+  fuzzySearch?: boolean; // Enable fuzzy search (1 char edit distance) - default: false
+  regexSearch?: boolean; // Enable regex pattern matching - default: false
 }
 
 export interface SearchResult {

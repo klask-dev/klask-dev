@@ -131,7 +131,9 @@ export const useMultiSelectSearch = (
   query: string,
   filters: { [key: string]: string[] | { min?: number; max?: number } | undefined },
   currentPage: number = 1,
-  options: UseSearchOptions = {}
+  options: UseSearchOptions = {},
+  fuzzySearch: boolean = false,
+  regexSearch: boolean = false
 ) => {
   const {
     enabled = true,
@@ -143,14 +145,14 @@ export const useMultiSelectSearch = (
   const offset = (currentPage - 1) * pageSize;
 
   return useQuery({
-    queryKey: ['search', 'multiselect', query, filters, currentPage],
+    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
-      
+
       if (query.trim()) {
         searchParams.set('q', query.trim());
       }
-      
+
       // Handle multi-select filters - join with commas
       // Support both singular and plural keys for backward compatibility
       const projects = filters.projects || filters.project;
@@ -187,6 +189,12 @@ export const useMultiSelectSearch = (
       searchParams.set('limit', pageSize.toString());
       searchParams.set('page', currentPage.toString());
       searchParams.set('include_facets', 'true');
+      if (fuzzySearch) {
+        searchParams.set('fuzzy_search', 'true');
+      }
+      if (regexSearch) {
+        searchParams.set('regex_search', 'true');
+      }
 
       const response = await fetchWithAuth(`/api/search?${searchParams.toString()}`);
       if (!response.ok) {
