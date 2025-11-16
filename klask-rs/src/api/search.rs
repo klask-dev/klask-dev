@@ -66,6 +66,8 @@ pub struct SearchRequest {
     pub min_size: Option<u64>,
     pub max_size: Option<u64>,
     pub include_facets: Option<bool>,
+    pub fuzzy_search: Option<bool>, // Enable fuzzy search (1 char edit distance) - default: false
+    pub regex_search: Option<bool>, // Enable regex search (pattern matching) - default: false
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -141,6 +143,14 @@ async fn search_files(
     // Get search query from either 'q' or 'query' parameter
     let query_string = params.q.or(params.query).ok_or(StatusCode::BAD_REQUEST)?;
 
+    // Validate regex pattern if regex search is enabled
+    if params.regex_search.unwrap_or(false)
+        && let Err(e) = crate::api::regex_validator::validate_regex_pattern(&query_string)
+    {
+        tracing::warn!("Invalid regex pattern attempted: {}", e);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     // Build search query - filters are already comma-separated strings
     let search_query = SearchQuery {
         query: query_string,
@@ -153,6 +163,8 @@ async fn search_files(
         limit: limit as usize,
         offset: offset as usize,
         include_facets: params.include_facets.unwrap_or(false),
+        fuzzy_search: params.fuzzy_search.unwrap_or(false),
+        regex_search: params.regex_search.unwrap_or(false),
     };
 
     // Perform search using Tantivy
@@ -265,6 +277,8 @@ async fn get_facets_with_filters(
         limit: 0, // We only need facets, not results
         offset: 0,
         include_facets: true, // Always include facets for this endpoint
+        fuzzy_search: false,  // Facets request doesn't use fuzzy search
+        regex_search: false,  // Facets request doesn't use regex search
     };
 
     // Perform search using Tantivy
