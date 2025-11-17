@@ -124,9 +124,12 @@ mod regex_search_final_tests {
         let result = service.search(query).await;
         assert!(result.is_err(), "Invalid regex should return error");
         if let Err(e) = result {
+            // Error could come from validation (ReDoS check) or Tantivy regex compilation
+            let error_msg = e.to_string().to_lowercase();
             assert!(
-                e.to_string().contains("Invalid regex"),
-                "Error should mention invalid regex"
+                error_msg.contains("invalid") || error_msg.contains("pattern") || error_msg.contains("regex"),
+                "Error should mention something about invalid/pattern/regex, got: {}",
+                e
             );
         }
     }
