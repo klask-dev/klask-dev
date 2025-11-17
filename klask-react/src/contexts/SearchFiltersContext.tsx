@@ -143,8 +143,7 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [filterFacets, lastValidFacets?.size_ranges]);
 
   // When all filters are cleared, reset to staticFilters to show all options again
-  // Note: size_ranges is NOT reset here because it comes from searchResultsFacets (query-specific)
-  // Resetting it would lose the facet counts for the current search query
+  // This applies to ALL filters including size_ranges for consistent behavior
   React.useEffect(() => {
     if (!hasActiveFilters && shouldResetRef.current && staticFilters) {
       setLastValidFacets({
@@ -152,12 +151,11 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
         versions: staticFilters.versions || [],
         extensions: staticFilters.extensions || [],
         repositories: staticFilters.repositories || [],
-        // Keep existing size_ranges from search results, don't reset to static
-        size_ranges: lastValidFacets?.size_ranges || [],
+        size_ranges: staticFilters.size_ranges || [],
       });
       shouldResetRef.current = false; // Only reset once per clear
     }
-  }, [hasActiveFilters, staticFilters, lastValidFacets?.size_ranges]);
+  }, [hasActiveFilters, staticFilters]);
 
   const clearFilters = useCallback(() => {
     setFilters({});
