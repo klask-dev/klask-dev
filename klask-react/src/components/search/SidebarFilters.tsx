@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { FolderIcon, TagIcon, DocumentIcon } from '@heroicons/react/24/solid';
 import { useSearchFiltersContext } from '../../contexts/SearchFiltersContext';
+import { SizeFilter } from './SizeFilter';
 
 export interface SearchFilters {
   project?: string[];
@@ -358,6 +359,23 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
               filterKey="language"
             />
           )}
+
+          {/* Size Filter - only show if has size ranges available or if size filter is active */}
+          {(availableFilters.sizeRanges && availableFilters.sizeRanges.length > 0) || (filters.size && (filters.size.min !== undefined || filters.size.max !== undefined)) ? (
+            <div className="mb-4">
+              <SizeFilter
+                value={filters.size}
+                onChange={(sizeValue) => {
+                  onFiltersChange({
+                    ...filters,
+                    size: sizeValue,
+                  });
+                }}
+                sizeRangeFacets={availableFilters.sizeRanges}
+                isLoading={isLoading}
+              />
+            </div>
+          ) : null}
         </>
       )}
     </div>
