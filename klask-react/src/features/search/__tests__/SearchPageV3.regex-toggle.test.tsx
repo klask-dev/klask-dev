@@ -198,8 +198,8 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
 
       const regexButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
 
-      // Check that it has gray styling (border-gray-300 or dark variant)
-      expect(regexButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      // Check that it has gray styling (border-gray-200 or dark variant)
+      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
     });
 
     it('should have purple border and background when regex is active', async () => {
@@ -230,7 +230,7 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
       // After state change, check for purple styling
       await waitFor(() => {
         const updatedButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
-        expect(updatedButton.className).toMatch(/border-purple-500|text-purple-700/);
+        expect(updatedButton.className).toMatch(/border-purple-200|text-purple-700/);
       });
     });
 
@@ -283,19 +283,19 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
       const regexButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
 
       // Initial state - regex should be inactive
-      expect(regexButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
 
       // Click to activate regex
       await userEvent.click(regexButton);
 
       // State should change to active (purple)
-      expect(regexButton.className).toMatch(/border-purple-500/);
+      expect(regexButton.className).toMatch(/border-purple-200/);
 
       // Click again to deactivate
       await userEvent.click(regexButton);
 
       // State should change back to inactive (gray)
-      expect(regexButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
     });
 
     it('should maintain regex state across re-renders', async () => {
@@ -322,14 +322,14 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
 
       // Activate regex
       await userEvent.click(regexButton);
-      expect(regexButton.className).toMatch(/border-purple-500/);
+      expect(regexButton.className).toMatch(/border-purple-200/);
 
       // Trigger re-render (simulate component update)
       rerender(<SearchPageV3 />);
 
       // State should be preserved
       const updatedButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
-      expect(updatedButton.className).toMatch(/border-purple-500/);
+      expect(updatedButton.className).toMatch(/border-purple-200/);
     });
 
     it('should start with regex disabled by default', async () => {
@@ -353,7 +353,7 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
       const regexButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
 
       // Initial state should be inactive (gray)
-      expect(regexButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
     });
   });
 
@@ -470,14 +470,14 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
 
       // Enable fuzzy
       await userEvent.click(fuzzyButton);
-      expect(fuzzyButton.className).toMatch(/border-blue-500/);
-      expect(regexButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      expect(fuzzyButton.className).toMatch(/border-blue-200/);
+      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
 
       // Enable regex - this should disable fuzzy (mutual exclusivity)
       await userEvent.click(regexButton);
-      expect(regexButton.className).toMatch(/border-purple-500/);
+      expect(regexButton.className).toMatch(/border-purple-200/);
       // Fuzzy should now be disabled
-      expect(fuzzyButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      expect(fuzzyButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
     });
 
     it('should maintain separate states for fuzzy and regex toggles', async () => {
@@ -507,22 +507,22 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
       await userEvent.click(regexButton);
 
       // Regex should be purple, fuzzy should be gray
-      expect(regexButton.className).toMatch(/border-purple-500/);
-      expect(fuzzyButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      expect(regexButton.className).toMatch(/border-purple-200/);
+      expect(fuzzyButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
 
       // Enable fuzzy - this disables regex due to mutual exclusivity
       await userEvent.click(fuzzyButton);
 
       // Fuzzy should be blue, regex should be gray (mutually exclusive)
-      expect(regexButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
-      expect(fuzzyButton.className).toMatch(/border-blue-500/);
+      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      expect(fuzzyButton.className).toMatch(/border-blue-200/);
 
       // Disable fuzzy by clicking again
       await userEvent.click(fuzzyButton);
 
       // Both should be disabled (back to normal state)
-      expect(regexButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
-      expect(fuzzyButton.className).toMatch(/border-gray-300|dark:border-gray-600/);
+      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      expect(fuzzyButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
     });
   });
 
@@ -627,8 +627,8 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
 
       const regexButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
 
-      // Inactive state should have dark:bg-gray-800, dark:border-gray-600
-      expect(regexButton.className).toMatch(/dark:bg-gray-800|dark:border-gray-600/);
+      // Inactive state should have dark:bg-gray-800/50, dark:border-gray-700
+      expect(regexButton.className).toMatch(/dark:border-gray-700|dark:hover:bg-gray-800/);
     });
 
     it('should use correct dark mode colors when active', async () => {
@@ -656,8 +656,8 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
       // Activate
       await userEvent.click(regexButton);
 
-      // Active state should have dark:bg-purple-900, dark:text-purple-200
-      expect(regexButton.className).toMatch(/dark:bg-purple-900|dark:text-purple-200/);
+      // Active state should have dark:bg-purple-900/30, dark:text-purple-300
+      expect(regexButton.className).toMatch(/dark:bg-purple-900|dark:text-purple-300/);
     });
   });
 
