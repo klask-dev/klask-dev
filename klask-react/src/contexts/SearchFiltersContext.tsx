@@ -321,10 +321,11 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
     })),
     languages: [], // Will be derived from extensions in the future
     // Size ranges: use same fallback strategy as other filters
-    // Use currentFacets (searchResults || lastValid) and fallback to staticFilters
-    // This ensures consistent behavior across all filter types
-    sizeRanges: (currentFacets?.size_ranges as Array<{ value: string; count: number }>) ||
-      (staticFilters?.size_ranges as Array<{ value: string; count: number }>) || [],
+    // Check if currentFacets has size_ranges with actual data (length > 0), not just existence
+    // Some search modes may return empty arrays instead of undefined
+    sizeRanges: (currentFacets?.size_ranges && currentFacets.size_ranges.length > 0)
+      ? (currentFacets.size_ranges as Array<{ value: string; count: number }>)
+      : (staticFilters?.size_ranges as Array<{ value: string; count: number }>) || [],
   }), [hybridFilters, currentFacets, staticFilters]);
 
   // Fix 1: Memoize the context value to prevent all consumers from re-rendering
