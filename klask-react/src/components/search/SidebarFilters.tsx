@@ -360,20 +360,22 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             />
           )}
 
-          {/* Size Filter */}
-          <div className="mb-4">
-            <SizeFilter
-              value={filters.size}
-              onChange={(sizeValue) => {
-                onFiltersChange({
-                  ...filters,
-                  size: sizeValue,
-                });
-              }}
-              sizeRangeFacets={availableFilters.sizeRanges}
-              isLoading={isLoading}
-            />
-          </div>
+          {/* Size Filter - only show if has size ranges available */}
+          {availableFilters.sizeRanges && availableFilters.sizeRanges.length > 0 && (
+            <div className="mb-4">
+              <SizeFilter
+                value={filters.size}
+                onChange={(sizeValue) => {
+                  onFiltersChange({
+                    ...filters,
+                    size: sizeValue,
+                  });
+                }}
+                sizeRangeFacets={availableFilters.sizeRanges}
+                isLoading={isLoading}
+              />
+            </div>
+          )}
         </>
       )}
     </div>
