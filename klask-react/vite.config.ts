@@ -39,7 +39,7 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     css: true,
     // Reduce verbosity
-    reporter: ['basic'],
+    reporter: ['default'],
     logHeapUsage: false,
     silent: false,
     ui: false,
