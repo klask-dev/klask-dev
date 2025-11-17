@@ -316,13 +316,13 @@ const SearchPageV3: React.FC = () => {
             title={fuzzySearch
               ? "Disable fuzzy search (1-character edit distance)"
               : "Enable fuzzy search (1-character edit distance)"}
-            className={`px-4 py-3 rounded-lg border-2 font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
               fuzzySearch
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50 text-blue-700 dark:text-blue-300 shadow-sm'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
             }`}
           >
-            <BoltIcon className="h-5 w-5" />
+            <BoltIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Fuzzy</span>
           </button>
 
@@ -332,13 +332,13 @@ const SearchPageV3: React.FC = () => {
             title={regexSearch
               ? "Disable regex search - use patterns like ^test.*, [a-z]+\\.rs$"
               : "Enable regex search - use patterns like ^test.*, [a-z]+\\.rs$"}
-            className={`px-4 py-3 rounded-lg border-2 font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
               regexSearch
-                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200'
-                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+                ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-700/50 text-purple-700 dark:text-purple-300 shadow-sm'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
             }`}
           >
-            <span className="text-lg">/</span>
+            <span className="text-base">/</span>
             <span className="hidden sm:inline">Regex</span>
           </button>
         </div>
