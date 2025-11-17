@@ -25,6 +25,8 @@ interface SearchResultsProps {
   onLoadMore?: () => void;
   hasNextPage?: boolean;
   className?: string;
+  // Search mode
+  regexSearch?: boolean;
 }
 
 export const SearchResults: React.FC<SearchResultsProps> = ({
@@ -43,6 +45,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   onLoadMore,
   hasNextPage = false,
   className = '',
+  regexSearch = false,
 }) => {
   const usePagination = currentPage !== undefined && totalPages !== undefined && onPageChange !== undefined;
 
@@ -181,6 +184,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             result={result}
             query={query}
             onFileClick={onFileClick}
+            regexSearch={regexSearch}
           />
         ))}
 

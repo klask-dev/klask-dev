@@ -366,6 +366,7 @@ const SearchPageV3: React.FC = () => {
         totalPages={totalPages}
         onPageChange={handlePageChange}
         pageSize={pageSize}
+        regexSearch={regexSearch}
       />
 
       {/* Tantivy Search Tips */}

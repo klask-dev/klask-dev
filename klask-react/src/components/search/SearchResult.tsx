@@ -13,6 +13,7 @@ interface SearchResultProps {
   query: string;
   onFileClick: (result: SearchResultType) => void;
   className?: string;
+  regexSearch?: boolean;
 }
 
 export const SearchResult: React.FC<SearchResultProps> = ({
@@ -20,11 +21,32 @@ export const SearchResult: React.FC<SearchResultProps> = ({
   query,
   onFileClick,
   className = '',
+  regexSearch = false,
 }) => {
 
-  const highlightQuery = (text: string, query: string): React.JSX.Element => {
+  const highlightQuery = (text: string, query: string, useRegex: boolean): React.JSX.Element => {
     if (!text || !query.trim()) return <>{text || ''}</>;
 
+    // If not in regex mode, do simple text matching (no regex needed)
+    if (!useRegex) {
+      const lowerText = text.toLowerCase();
+      const lowerQuery = query.toLowerCase();
+      const index = lowerText.indexOf(lowerQuery);
+
+      if (index === -1) return <>{text}</>;
+
+      return (
+        <>
+          {text.substring(0, index)}
+          <mark className="bg-yellow-200 font-semibold">
+            {text.substring(index, index + query.length)}
+          </mark>
+          {text.substring(index + query.length)}
+        </>
+      );
+    }
+
+    // If in regex mode, try to use regex (with error handling)
     try {
       const parts = text.split(new RegExp(`(${query})`, 'gi'));
       return (
@@ -76,7 +98,7 @@ export const SearchResult: React.FC<SearchResultProps> = ({
             <div className="min-w-0 flex-1">
               {/* File name - prominent */}
               <h3 className="font-semibold text-gray-900 dark:text-white text-base leading-tight">
-                {highlightQuery(filename, query)}
+                {highlightQuery(filename, query, regexSearch)}
               </h3>
             </div>
           </div>
