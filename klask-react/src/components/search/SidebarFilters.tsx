@@ -360,8 +360,8 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
             />
           )}
 
-          {/* Size Filter - only show if has size ranges available or if size filter is active */}
-          {(availableFilters.sizeRanges && availableFilters.sizeRanges.length > 0) || (filters.size && (filters.size.min !== undefined || filters.size.max !== undefined)) ? (
+          {/* Size Filter - only show if has size ranges with count > 0 available or if size filter is active */}
+          {(availableFilters.sizeRanges && availableFilters.sizeRanges.some(range => range.count > 0)) || (filters.size && (filters.size.min !== undefined || filters.size.max !== undefined)) ? (
             <div className="mb-4">
               <SizeFilter
                 value={filters.size}
