@@ -321,10 +321,12 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
     })),
     languages: [], // Will be derived from extensions in the future
     // Size ranges: prefer search results (query-specific), fallback to lastValidFacets (static), then empty
-    // When user has typed a query: use searchResultsFacets (if available)
-    // When user hasn't typed a query: use lastValidFacets (static filters, all documents)
-    // This allows pre-filtering by size even before searching
-    sizeRanges: searchResultsFacets?.size_ranges || lastValidFacets?.size_ranges || [],
+    // When user has typed a query: use searchResultsFacets (if available and has data)
+    // When user hasn't typed a query or search has no size data: use lastValidFacets (static filters, all documents)
+    // This allows pre-filtering by size even before searching, and shows size filter across all search modes
+    sizeRanges: (searchResultsFacets?.size_ranges && searchResultsFacets.size_ranges.length > 0)
+      ? searchResultsFacets.size_ranges
+      : (lastValidFacets?.size_ranges || []),
   }), [hybridFilters, searchResultsFacets?.size_ranges, lastValidFacets?.size_ranges]);
 
   // Fix 1: Memoize the context value to prevent all consumers from re-rendering
