@@ -366,18 +366,40 @@ describe('LoginPage - Registration Blocking Feature', () => {
   });
 
   describe('UI State Consistency', () => {
-    beforeEach(() => {
+    it('should maintain consistent UI when toggling between enabled/disabled', async () => {
+      // First render with registration enabled
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
         registration_allowed: true,
       });
-    });
 
-    it('should maintain consistent UI when toggling between enabled/disabled', async () => {
-      const { rerender } = render(<LoginPage />, { wrapper: createWrapper() });
+      const { rerender, unmount } = render(<LoginPage />, { wrapper: createWrapper() });
 
+      // Verify the create account link is present when enabled
       await waitFor(() => {
         expect(screen.getByRole('link', { name: /create a new account/i })).toBeInTheDocument();
       });
+
+      // Cleanup the previous render
+      unmount();
+
+      // Second render with registration disabled
+      vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
+        registration_allowed: false,
+      });
+
+      render(<LoginPage />, { wrapper: createWrapper() });
+
+      // Verify the create account link is NOT present when disabled
+      await waitFor(() => {
+        expect(screen.getByText(/Sign in to Klask/i)).toBeInTheDocument();
+      });
+
+      const createAccountLink = screen.queryByRole('link', { name: /create a new account/i });
+      expect(createAccountLink).not.toBeInTheDocument();
+
+      // Verify the login form is still present
+      expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     });
 
     it('should keep form visible regardless of registration status', async () => {
