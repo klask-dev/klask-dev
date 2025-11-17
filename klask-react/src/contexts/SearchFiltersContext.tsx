@@ -166,13 +166,13 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
   // These facets are specific to the current search query
   const updateDynamicFilters = useCallback((facets: DynamicFilters | null) => {
     if (facets) {
-      // We have facets from search results, use them
+      // We have facets from search results, store them separately
+      // Do NOT overwrite lastValidFacets (which holds static filters)
       setSearchResultsFacets(facets);
-      setLastValidFacets(facets);
     } else {
-      // No facets (e.g., cleared search), clear both to force fallback to staticFilters
+      // No facets (e.g., cleared search), clear search results
+      // lastValidFacets will fallback to staticFilters automatically via currentFacets
       setSearchResultsFacets(null);
-      setLastValidFacets(null);
     }
   }, []);
 
