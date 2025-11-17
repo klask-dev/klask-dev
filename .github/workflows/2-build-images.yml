@@ -37,16 +37,17 @@ jobs:
 
   build-frontend:
     needs: detect-changes
-    # Condition pour exécuter ce job seulement si :
-    # - Le workflow précédent a réussi (si déclenché par workflow_run)
-    # - Le push vient bien de main ou master (si déclenché par workflow_run)
-    # - Des changements frontend ont été détectés
+    # Condition pour exécuter ce job :
+    # - Sur main/master : toujours (pour garder les versions homogènes)
+    # - Sur autres branches : seulement si frontend modifié
+    # - Sur workflow_dispatch manuel : seulement si frontend modifié
     if: >
-        ${{ (github.event_name == 'workflow_dispatch' ||
-            (github.event.workflow_run.conclusion == 'success' &&
-            ( startsWith(github.event.workflow_run.head_branch, 'main')
-            || startsWith(github.event.workflow_run.head_branch, 'master') ))) &&
-            needs.detect-changes.outputs.frontend == 'true'
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.frontend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.frontend == 'true')
         }}
     runs-on: ubuntu-latest
 
@@ -95,16 +96,17 @@ jobs:
 
   build-backend:
     needs: detect-changes
-    # Condition pour exécuter ce job seulement si :
-    # - Le workflow précédent a réussi (si déclenché par workflow_run)
-    # - Le push vient bien de main ou master (si déclenché par workflow_run)
-    # - Des changements backend ont été détectés
+    # Condition pour exécuter ce job :
+    # - Sur main/master : toujours (pour garder les versions homogènes)
+    # - Sur autres branches : seulement si backend modifié
+    # - Sur workflow_dispatch manuel : seulement si backend modifié
     if: >
-        ${{ (github.event_name == 'workflow_dispatch' ||
-            (github.event.workflow_run.conclusion == 'success' &&
-            ( startsWith(github.event.workflow_run.head_branch, 'main')
-            || startsWith(github.event.workflow_run.head_branch, 'master') ))) &&
-            needs.detect-changes.outputs.backend == 'true'
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.backend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.backend == 'true')
         }}
     runs-on: ubuntu-latest
 
@@ -168,7 +170,15 @@ jobs:
 
   security-scan-frontend:
     needs: [detect-changes, build-frontend]
-    if: needs.detect-changes.outputs.frontend == 'true'
+    # Même condition que build-frontend : scan si l'image a été construite
+    if: >
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.frontend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.frontend == 'true')
+        }}
     runs-on: ubuntu-latest
 
     steps:
@@ -209,7 +219,15 @@ jobs:
 
   security-scan-backend:
     needs: [detect-changes, build-backend]
-    if: needs.detect-changes.outputs.backend == 'true'
+    # Même condition que build-backend : scan si l'image a été construite
+    if: >
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.backend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.backend == 'true')
+        }}
     runs-on: ubuntu-latest
 
     steps:
