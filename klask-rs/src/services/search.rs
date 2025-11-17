@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::directory::MmapDirectory;
 use tantivy::query::{BooleanQuery, QueryParser, RegexQuery, TermQuery};
@@ -13,6 +14,10 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use tracing::{debug, warn};
+
+// Search timeout: maximum time allowed for a single search query (30 seconds)
+// This prevents heavy regex queries (e.g., .*pattern) from blocking other requests
+const SEARCH_TIMEOUT: Duration = Duration::from_secs(30);
 
 const SIZE_BUCKETS: &[(&str, Option<u64>, Option<u64>)] = &[
     ("< 1 KB", None, Some(1024)),
@@ -438,6 +443,39 @@ impl SearchService {
     }
 
     pub async fn search(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
+        // Detect inefficient regex patterns (.*prefix or .*) that cause full index scans
+        if search_query.regex_search {
+            let pattern = search_query.query.trim();
+            if pattern.starts_with(".*") || pattern == ".*" {
+                warn!(
+                    "Inefficient regex pattern detected: '{}' - patterns starting with .* require full index scan and are very slow",
+                    pattern
+                );
+            }
+        }
+
+        // Clone self to move into spawn_blocking (SearchService is Clone)
+        let service = self.clone();
+
+        // Execute search in a blocking thread pool to avoid blocking the async runtime
+        // This allows multiple concurrent searches to run in parallel
+        let search_future = tokio::task::spawn_blocking(move || {
+            service.search_blocking(search_query)
+        });
+
+        // Apply timeout to prevent queries from running indefinitely
+        match tokio::time::timeout(SEARCH_TIMEOUT, search_future).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(e)) => Err(anyhow!("Search thread panicked: {}", e)),
+            Err(_) => Err(anyhow!(
+                "Search timeout: query took longer than {} seconds. Consider simplifying your query or avoiding patterns like '.*prefix' in regex mode.",
+                SEARCH_TIMEOUT.as_secs()
+            )),
+        }
+    }
+
+    // Blocking search implementation - runs in a dedicated thread pool
+    fn search_blocking(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
         let searcher = self.reader.searcher();
 
         // Notes on search modes:
@@ -783,7 +821,7 @@ impl SearchService {
 
         // Collect facets - calculate from search results when requested
         let facets = if search_query.include_facets {
-            Some(self.collect_facets_from_search_results(&searcher, &final_query, &search_query).await?)
+            Some(self.collect_facets_from_search_results(&searcher, &final_query, &search_query)?)
         } else {
             None
         };
@@ -1144,7 +1182,7 @@ impl SearchService {
 
     /// Collect facets using Tantivy native aggregations API
     /// ULTRA-OPTIMIZED VERSION: Using terms aggregations for <100ms performance
-    async fn collect_facets_from_search_results(
+    fn collect_facets_from_search_results(
         &self,
         searcher: &tantivy::Searcher,
         _query: &dyn tantivy::query::Query,
