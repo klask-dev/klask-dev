@@ -117,6 +117,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: "^[a-z".to_string(), // Invalid: unclosed bracket
             regex_search: true,
+        regex_flags: None,
             limit: 100,
             ..Default::default()
         };
@@ -180,6 +181,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             repository_filter: Some("backend".to_string()),
             limit: 100,
             ..Default::default()
@@ -200,6 +202,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             extension_filter: Some("rs".to_string()),
             limit: 100,
             ..Default::default()
@@ -220,6 +223,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             version_filter: Some("1.0".to_string()),
             limit: 100,
             ..Default::default()
@@ -240,6 +244,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             min_size: Some(200),
             max_size: Some(600),
             limit: 100,
@@ -258,6 +263,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             repository_filter: Some("backend".to_string()),
             extension_filter: Some("rs".to_string()),
             version_filter: Some("1.0".to_string()),
@@ -287,6 +293,7 @@ mod regex_search_final_tests {
         let regex_query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             fuzzy_search: false,
             limit: 100,
             ..Default::default()
@@ -295,6 +302,7 @@ mod regex_search_final_tests {
         let both_query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             fuzzy_search: true, // This should be ignored
             limit: 100,
             ..Default::default()
@@ -384,6 +392,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             include_facets: true,
             limit: 100,
             ..Default::default()
@@ -411,6 +420,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             include_facets: true,
             limit: 100,
             ..Default::default()
@@ -519,6 +529,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+        regex_flags: None,
             include_facets: false,
             limit: 100,
             ..Default::default()

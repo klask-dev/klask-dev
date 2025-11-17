@@ -109,6 +109,7 @@ async fn main() -> Result<()> {
         include_facets: false,
         fuzzy_search: false,
         regex_search: false,
+        regex_flags: None,
     };
 
     match search_service.search(search_query).await {
