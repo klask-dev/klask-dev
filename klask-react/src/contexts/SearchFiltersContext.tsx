@@ -170,10 +170,19 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
       setSearchResultsFacets(facets);
       setLastValidFacets(facets);
     } else {
-      // No facets (e.g., cleared search), clear search result facets
+      // No facets (e.g., cleared search), reset to static filters for all filters
       setSearchResultsFacets(null);
+      if (staticFilters) {
+        setLastValidFacets({
+          projects: staticFilters.projects || [],
+          versions: staticFilters.versions || [],
+          extensions: staticFilters.extensions || [],
+          repositories: staticFilters.repositories || [],
+          size_ranges: staticFilters.size_ranges || [],
+        });
+      }
     }
-  }, []);
+  }, [staticFilters]);
 
   /**
    * Merges static filter lists with dynamic facet counts from the API.
