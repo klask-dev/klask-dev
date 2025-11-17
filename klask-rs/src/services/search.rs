@@ -829,8 +829,10 @@ impl SearchService {
             && let Some(content) = doc.get_first(self.fields.content).and_then(|v| v.as_str())
         {
             // Return first 400 chars without HTML highlighting (better than nothing)
-            let excerpt = if content.len() > 400 {
-                format!("{}...", &content[..400].replace('<', "&lt;").replace('>', "&gt;"))
+            // Use chars() to properly handle UTF-8 multi-byte characters (e.g., é, ü, 中)
+            let excerpt = if content.chars().count() > 400 {
+                let truncated: String = content.chars().take(400).collect();
+                format!("{}...", truncated.replace('<', "&lt;").replace('>', "&gt;"))
             } else {
                 content.replace('<', "&lt;").replace('>', "&gt;")
             };
