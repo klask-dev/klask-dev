@@ -24,21 +24,27 @@ export const SearchResult: React.FC<SearchResultProps> = ({
 
   const highlightQuery = (text: string, query: string): React.JSX.Element => {
     if (!text || !query.trim()) return <>{text || ''}</>;
-    
-    const parts = text.split(new RegExp(`(${query})`, 'gi'));
-    return (
-      <>
-        {parts.map((part, index) => 
-          part.toLowerCase() === query.toLowerCase() ? (
-            <mark key={index} className="bg-yellow-200 font-semibold">
-              {part}
-            </mark>
-          ) : (
-            part
-          )
-        )}
-      </>
-    );
+
+    try {
+      const parts = text.split(new RegExp(`(${query})`, 'gi'));
+      return (
+        <>
+          {parts.map((part, index) =>
+            part.toLowerCase() === query.toLowerCase() ? (
+              <mark key={index} className="bg-yellow-200 font-semibold">
+                {part}
+              </mark>
+            ) : (
+              part
+            )
+          )}
+        </>
+      );
+    } catch (e) {
+      // If regex is invalid, just return the text without highlighting
+      // This can happen with incomplete regex patterns from user input
+      return <>{text}</>;
+    }
   };
 
   const formatPath = (path: string): { directory: string; filename: string } => {
