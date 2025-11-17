@@ -521,19 +521,17 @@ impl SearchService {
             }
 
             // Parse the main query
-            // If parsing fails (e.g., invalid syntax like "string[abc]"), fall back to "*"
+            // If parsing fails (e.g., invalid syntax like "string[abc]"), use EmptyQuery (no results)
             // This happens when user types incomplete regex patterns without activating regex mode
             match query_parser.parse_query(&search_query.query) {
                 Ok(q) => q,
                 Err(e) => {
                     debug!(
-                        "Failed to parse query '{}', falling back to wildcard '*': {}",
+                        "Failed to parse query '{}', returning no results: {}",
                         search_query.query, e
                     );
-                    // Fall back to matching all documents
-                    query_parser
-                        .parse_query("*")
-                        .map_err(|e| anyhow!("Failed to parse fallback wildcard query: {}", e))?
+                    // Return EmptyQuery to match no documents
+                    Box::new(tantivy::query::EmptyQuery)
                 }
             }
         };
