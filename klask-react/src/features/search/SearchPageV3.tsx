@@ -78,13 +78,21 @@ const SearchPageV3: React.FC = () => {
       }
     }
 
+    // Handle search mode flags
+    if (fuzzySearch) {
+      params.set('fuzzySearch', 'true');
+    }
+    if (regexSearch) {
+      params.set('regexSearch', 'true');
+    }
+
     if (page > 1) {
       params.set('page', page.toString());
     }
 
     const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState(null, '', newURL);
-  }, []);
+  }, [fuzzySearch, regexSearch]);
 
   // Track if we're initializing to avoid double URL updates
   const [isInitializing, setIsInitializing] = useState(true);
@@ -104,6 +112,11 @@ const SearchPageV3: React.FC = () => {
     // Parse size filter
     const urlMinSize = urlParams.get('min_size');
     const urlMaxSize = urlParams.get('max_size');
+
+    // Parse search mode flags
+    const urlFuzzySearch = urlParams.get('fuzzySearch') === 'true';
+    const urlRegexSearch = urlParams.get('regexSearch') === 'true';
+
     const urlPage = parseInt(urlParams.get('page') || '1', 10);
 
     // Set React state from URL
@@ -130,6 +143,15 @@ const SearchPageV3: React.FC = () => {
       setFilters(filtersFromUrl);
     }
 
+    // Set search mode from URL
+    if (urlRegexSearch) {
+      setSearchMode('regex');
+    } else if (urlFuzzySearch) {
+      setSearchMode('fuzzy');
+    } else {
+      setSearchMode('normal');
+    }
+
     setCurrentPage(urlPage);
     setIsInitializing(false);
   }, [location.search, setFilters]);
@@ -138,7 +160,7 @@ const SearchPageV3: React.FC = () => {
   useEffect(() => {
     if (isInitializing) return;
     updateURL(query, filters, currentPage);
-  }, [query, filters, currentPage, updateURL, isInitializing]);
+  }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch]);
 
   // Sync query to context for facet fetching
   useEffect(() => {
