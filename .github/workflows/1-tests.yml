@@ -9,7 +9,28 @@ on:
   workflow_dispatch:             # Déclenchement manuel si besoin
 
 jobs:
+  # Détecte quels répertoires ont été modifiés
+  detect-changes:
+    runs-on: ubuntu-latest
+    # Map a step output to a job output
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'klask-react/**'
+            backend:
+              - 'klask-rs/**'
+
   test-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,6 +60,8 @@ jobs:
       run: npm run build
 
   test-backend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
