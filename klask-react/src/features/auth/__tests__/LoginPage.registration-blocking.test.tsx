@@ -367,10 +367,15 @@ describe('LoginPage - Registration Blocking Feature', () => {
 
   describe('UI State Consistency', () => {
     it('should maintain consistent UI when toggling between enabled/disabled', async () => {
-      // First render with registration enabled
-      vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
-        registration_allowed: true,
-      });
+      // Use mockResolvedValue() to provide unlimited mocks for both renders
+      // First call will return enabled, second call will return disabled
+      vi.mocked(api.apiClient.auth.checkRegistrationStatus)
+        .mockResolvedValueOnce({
+          registration_allowed: true,
+        })
+        .mockResolvedValueOnce({
+          registration_allowed: false,
+        });
 
       const { rerender, unmount } = render(<LoginPage />, { wrapper: createWrapper() });
 
@@ -381,11 +386,6 @@ describe('LoginPage - Registration Blocking Feature', () => {
 
       // Cleanup the previous render
       unmount();
-
-      // Second render with registration disabled
-      vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
-        registration_allowed: false,
-      });
 
       render(<LoginPage />, { wrapper: createWrapper() });
 
@@ -403,7 +403,7 @@ describe('LoginPage - Registration Blocking Feature', () => {
     });
 
     it('should keep form visible regardless of registration status', async () => {
-      vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
+      vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValue({
         registration_allowed: false,
       });
 
