@@ -50,6 +50,19 @@ backend:
     repository: ghcr.io/klask-dev/klask-backend
     tag: "pr-69"
 
+  # Configuration de l'authentification (ENCRYPTION_KEY et JWT_SECRET)
+  # OPTIONNEL: Si non fourni, les clés seront générées automatiquement
+  # Les clés auto-générées sont préservées lors des upgrades Helm
+  # Pour fournir des clés personnalisées:
+  auth:
+    encryptionKey: ""  # Laisser vide pour auto-génération
+    jwtSecret: ""      # Laisser vide pour auto-génération
+
+  # Exemple avec clés custom (générer avec: openssl rand -hex 32):
+  # auth:
+  #   encryptionKey: "custom-encryption-key-64-chars-here"
+  #   jwtSecret: "custom-jwt-secret-64-chars-here"
+
   config:
     rustLog: "error,klask=info"
     logFormat: "text"  # Plus lisible en dev

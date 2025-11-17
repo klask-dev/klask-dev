@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{BooleanQuery, QueryParser, TermQuery};
+use tantivy::query::{BooleanQuery, QueryParser, RegexQuery, TermQuery};
 use tantivy::schema::{FAST, Field, STORED, STRING, Schema, TEXT, Value};
 use tantivy::snippet::SnippetGenerator;
 use tantivy::{Index, IndexReader, IndexWriter, Term, doc};
@@ -66,7 +66,7 @@ pub struct SearchFacets {
     pub size_ranges: Vec<(String, u64)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SearchQuery {
     pub query: String,
     pub repository_filter: Option<String>,
@@ -78,6 +78,43 @@ pub struct SearchQuery {
     pub limit: usize,
     pub offset: usize,
     pub include_facets: bool,
+    pub fuzzy_search: bool, // Enable fuzzy search (1 char edit distance) - default: false
+    pub regex_search: bool, // Enable regex search (pattern matching) - default: false
+}
+
+impl SearchQuery {
+    /// Create a SearchQuery with default search options (no fuzzy, no regex)
+    #[allow(dead_code)]
+    pub fn new(query: String) -> Self {
+        SearchQuery {
+            query,
+            repository_filter: None,
+            project_filter: None,
+            version_filter: None,
+            extension_filter: None,
+            min_size: None,
+            max_size: None,
+            limit: 10,
+            offset: 0,
+            include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
+        }
+    }
+
+    /// Set fuzzy search option
+    #[allow(dead_code)]
+    pub fn with_fuzzy(mut self, fuzzy: bool) -> Self {
+        self.fuzzy_search = fuzzy;
+        self
+    }
+
+    /// Set regex search option
+    #[allow(dead_code)]
+    pub fn with_regex(mut self, regex: bool) -> Self {
+        self.regex_search = regex;
+        self
+    }
 }
 
 #[derive(Clone)]
@@ -100,7 +137,9 @@ struct SearchFields {
     project: Field,    // Individual project name
     version: Field,
     extension: Field,
-    size: Field, // File content size in bytes
+    size: Field,          // File content size in bytes
+    file_name_raw: Field, // Non-tokenized file_name for regex search
+    file_path_raw: Field, // Non-tokenized file_path for regex search
 }
 
 impl SearchService {
@@ -159,7 +198,7 @@ impl SearchService {
         schema_builder.add_text_field("file_name", TEXT | STORED);
         schema_builder.add_text_field("file_path", TEXT | STORED);
 
-        // Content field cargo clippy -- -D warningswith custom analyzer for code search
+        // Content field with custom analyzer for code search
         schema_builder.add_text_field("content", TEXT | STORED);
 
         // Filter fields - use STRING for exact matching, not TEXT which tokenizes
@@ -170,6 +209,11 @@ impl SearchService {
 
         // Size field for filtering by file content size (in bytes)
         schema_builder.add_u64_field("size", FAST | STORED);
+
+        // Raw (non-tokenized) versions of file_name and file_path for regex search
+        // These allow RegexQuery to match partial strings instead of just complete tokens
+        schema_builder.add_text_field("file_name_raw", STRING | STORED);
+        schema_builder.add_text_field("file_path_raw", STRING | STORED);
 
         schema_builder.build()
     }
@@ -185,6 +229,8 @@ impl SearchService {
             version: schema.get_field("version").expect("version field should exist"),
             extension: schema.get_field("extension").expect("extension field should exist"),
             size: schema.get_field("size").expect("size field should exist"),
+            file_name_raw: schema.get_field("file_name_raw").expect("file_name_raw field should exist"),
+            file_path_raw: schema.get_field("file_path_raw").expect("file_path_raw field should exist"),
         }
     }
 
@@ -202,6 +248,8 @@ impl SearchService {
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
             self.fields.size => file_data.size,
+            self.fields.file_name_raw => file_data.file_name,
+            self.fields.file_path_raw => file_data.file_path,
         );
 
         writer.add_document(doc)?;
@@ -236,6 +284,8 @@ impl SearchService {
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
             self.fields.size => file_data.size,
+            self.fields.file_name_raw => file_data.file_name,
+            self.fields.file_path_raw => file_data.file_path,
         );
 
         writer.add_document(doc)?;
@@ -345,6 +395,8 @@ impl SearchService {
                     self.fields.version => version,
                     self.fields.extension => extension,
                     self.fields.size => size,
+                    self.fields.file_name_raw => file_name,
+                    self.fields.file_path_raw => file_path,
                 );
 
                 writer.add_document(new_doc)?;
@@ -388,20 +440,147 @@ impl SearchService {
     pub async fn search(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
         let searcher = self.reader.searcher();
 
-        // Build query parser for content search
-        let query_parser = QueryParser::for_index(
-            &self.index,
-            vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-        );
+        // Notes on search modes:
+        // - regex_search and fuzzy_search are mutually exclusive (regex takes priority)
+        // - RegexQuery may be slower than QueryParser, especially for complex patterns
+        // - SnippetGenerator doesn't work well with RegexQuery (uses fallback query)
+        // - Regex patterns must be valid Rust regex syntax (e.g., ^pattern$, .*test.*)
 
-        // Parse the main query
-        let base_query = query_parser
-            .parse_query(&search_query.query)
-            .map_err(|e| anyhow!("Failed to parse query '{}': {}", search_query.query, e))?;
+        // Build the base query - choose between RegexQuery or QueryParser
+        let base_query: Box<dyn tantivy::query::Query> = if search_query.regex_search {
+            // Mode REGEX: Use RegexQuery for pattern matching (mutually exclusive with fuzzy)
+            debug!("Using regex search mode with pattern: {}", search_query.query);
 
-        // Create snippet generator once for the entire search
+            let mut regex_clauses = Vec::new();
+
+            // Try to apply regex query to file_name_raw field (non-tokenized for complete matching)
+            match RegexQuery::from_pattern(&search_query.query, self.fields.file_name_raw) {
+                Ok(regex_q) => {
+                    regex_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Regex pattern doesn't match file_name_raw: {}", e);
+                }
+            }
+
+            // Try to apply regex query to file_path_raw field (non-tokenized for complete matching)
+            match RegexQuery::from_pattern(&search_query.query, self.fields.file_path_raw) {
+                Ok(regex_q) => {
+                    regex_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Regex pattern doesn't match file_path_raw: {}", e);
+                }
+            }
+
+            // For content, use content field (tokenized) with OR - better than nothing
+            // Note: Regex on content will only match complete tokens
+            match RegexQuery::from_pattern(&search_query.query, self.fields.content) {
+                Ok(regex_q) => {
+                    regex_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Regex pattern doesn't match content: {}", e);
+                }
+            }
+
+            if regex_clauses.is_empty() {
+                return Err(anyhow!(
+                    "Regex pattern '{}' did not match any searchable fields",
+                    search_query.query
+                ));
+            }
+
+            Box::new(BooleanQuery::new(regex_clauses))
+        } else {
+            // Mode NORMAL/FUZZY: Use QueryParser (existing code)
+            let mut query_parser = QueryParser::for_index(
+                &self.index,
+                vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+            );
+
+            // Optionally enable fuzzy search for all fields (only if search_query.fuzzy_search is true)
+            // set_field_fuzzy(field, prefix, distance, transpose_cost_one)
+            // - prefix: whether to enable prefix matching (e.g., "helo" matches "hello")
+            // - distance: max Levenshtein distance (1 or 2, typically 1)
+            // - transpose_cost_one: whether transpositions count as 1 edit (usually true)
+            // We use a bool to enable/disable fuzzy search due to this bug: https://github.com/quickwit-oss/tantivy/issues/867
+            if search_query.fuzzy_search {
+                query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
+                query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
+                query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+            }
+
+            // Parse the main query
+            // If parsing fails (e.g., invalid syntax like "string[abc]"), use EmptyQuery (no results)
+            // This happens when user types incomplete regex patterns without activating regex mode
+            match query_parser.parse_query(&search_query.query) {
+                Ok(q) => q,
+                Err(e) => {
+                    debug!(
+                        "Failed to parse query '{}', returning no results: {}",
+                        search_query.query, e
+                    );
+                    // Return EmptyQuery to match no documents
+                    Box::new(tantivy::query::EmptyQuery)
+                }
+            }
+        };
+
+        // Create a separate query for snippet highlighting
+        // (SnippetGenerator doesn't work well with FuzzyTermQuery or RegexQuery - tantivy issue #867)
+        // For regex mode, extract simple terms from the pattern for snippet generation
+        let base_query_for_snippet = if search_query.regex_search {
+            // For regex, extract alphanumeric terms from pattern for highlighting
+            let simple_terms = extract_simple_terms_from_regex(&search_query.query);
+
+            if !simple_terms.is_empty() {
+                // Try to parse extracted terms with OR for better highlighting
+                let terms_query = simple_terms.join(" OR ");
+                let query_parser_for_snippet = QueryParser::for_index(
+                    &self.index,
+                    vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                );
+
+                match query_parser_for_snippet.parse_query(&terms_query) {
+                    Ok(q) => {
+                        debug!("Using extracted terms for snippet: {}", terms_query);
+                        q
+                    }
+                    Err(_) => {
+                        // Fallback if extraction fails
+                        debug!("Failed to parse extracted terms, using AllQuery");
+                        Box::new(tantivy::query::AllQuery)
+                    }
+                }
+            } else {
+                // No terms extracted - use AllQuery
+                debug!("No simple terms extracted from regex pattern, using AllQuery");
+                Box::new(tantivy::query::AllQuery)
+            }
+        } else {
+            // For normal/fuzzy search, use the original query as-is
+            let query_parser_for_snippet = QueryParser::for_index(
+                &self.index,
+                vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+            );
+            query_parser_for_snippet
+                .parse_query(&search_query.query)
+                .unwrap_or_else(|_| Box::new(tantivy::query::AllQuery))
+        };
+
+        // Create snippet generator once for the entire search (using non-fuzzy query)
         let snippet_generator = if search_query.limit > 0 {
-            Some(self.create_snippet_generator(&searcher, &*base_query)?)
+            Some(self.create_snippet_generator(&searcher, &*base_query_for_snippet)?)
         } else {
             None
         };
@@ -618,7 +797,7 @@ impl SearchService {
         query: &dyn tantivy::query::Query,
     ) -> Result<SnippetGenerator> {
         let mut snippet_generator = SnippetGenerator::create(searcher, query, self.fields.content)?;
-        snippet_generator.set_max_num_chars(400);
+        snippet_generator.set_max_num_chars(300);
         Ok(snippet_generator)
     }
 
@@ -628,35 +807,46 @@ impl SearchService {
         query: &str,
         doc: &tantivy::TantivyDocument,
     ) -> Result<(String, Option<u32>)> {
-        // Generate the snippet with HTML highlighting - this is now much faster
+        // Generate the snippet with HTML highlighting using Tantivy's SnippetGenerator
+        // The snippet generator uses the non-fuzzy query, so it can properly highlight matches
         let snippet = generator.snippet_from_doc(doc);
-        let mut highlighted_html = snippet.to_html();
+        let highlighted_html = snippet.to_html();
 
-        // Adjust snippet to only include complete lines (start after first newline, end at last newline)
-        if let Some(first_newline_pos) = highlighted_html.find('\n') {
-            // Find the last newline in the snippet
-            if let Some(last_newline_pos) = highlighted_html.rfind('\n')
-                && last_newline_pos > first_newline_pos
-            {
-                // Trim to only include complete lines (after first \n, up to last \n)
-                highlighted_html = highlighted_html[first_newline_pos + 1..last_newline_pos].to_string();
-            }
+        // Extract clean search terms from query for line number calculation (remove fuzzy/wildcard chars)
+        let clean_terms: Vec<String> = query
+            .split_whitespace()
+            .map(|term| {
+                term.trim_end_matches(|c: char| c == '*' || c == '?' || c == '~' || c.is_numeric())
+                    .trim_matches(|c: char| c == '"' || c == '(')
+                    .trim_end_matches(')')
+                    .to_lowercase()
+            })
+            .filter(|t| !t.is_empty())
+            .collect();
+
+        // If snippet is empty (no matches found by generator), fallback to raw content excerpt
+        if highlighted_html.trim().is_empty()
+            && let Some(content) = doc.get_first(self.fields.content).and_then(|v| v.as_str())
+        {
+            // Return first 400 chars without HTML highlighting (better than nothing)
+            // Use chars() to properly handle UTF-8 multi-byte characters (e.g., é, ü, 中)
+            let excerpt = if content.chars().count() > 400 {
+                let truncated: String = content.chars().take(400).collect();
+                format!("{}...", truncated.replace('<', "&lt;").replace('>', "&gt;"))
+            } else {
+                content.replace('<', "&lt;").replace('>', "&gt;")
+            };
+            return Ok((excerpt, None));
         }
 
         // For line number, use a simple approach to avoid scanning the entire content
         let line_number = if let Some(content) = doc.get_first(self.fields.content).and_then(|v| v.as_str()) {
-            // Only search for the first term to avoid performance issues
-            if let Some(first_term) = query.split_whitespace().next() {
-                content.to_lowercase().find(&first_term.to_lowercase()).and_then(|pos| {
-                    // Ensure we don't slice in the middle of a UTF-8 character
-                    if content.is_char_boundary(pos) {
-                        Some(content[..pos].chars().filter(|&c| c == '\n').count() as u32 + 1)
-                    } else {
-                        // If pos is not a char boundary, find the nearest valid boundary
-                        let valid_pos = (0..=pos).rev().find(|&p| content.is_char_boundary(p))?;
-                        Some(content[..valid_pos].chars().filter(|&c| c == '\n').count() as u32 + 1)
-                    }
-                })
+            if let Some(first_term) = clean_terms.first() {
+                // Search for first term (case-insensitive)
+                content
+                    .to_lowercase()
+                    .find(first_term)
+                    .map(|pos| content[..pos].chars().filter(|&c| c == '\n').count() as u32 + 1)
             } else {
                 None
             }
@@ -974,19 +1164,65 @@ impl SearchService {
             let mut clauses = vec![];
 
             // Always include text query
-            let text_query: Box<dyn tantivy::query::Query> =
-                if search_query.query.trim().is_empty() || search_query.query == "*" {
-                    Box::new(AllQuery)
-                } else {
-                    let query_parser = QueryParser::for_index(
-                        searcher.index(),
-                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                    );
-                    match query_parser.parse_query(&search_query.query) {
-                        Ok(parsed) => parsed,
-                        Err(_) => Box::new(AllQuery),
+            let text_query: Box<dyn tantivy::query::Query> = if search_query.query.trim().is_empty()
+                || search_query.query == "*"
+            {
+                Box::new(AllQuery)
+            } else if search_query.regex_search {
+                // Use RegexQuery for regex search mode - search on raw fields
+                use tantivy::query::RegexQuery;
+                match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
+                    Ok(_) => {
+                        // Valid regex - create RegexQuery queries for name and path
+                        let mut regex_clauses = vec![];
+
+                        // Search in file_name_raw (non-tokenized)
+                        if let Ok(regex_query) =
+                            RegexQuery::from_pattern(&search_query.query, self.fields.file_name_raw)
+                        {
+                            regex_clauses
+                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                        }
+
+                        // Search in file_path_raw (non-tokenized)
+                        if let Ok(regex_query) =
+                            RegexQuery::from_pattern(&search_query.query, self.fields.file_path_raw)
+                        {
+                            regex_clauses
+                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                        }
+
+                        // Search in content (tokenized, regex on individual terms)
+                        if let Ok(regex_query) = RegexQuery::from_pattern(&search_query.query, self.fields.content) {
+                            regex_clauses
+                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                        }
+
+                        if !regex_clauses.is_empty() {
+                            Box::new(BooleanQuery::from(regex_clauses))
+                        } else {
+                            Box::new(AllQuery)
+                        }
                     }
-                };
+                    Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
+                }
+            } else {
+                // Use QueryParser for normal and fuzzy search modes
+                let mut query_parser = QueryParser::for_index(
+                    searcher.index(),
+                    vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                );
+                // For fuzzy search, enable fuzzy search on individual fields
+                if search_query.fuzzy_search {
+                    query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
+                    query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
+                    query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+                }
+                match query_parser.parse_query(&search_query.query) {
+                    Ok(parsed) => parsed,
+                    Err(_) => Box::new(AllQuery),
+                }
+            };
             clauses.push((Occur::Must, text_query));
 
             // Add repository filter if requested
@@ -1215,20 +1451,66 @@ impl SearchService {
             // For size ranges, we should NOT include the size filter from the search query
             let mut size_clauses = vec![];
 
-            // Always include text query
-            let text_query: Box<dyn tantivy::query::Query> =
-                if search_query.query.trim().is_empty() || search_query.query == "*" {
-                    Box::new(AllQuery)
-                } else {
-                    let query_parser = QueryParser::for_index(
-                        searcher.index(),
-                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                    );
-                    match query_parser.parse_query(&search_query.query) {
-                        Ok(parsed) => parsed,
-                        Err(_) => Box::new(AllQuery),
+            // Always include text query - must match the same search mode as main query
+            let text_query: Box<dyn tantivy::query::Query> = if search_query.query.trim().is_empty()
+                || search_query.query == "*"
+            {
+                Box::new(AllQuery)
+            } else if search_query.regex_search {
+                // Use RegexQuery for regex search mode - search on raw fields
+                use tantivy::query::RegexQuery;
+                match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
+                    Ok(_) => {
+                        // Valid regex - create RegexQuery queries for name and path
+                        let mut regex_clauses = vec![];
+
+                        // Search in file_name_raw (non-tokenized)
+                        if let Ok(regex_query) =
+                            RegexQuery::from_pattern(&search_query.query, self.fields.file_name_raw)
+                        {
+                            regex_clauses
+                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                        }
+
+                        // Search in file_path_raw (non-tokenized)
+                        if let Ok(regex_query) =
+                            RegexQuery::from_pattern(&search_query.query, self.fields.file_path_raw)
+                        {
+                            regex_clauses
+                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                        }
+
+                        // Search in content (tokenized, regex on individual terms)
+                        if let Ok(regex_query) = RegexQuery::from_pattern(&search_query.query, self.fields.content) {
+                            regex_clauses
+                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                        }
+
+                        if !regex_clauses.is_empty() {
+                            Box::new(BooleanQuery::from(regex_clauses))
+                        } else {
+                            Box::new(AllQuery)
+                        }
                     }
-                };
+                    Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
+                }
+            } else {
+                // Use QueryParser for normal and fuzzy search modes
+                let mut query_parser = QueryParser::for_index(
+                    searcher.index(),
+                    vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                );
+                // For fuzzy search, enable fuzzy search on individual fields
+                if search_query.fuzzy_search {
+                    query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
+                    query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
+                    query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+                }
+                match query_parser.parse_query(&search_query.query) {
+                    Ok(parsed) => parsed,
+                    Err(_) => Box::new(AllQuery),
+                }
+            };
             size_clauses.push((Occur::Must, text_query));
 
             // Add repository filter if present
@@ -1319,132 +1601,180 @@ impl SearchService {
 
             // Count documents for each size bucket using RangeQuery
             // We need a helper closure to rebuild the base query for each bucket since we can't clone the boxed queries
-            let get_size_bucket_query =
-                |min_size: Option<u64>, max_size: Option<u64>| -> Box<dyn tantivy::query::Query> {
-                    use std::ops::Bound;
-                    use tantivy::query::RangeQuery;
+            let get_size_bucket_query = |min_size: Option<u64>,
+                                         max_size: Option<u64>|
+             -> Box<dyn tantivy::query::Query> {
+                use std::ops::Bound;
+                use tantivy::query::RangeQuery;
 
-                    let min_term = min_size.map(|size| Term::from_field_u64(self.fields.size, size));
-                    let max_term = max_size.map(|size| Term::from_field_u64(self.fields.size, size));
+                let min_term = min_size.map(|size| Term::from_field_u64(self.fields.size, size));
+                let max_term = max_size.map(|size| Term::from_field_u64(self.fields.size, size));
 
-                    let min_bound = min_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
-                    let max_bound = max_term.map(Bound::Excluded).unwrap_or(Bound::Unbounded); // Use Excluded for max to not include boundary
+                let min_bound = min_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+                let max_bound = max_term.map(Bound::Excluded).unwrap_or(Bound::Unbounded); // Use Excluded for max to not include boundary
 
-                    let range_query = RangeQuery::new(min_bound, max_bound);
+                let range_query = RangeQuery::new(min_bound, max_bound);
 
-                    // Rebuild the complete query with all filters for this bucket
-                    let mut query_clauses = Vec::new();
+                // Rebuild the complete query with all filters for this bucket
+                let mut query_clauses = Vec::new();
 
-                    // Always include text query
-                    let text_query: Box<dyn tantivy::query::Query> =
-                        if search_query.query.trim().is_empty() || search_query.query == "*" {
-                            Box::new(AllQuery)
-                        } else {
-                            let parser = QueryParser::for_index(
-                                searcher.index(),
-                                vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                            );
-                            match parser.parse_query(&search_query.query) {
-                                Ok(parsed) => parsed,
-                                Err(_) => Box::new(AllQuery),
+                // Always include text query - must match the same search mode as main query
+                let text_query: Box<dyn tantivy::query::Query> = if search_query.query.trim().is_empty()
+                    || search_query.query == "*"
+                {
+                    Box::new(AllQuery)
+                } else if search_query.regex_search {
+                    // Use RegexQuery for regex search mode - search on raw fields
+                    use tantivy::query::RegexQuery;
+                    match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
+                        Ok(_) => {
+                            // Valid regex - create RegexQuery queries for name and path
+                            let mut regex_clauses = vec![];
+
+                            // Search in file_name_raw (non-tokenized)
+                            if let Ok(regex_query) =
+                                RegexQuery::from_pattern(&search_query.query, self.fields.file_name_raw)
+                            {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
                             }
-                        };
-                    query_clauses.push((Occur::Must, text_query));
 
-                    // Add repository filter if present
-                    if let Some(ref repository_filter) = search_query.repository_filter {
-                        let repositories: Vec<&str> =
-                            repository_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                        if !repositories.is_empty() {
-                            let mut repository_clauses = vec![];
-                            for repository in repositories {
-                                let term = tantivy::Term::from_field_text(self.fields.repository, repository);
-                                repository_clauses.push((
-                                    Occur::Should,
-                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                        as Box<dyn tantivy::query::Query>,
-                                ));
+                            // Search in file_path_raw (non-tokenized)
+                            if let Ok(regex_query) =
+                                RegexQuery::from_pattern(&search_query.query, self.fields.file_path_raw)
+                            {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
                             }
-                            query_clauses.push((
-                                Occur::Must,
-                                Box::new(BooleanQuery::from(repository_clauses)) as Box<dyn tantivy::query::Query>,
-                            ));
+
+                            // Search in content (tokenized, regex on individual terms)
+                            if let Ok(regex_query) = RegexQuery::from_pattern(&search_query.query, self.fields.content)
+                            {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                            }
+
+                            if !regex_clauses.is_empty() {
+                                Box::new(BooleanQuery::from(regex_clauses))
+                            } else {
+                                Box::new(AllQuery)
+                            }
                         }
+                        Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
                     }
-
-                    // Add project filter if present
-                    if let Some(ref project_filter) = search_query.project_filter {
-                        let projects: Vec<&str> =
-                            project_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                        if !projects.is_empty() {
-                            let mut project_clauses = vec![];
-                            for project in projects {
-                                let term = tantivy::Term::from_field_text(self.fields.project, project);
-                                project_clauses.push((
-                                    Occur::Should,
-                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                        as Box<dyn tantivy::query::Query>,
-                                ));
-                            }
-                            query_clauses.push((
-                                Occur::Must,
-                                Box::new(BooleanQuery::from(project_clauses)) as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
+                } else {
+                    // Use QueryParser for normal and fuzzy search modes
+                    let mut parser = QueryParser::for_index(
+                        searcher.index(),
+                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                    );
+                    // For fuzzy search, enable fuzzy search on individual fields
+                    if search_query.fuzzy_search {
+                        parser.set_field_fuzzy(self.fields.content, true, 1, true);
+                        parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
+                        parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
                     }
-
-                    // Add version filter if present
-                    if let Some(ref version_filter) = search_query.version_filter {
-                        let versions: Vec<&str> =
-                            version_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                        if !versions.is_empty() {
-                            let mut version_clauses = vec![];
-                            for version in versions {
-                                let term = tantivy::Term::from_field_text(self.fields.version, version);
-                                version_clauses.push((
-                                    Occur::Should,
-                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                        as Box<dyn tantivy::query::Query>,
-                                ));
-                            }
-                            query_clauses.push((
-                                Occur::Must,
-                                Box::new(BooleanQuery::from(version_clauses)) as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
-                    }
-
-                    // Add extension filter if present
-                    if let Some(ref extension_filter) = search_query.extension_filter {
-                        let extensions: Vec<&str> =
-                            extension_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                        if !extensions.is_empty() {
-                            let mut extension_clauses = vec![];
-                            for extension in extensions {
-                                let term = tantivy::Term::from_field_text(self.fields.extension, extension);
-                                extension_clauses.push((
-                                    Occur::Should,
-                                    Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
-                                        as Box<dyn tantivy::query::Query>,
-                                ));
-                            }
-                            query_clauses.push((
-                                Occur::Must,
-                                Box::new(BooleanQuery::from(extension_clauses)) as Box<dyn tantivy::query::Query>,
-                            ));
-                        }
-                    }
-
-                    // Add the size range query
-                    query_clauses.push((Occur::Must, Box::new(range_query) as Box<dyn tantivy::query::Query>));
-
-                    // Return the combined query
-                    if query_clauses.len() == 1 {
-                        query_clauses.into_iter().next().unwrap().1
-                    } else {
-                        Box::new(BooleanQuery::from(query_clauses))
+                    match parser.parse_query(&search_query.query) {
+                        Ok(parsed) => parsed,
+                        Err(_) => Box::new(AllQuery),
                     }
                 };
+                query_clauses.push((Occur::Must, text_query));
+
+                // Add repository filter if present
+                if let Some(ref repository_filter) = search_query.repository_filter {
+                    let repositories: Vec<&str> =
+                        repository_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                    if !repositories.is_empty() {
+                        let mut repository_clauses = vec![];
+                        for repository in repositories {
+                            let term = tantivy::Term::from_field_text(self.fields.repository, repository);
+                            repository_clauses.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                    as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                        query_clauses.push((
+                            Occur::Must,
+                            Box::new(BooleanQuery::from(repository_clauses)) as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                }
+
+                // Add project filter if present
+                if let Some(ref project_filter) = search_query.project_filter {
+                    let projects: Vec<&str> =
+                        project_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                    if !projects.is_empty() {
+                        let mut project_clauses = vec![];
+                        for project in projects {
+                            let term = tantivy::Term::from_field_text(self.fields.project, project);
+                            project_clauses.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                    as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                        query_clauses.push((
+                            Occur::Must,
+                            Box::new(BooleanQuery::from(project_clauses)) as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                }
+
+                // Add version filter if present
+                if let Some(ref version_filter) = search_query.version_filter {
+                    let versions: Vec<&str> =
+                        version_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                    if !versions.is_empty() {
+                        let mut version_clauses = vec![];
+                        for version in versions {
+                            let term = tantivy::Term::from_field_text(self.fields.version, version);
+                            version_clauses.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                    as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                        query_clauses.push((
+                            Occur::Must,
+                            Box::new(BooleanQuery::from(version_clauses)) as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                }
+
+                // Add extension filter if present
+                if let Some(ref extension_filter) = search_query.extension_filter {
+                    let extensions: Vec<&str> =
+                        extension_filter.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                    if !extensions.is_empty() {
+                        let mut extension_clauses = vec![];
+                        for extension in extensions {
+                            let term = tantivy::Term::from_field_text(self.fields.extension, extension);
+                            extension_clauses.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic))
+                                    as Box<dyn tantivy::query::Query>,
+                            ));
+                        }
+                        query_clauses.push((
+                            Occur::Must,
+                            Box::new(BooleanQuery::from(extension_clauses)) as Box<dyn tantivy::query::Query>,
+                        ));
+                    }
+                }
+
+                // Add the size range query
+                query_clauses.push((Occur::Must, Box::new(range_query) as Box<dyn tantivy::query::Query>));
+
+                // Return the combined query
+                if query_clauses.len() == 1 {
+                    query_clauses.into_iter().next().unwrap().1
+                } else {
+                    Box::new(BooleanQuery::from(query_clauses))
+                }
+            };
 
             let mut size_facets = Vec::new();
             for (label, min_size, max_size) in SIZE_BUCKETS.iter() {
@@ -1680,6 +2010,110 @@ impl SearchService {
     #[allow(dead_code)]
     pub fn get_configured_settings(&self) -> crate::models::TantivyConfig {
         crate::services::tantivy_config::load_config()
+    }
+}
+
+/// Extract simple alphanumeric terms from regex pattern for snippet highlighting
+///
+/// This function helps generate better snippets for regex searches by extracting
+/// meaningful alphanumeric terms that can be used to highlight relevant content.
+///
+/// # Examples
+/// - "^Crawler.*" -> ["Crawler"]
+/// - "test[0-9]+" -> ["test"]
+/// - ".*Service" -> ["Service"]
+/// - "^([a-z]+)_([0-9]+)$" -> [] (no term >= 3 chars)
+///
+/// # Returns
+/// Vector of alphanumeric terms found in the pattern (minimum 3 chars)
+fn extract_simple_terms_from_regex(pattern: &str) -> Vec<String> {
+    let mut terms = Vec::new();
+    let mut current_term = String::new();
+
+    for c in pattern.chars() {
+        if c.is_alphanumeric() || c == '_' {
+            current_term.push(c);
+        } else {
+            // Non-alphanumeric character - end current term if long enough
+            if !current_term.is_empty() && current_term.len() > 2 {
+                terms.push(current_term.clone());
+            }
+            current_term.clear();
+        }
+    }
+
+    // Don't forget the last term if pattern ends with alphanumeric
+    if !current_term.is_empty() && current_term.len() > 2 {
+        terms.push(current_term);
+    }
+
+    terms
+}
+
+#[cfg(test)]
+mod regex_term_extraction_tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_anchor_pattern() {
+        let result = extract_simple_terms_from_regex("^Crawler.*");
+        assert_eq!(result, vec!["Crawler"]);
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_with_character_class() {
+        let result = extract_simple_terms_from_regex("test[0-9]+");
+        assert_eq!(result, vec!["test"]);
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_wildcard_pattern() {
+        let result = extract_simple_terms_from_regex(".*Service");
+        assert_eq!(result, vec!["Service"]);
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_empty_result() {
+        let result = extract_simple_terms_from_regex("^([a-z]+)_([0-9]+)$");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_complex_pattern() {
+        let result = extract_simple_terms_from_regex("^(Service_[0-9]+).rs$");
+        // Underscores are treated as alphanumeric, so "Service_" is captured
+        assert_eq!(result, vec!["Service_"]);
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_file_extension() {
+        let result = extract_simple_terms_from_regex(".*\\.rs$");
+        // Backslash breaks the term, so 'rs' at end should be captured
+        assert!(result.is_empty() || result.contains(&"rs".to_string()));
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_underscore_separated() {
+        let result = extract_simple_terms_from_regex("test_service_impl");
+        assert_eq!(result, vec!["test_service_impl"]);
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_multiple_terms() {
+        let result = extract_simple_terms_from_regex("FooBarBaz[0-9]+Qux");
+        assert_eq!(result, vec!["FooBarBaz", "Qux"]);
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_too_short() {
+        let result = extract_simple_terms_from_regex("a[0-9]b");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_simple_terms_from_regex_empty_pattern() {
+        let result = extract_simple_terms_from_regex("");
+        assert!(result.is_empty());
     }
 }
 

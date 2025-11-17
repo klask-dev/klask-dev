@@ -143,8 +143,7 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [filterFacets, lastValidFacets?.size_ranges]);
 
   // When all filters are cleared, reset to staticFilters to show all options again
-  // Note: size_ranges is NOT reset here because it comes from searchResultsFacets (query-specific)
-  // Resetting it would lose the facet counts for the current search query
+  // This applies to ALL filters including size_ranges for consistent behavior
   React.useEffect(() => {
     if (!hasActiveFilters && shouldResetRef.current && staticFilters) {
       setLastValidFacets({
@@ -152,12 +151,11 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
         versions: staticFilters.versions || [],
         extensions: staticFilters.extensions || [],
         repositories: staticFilters.repositories || [],
-        // Keep existing size_ranges from search results, don't reset to static
-        size_ranges: lastValidFacets?.size_ranges || [],
+        size_ranges: staticFilters.size_ranges || [],
       });
       shouldResetRef.current = false; // Only reset once per clear
     }
-  }, [hasActiveFilters, staticFilters, lastValidFacets?.size_ranges]);
+  }, [hasActiveFilters, staticFilters]);
 
   const clearFilters = useCallback(() => {
     setFilters({});
@@ -168,11 +166,12 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
   // These facets are specific to the current search query
   const updateDynamicFilters = useCallback((facets: DynamicFilters | null) => {
     if (facets) {
-      // We have facets from search results, use them
+      // We have facets from search results, store them separately
+      // Do NOT overwrite lastValidFacets (which holds static filters)
       setSearchResultsFacets(facets);
-      setLastValidFacets(facets);
     } else {
-      // No facets (e.g., cleared search), clear search result facets
+      // No facets (e.g., cleared search), clear search results
+      // lastValidFacets will fallback to staticFilters automatically via currentFacets
       setSearchResultsFacets(null);
     }
   }, []);
@@ -245,15 +244,16 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
 
+  // Use search results facets if available (from direct search), otherwise use lastValidFacets
+  // This is used by both hybridFilters and availableFiltersList
+  const currentFacets = searchResultsFacets || lastValidFacets;
+
   // Fix 3: Memoize hybridFilters to prevent recreation every render
   // Smart hybrid strategy:
   // - If no filter selected in a category → show only items with results (dynamic)
   // - If filters selected in a category → show all items (static) with current counts (dynamic)
   // Prioritize searchResultsFacets (from direct search) over lastValidFacets (from /facets API) to avoid flickering
   const hybridFilters: Record<string, Array<{ value: string; count: number }>> = React.useMemo(() => {
-    // Use search results facets if available (from direct search), otherwise use lastValidFacets
-    const currentFacets = searchResultsFacets || lastValidFacets;
-
     return {
       projects: (filters.project && filters.project.length > 0)
         ? mergeFiltersWithDynamicCounts(
@@ -288,7 +288,7 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
         : (currentFacets?.repositories as Array<{ value: string; count: number }>) ||
           (staticFilters?.repositories as Array<{ value: string; count: number }>) || [],
     };
-  }, [filters, staticFilters, lastValidFacets, searchResultsFacets, mergeFiltersWithDynamicCounts]);
+  }, [filters, staticFilters, currentFacets, mergeFiltersWithDynamicCounts]);
 
   // Fix 2: Memoize availableFiltersList to prevent .map() recreations every render
   const availableFiltersList: {
@@ -320,11 +320,13 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
       count: r.count || 0,
     })),
     languages: [], // Will be derived from extensions in the future
-    // Size ranges should come ONLY from search results facets (query-specific), NOT from filter facets
-    // Filter facets (/facets endpoint) don't include the query, so their size_ranges would be wrong
-    // This ensures counters are accurate for the current search query
-    sizeRanges: searchResultsFacets?.size_ranges || [],
-  }), [hybridFilters, searchResultsFacets?.size_ranges]);
+    // Size ranges: use same fallback strategy as other filters
+    // Check if currentFacets has size_ranges with actual data (length > 0), not just existence
+    // Some search modes may return empty arrays instead of undefined
+    sizeRanges: (currentFacets?.size_ranges && currentFacets.size_ranges.length > 0)
+      ? (currentFacets.size_ranges as Array<{ value: string; count: number }>)
+      : (staticFilters?.size_ranges as Array<{ value: string; count: number }>) || [],
+  }), [hybridFilters, currentFacets, staticFilters]);
 
   // Fix 1: Memoize the context value to prevent all consumers from re-rendering
   const value: SearchFiltersContextType = React.useMemo(() => ({

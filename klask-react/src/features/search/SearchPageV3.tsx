@@ -10,7 +10,8 @@ import {
   ClockIcon,
   ChartBarIcon,
   DocumentMagnifyingGlassIcon,
-  SparklesIcon
+  SparklesIcon,
+  BoltIcon
 } from '@heroicons/react/24/outline';
 
 const SearchPageV3: React.FC = () => {
@@ -18,6 +19,11 @@ const SearchPageV3: React.FC = () => {
   const location = useLocation();
   const [query, setQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchMode, setSearchMode] = useState<'normal' | 'fuzzy' | 'regex'>('normal');
+
+  // Derive boolean flags from searchMode for backward compatibility
+  const fuzzySearch = searchMode === 'fuzzy';
+  const regexSearch = searchMode === 'regex';
 
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
@@ -72,13 +78,21 @@ const SearchPageV3: React.FC = () => {
       }
     }
 
+    // Handle search mode flags
+    if (fuzzySearch) {
+      params.set('fuzzySearch', 'true');
+    }
+    if (regexSearch) {
+      params.set('regexSearch', 'true');
+    }
+
     if (page > 1) {
       params.set('page', page.toString());
     }
 
     const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState(null, '', newURL);
-  }, []);
+  }, [fuzzySearch, regexSearch]);
 
   // Track if we're initializing to avoid double URL updates
   const [isInitializing, setIsInitializing] = useState(true);
@@ -98,6 +112,11 @@ const SearchPageV3: React.FC = () => {
     // Parse size filter
     const urlMinSize = urlParams.get('min_size');
     const urlMaxSize = urlParams.get('max_size');
+
+    // Parse search mode flags
+    const urlFuzzySearch = urlParams.get('fuzzySearch') === 'true';
+    const urlRegexSearch = urlParams.get('regexSearch') === 'true';
+
     const urlPage = parseInt(urlParams.get('page') || '1', 10);
 
     // Set React state from URL
@@ -124,6 +143,15 @@ const SearchPageV3: React.FC = () => {
       setFilters(filtersFromUrl);
     }
 
+    // Set search mode from URL
+    if (urlRegexSearch) {
+      setSearchMode('regex');
+    } else if (urlFuzzySearch) {
+      setSearchMode('fuzzy');
+    } else {
+      setSearchMode('normal');
+    }
+
     setCurrentPage(urlPage);
     setIsInitializing(false);
   }, [location.search, setFilters]);
@@ -132,7 +160,7 @@ const SearchPageV3: React.FC = () => {
   useEffect(() => {
     if (isInitializing) return;
     updateURL(query, filters, currentPage);
-  }, [query, filters, currentPage, updateURL, isInitializing]);
+  }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch]);
 
   // Sync query to context for facet fetching
   useEffect(() => {
@@ -154,7 +182,7 @@ const SearchPageV3: React.FC = () => {
     sizeRange: filters?.size,
   }, currentPage, {
     enabled: !!query.trim(),
-  });
+  }, fuzzySearch, regexSearch);
 
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
@@ -163,7 +191,11 @@ const SearchPageV3: React.FC = () => {
   // Update context with facets from search results
   // When query is empty, clear searchResultsFacets to fallback to lastValidFacets
   useEffect(() => {
-    if (facets) {
+    if (!query.trim()) {
+      // Query is empty, clear search result facets to use filter-based facets instead
+      updateDynamicFilters(null);
+    } else if (facets) {
+      // Query exists and we have facets - use them (even if search returned 0 results)
       updateDynamicFilters({
         projects: facets.projects,
         versions: facets.versions,
@@ -172,10 +204,9 @@ const SearchPageV3: React.FC = () => {
         // Backend returns size_ranges in snake_case, not camelCase
         size_ranges: (facets as any).size_ranges || facets.sizeRanges || [],
       });
-    } else if (!query.trim()) {
-      // Query is empty, clear search result facets to use filter-based facets instead
-      updateDynamicFilters(null);
     }
+    // If query exists but facets is still loading/undefined, keep existing filters
+    // Don't clear them - wait for the facets to arrive
   }, [facets, query, updateDynamicFilters]);
   const pageSize = 20;
   const totalPages = Math.ceil(totalResults / pageSize);
@@ -225,6 +256,14 @@ const SearchPageV3: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Toggle handlers with mutual exclusivity logic
+  const handleFuzzyToggle = useCallback(() => {
+    setSearchMode(prev => (prev === 'fuzzy' ? 'normal' : 'fuzzy'));
+  }, []);
+
+  const handleRegexToggle = useCallback(() => {
+    setSearchMode(prev => (prev === 'regex' ? 'normal' : 'regex'));
+  }, []);
 
   const searchError = isError ? getErrorMessage(error) : null;
 
@@ -260,13 +299,49 @@ const SearchPageV3: React.FC = () => {
 
       {/* Search Bar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-        <SearchBar
-          value={query}
-          onChange={setQuery}
-          onSearch={handleSearch}
-          placeholder="Search functions, classes, variables, comments..."
-          isLoading={isLoading || isFetching}
-        />
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <SearchBar
+              value={query}
+              onChange={setQuery}
+              onSearch={handleSearch}
+              placeholder="Search functions, classes, variables, comments..."
+              isLoading={isLoading || isFetching}
+            />
+          </div>
+          
+          {/* Fuzzy Search Toggle */}
+          <button
+            onClick={handleFuzzyToggle}
+            title={fuzzySearch
+              ? "Disable fuzzy search (1-character edit distance)"
+              : "Enable fuzzy search (1-character edit distance)"}
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+              fuzzySearch
+                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50 text-blue-700 dark:text-blue-300 shadow-sm'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            }`}
+          >
+            <BoltIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Fuzzy</span>
+          </button>
+
+          {/* Regex Search Toggle */}
+          <button
+            onClick={handleRegexToggle}
+            title={regexSearch
+              ? "Disable regex search - use patterns like ^test.*, [a-z]+\\.rs$"
+              : "Enable regex search - use patterns like ^test.*, [a-z]+\\.rs$"}
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+              regexSearch
+                ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-700/50 text-purple-700 dark:text-purple-300 shadow-sm'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            }`}
+          >
+            <span className="text-base">/</span>
+            <span className="hidden sm:inline">Regex</span>
+          </button>
+        </div>
 
         {/* Search History */}
         {!query && history.length > 0 && (
@@ -313,6 +388,7 @@ const SearchPageV3: React.FC = () => {
         totalPages={totalPages}
         onPageChange={handlePageChange}
         pageSize={pageSize}
+        regexSearch={regexSearch}
       />
 
       {/* Tantivy Search Tips */}

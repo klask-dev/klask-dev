@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod auth;
 pub mod files;
+pub mod regex_validator;
 pub mod repositories;
 pub mod scheduler;
 pub mod search;

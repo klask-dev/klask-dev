@@ -63,3 +63,6 @@ _ parfois j'ai INFO tantivy::indexer::index_writer: Buffer limit reached, flushi
 - cargo tree -e no-dev montre beaucoup de dépendances gix, à voir avec les features si on peut réduire le champ des dépendances
 - lancer les tests front avec --coverage pour augmenter la couverture de tests
 - corriger les tests frontend skipped
+- supprimer les valeurs par défaut dans le code  de ENCRYPTION KEY et JWT KEY (surtout dans config.rs AppConfig)
+- tri sur la table User Management et corriger les compteurs vides au dessus
+- de même pour les compteurs dans Repositories
