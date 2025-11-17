@@ -245,15 +245,16 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
 
+  // Use search results facets if available (from direct search), otherwise use lastValidFacets
+  // This is used by both hybridFilters and availableFiltersList
+  const currentFacets = searchResultsFacets || lastValidFacets;
+
   // Fix 3: Memoize hybridFilters to prevent recreation every render
   // Smart hybrid strategy:
   // - If no filter selected in a category → show only items with results (dynamic)
   // - If filters selected in a category → show all items (static) with current counts (dynamic)
   // Prioritize searchResultsFacets (from direct search) over lastValidFacets (from /facets API) to avoid flickering
   const hybridFilters: Record<string, Array<{ value: string; count: number }>> = React.useMemo(() => {
-    // Use search results facets if available (from direct search), otherwise use lastValidFacets
-    const currentFacets = searchResultsFacets || lastValidFacets;
-
     return {
       projects: (filters.project && filters.project.length > 0)
         ? mergeFiltersWithDynamicCounts(
@@ -288,7 +289,7 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
         : (currentFacets?.repositories as Array<{ value: string; count: number }>) ||
           (staticFilters?.repositories as Array<{ value: string; count: number }>) || [],
     };
-  }, [filters, staticFilters, lastValidFacets, searchResultsFacets, mergeFiltersWithDynamicCounts]);
+  }, [filters, staticFilters, currentFacets, mergeFiltersWithDynamicCounts]);
 
   // Fix 2: Memoize availableFiltersList to prevent .map() recreations every render
   const availableFiltersList: {
@@ -320,16 +321,12 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
       count: r.count || 0,
     })),
     languages: [], // Will be derived from extensions in the future
-    // Size ranges: prefer search results (query-specific), fallback to lastValidFacets (static), then empty
-    // When user has typed a query: use searchResultsFacets (if available and has data)
-    // When user hasn't typed a query or search has no size data: use lastValidFacets (static filters, all documents)
-    // This allows pre-filtering by size even before searching, and shows size filter across all search modes
-    sizeRanges: (searchResultsFacets?.size_ranges && searchResultsFacets.size_ranges.length > 0)
-      ? searchResultsFacets.size_ranges
-      : (lastValidFacets?.size_ranges && lastValidFacets.size_ranges.length > 0
-        ? lastValidFacets.size_ranges
-        : []),
-  }), [hybridFilters, searchResultsFacets?.size_ranges, lastValidFacets?.size_ranges]);
+    // Size ranges: use same fallback strategy as other filters
+    // Use currentFacets (searchResults || lastValid) and fallback to staticFilters
+    // This ensures consistent behavior across all filter types
+    sizeRanges: (currentFacets?.size_ranges as Array<{ value: string; count: number }>) ||
+      (staticFilters?.size_ranges as Array<{ value: string; count: number }>) || [],
+  }), [hybridFilters, currentFacets, staticFilters]);
 
   // Fix 1: Memoize the context value to prevent all consumers from re-rendering
   const value: SearchFiltersContextType = React.useMemo(() => ({
