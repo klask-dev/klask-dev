@@ -64,6 +64,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -138,6 +140,8 @@ mod search_size_facets_tests {
             limit: 100,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -235,6 +239,8 @@ mod search_size_facets_tests {
             limit: 100,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -298,6 +304,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -361,6 +369,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -423,6 +433,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -488,6 +500,8 @@ mod search_size_facets_tests {
             limit: 100,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -548,6 +562,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -608,6 +624,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -662,6 +680,8 @@ mod search_size_facets_tests {
             limit: 100,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -726,6 +746,8 @@ mod search_size_facets_tests {
             limit: 100,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -798,6 +820,8 @@ mod search_size_facets_tests {
             limit: 100,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -862,6 +886,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -922,6 +948,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -974,6 +1002,8 @@ mod search_size_facets_tests {
             limit: 10,
             offset: 0,
             include_facets: false, // Facets not requested
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();

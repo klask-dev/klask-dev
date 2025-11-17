@@ -63,6 +63,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -120,6 +122,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -160,6 +164,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -207,6 +213,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -254,6 +262,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -313,6 +323,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -374,6 +386,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: true,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -441,6 +455,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -490,6 +506,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
@@ -508,6 +526,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let old_results = service.search(old_query).await.unwrap();
@@ -557,6 +577,8 @@ mod search_repository_tests {
             limit: 10,
             offset: 0,
             include_facets: false,
+            fuzzy_search: false,
+            regex_search: false,
         };
 
         let results = service.search(query).await.unwrap();
