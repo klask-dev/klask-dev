@@ -326,7 +326,9 @@ export const SearchFiltersProvider: React.FC<{ children: React.ReactNode }> = ({
     // This allows pre-filtering by size even before searching, and shows size filter across all search modes
     sizeRanges: (searchResultsFacets?.size_ranges && searchResultsFacets.size_ranges.length > 0)
       ? searchResultsFacets.size_ranges
-      : (lastValidFacets?.size_ranges || []),
+      : (lastValidFacets?.size_ranges && lastValidFacets.size_ranges.length > 0
+        ? lastValidFacets.size_ranges
+        : []),
   }), [hybridFilters, searchResultsFacets?.size_ranges, lastValidFacets?.size_ranges]);
 
   // Fix 1: Memoize the context value to prevent all consumers from re-rendering
