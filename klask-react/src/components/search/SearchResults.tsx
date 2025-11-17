@@ -1,6 +1,7 @@
 import React from 'react';
 import { SearchResult } from './SearchResult';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { SearchProgress } from './SearchProgress';
 import { Pagination } from '../ui/Pagination';
 import {
   MagnifyingGlassIcon,
@@ -104,21 +105,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     );
   }
 
-  // Loading state
+  // Loading state with progress tracking
   if (isLoading && results.length === 0) {
-    return (
-      <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
-        <div className="flex flex-col items-center justify-center py-12 px-4">
-          <LoadingSpinner size="lg" className="mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Searching...
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 text-center">
-            Looking for "{query}" in your codebase
-          </p>
-        </div>
-      </div>
-    );
+    return <SearchProgress query={query} isRegex={regexSearch} className={className} />;
   }
 
   // No results state
@@ -146,25 +135,26 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
   // Results display
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className} relative`}>
+      {/* Loading overlay banner when refetching with existing results */}
+      {isLoading && results.length > 0 && (
+        <div className="absolute top-0 left-0 right-0 z-10 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-700/50 px-4 py-2 rounded-t-lg">
+          <div className="flex items-center justify-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
+            <LoadingSpinner size="sm" />
+            <span className="font-medium">Updating search results...</span>
+          </div>
+        </div>
+      )}
+
       {/* Results Header */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className={`px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${isLoading && results.length > 0 ? 'mt-10' : ''}`}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
               Search Results
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isLoading ? (
-                <>
-                  Found {results.length} results so far for "{query}"
-                  <LoadingSpinner size="sm" className="ml-2 inline" />
-                </>
-              ) : (
-                <>
-                  {totalResults.toLocaleString()} {totalResults === 1 ? 'result' : 'results'} for "{query}"
-                </>
-              )}
+              {totalResults.toLocaleString()} {totalResults === 1 ? 'result' : 'results'} for "{query}"
             </p>
           </div>
 
