@@ -366,11 +366,13 @@ describe('LoginPage - Registration Blocking Feature', () => {
   });
 
   describe('UI State Consistency', () => {
-    it('should maintain consistent UI when toggling between enabled/disabled', async () => {
+    beforeEach(() => {
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
         registration_allowed: true,
       });
+    });
 
+    it('should maintain consistent UI when toggling between enabled/disabled', async () => {
       const { rerender } = render(<LoginPage />, { wrapper: createWrapper() });
 
       await waitFor(() => {
