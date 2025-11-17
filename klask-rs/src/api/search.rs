@@ -266,8 +266,17 @@ async fn get_facets_with_filters(
 
     // Build search query with optional search query and filters
     // If no query provided, use "*" to match all documents
+    // NOTE: If query parsing fails (e.g., invalid QueryParser syntax like "string[abc]"),
+    // we fall back to "*" to avoid 500 errors. This happens when user types incomplete
+    // regex patterns without activating regex mode.
+    let query_string = if let Some(ref q) = params.query {
+        if q.trim().is_empty() { "*".to_string() } else { q.clone() }
+    } else {
+        "*".to_string()
+    };
+
     let search_query = SearchQuery {
-        query: params.query.clone().unwrap_or_else(|| "*".to_string()),
+        query: query_string,
         repository_filter: params.repositories,
         project_filter: params.projects,
         version_filter: params.versions,

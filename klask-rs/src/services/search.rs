@@ -521,9 +521,21 @@ impl SearchService {
             }
 
             // Parse the main query
-            query_parser
-                .parse_query(&search_query.query)
-                .map_err(|e| anyhow!("Failed to parse query '{}': {}", search_query.query, e))?
+            // If parsing fails (e.g., invalid syntax like "string[abc]"), fall back to "*"
+            // This happens when user types incomplete regex patterns without activating regex mode
+            match query_parser.parse_query(&search_query.query) {
+                Ok(q) => q,
+                Err(e) => {
+                    debug!(
+                        "Failed to parse query '{}', falling back to wildcard '*': {}",
+                        search_query.query, e
+                    );
+                    // Fall back to matching all documents
+                    query_parser
+                        .parse_query("*")
+                        .map_err(|e| anyhow!("Failed to parse fallback wildcard query: {}", e))?
+                }
+            }
         };
 
         // Create a separate query for snippet highlighting
