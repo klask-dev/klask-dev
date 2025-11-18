@@ -50,7 +50,7 @@ async fn test_regex_case_sensitivity() {
     ];
 
     for file in &files {
-        service.index_file(file).await.unwrap();
+        service.upsert_file(file.clone()).await.unwrap();
     }
     service.commit().await.unwrap();
 
@@ -134,7 +134,7 @@ async fn test_regex_multiple_flags() {
         size: 22,
     };
 
-    service.index_file(&file).await.unwrap();
+    service.upsert_file(file).await.unwrap();
     service.commit().await.unwrap();
 
     // Test with multiple flags: "ims"
@@ -171,7 +171,7 @@ async fn test_regex_invalid_flags_ignored() {
         size: 7,
     };
 
-    service.index_file(&file).await.unwrap();
+    service.upsert_file(file).await.unwrap();
     service.commit().await.unwrap();
 
     // Test with invalid flags mixed with valid ones
