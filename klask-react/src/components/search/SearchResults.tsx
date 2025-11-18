@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SearchResult } from './SearchResult';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { SearchProgress } from './SearchProgress';
@@ -49,6 +49,22 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   regexSearch = false,
 }) => {
   const usePagination = currentPage !== undefined && totalPages !== undefined && onPageChange !== undefined;
+
+  // Show loading indicator only after 1 second to avoid flashing on quick responses
+  const [showLoading, setShowLoading] = useState(false);
+
+  useEffect(() => {
+    if (isLoading && results.length === 0) {
+      // Set timer to show loading indicator after 1 second
+      const timer = setTimeout(() => setShowLoading(true), 1000);
+      return () => {
+        clearTimeout(timer);
+        setShowLoading(false);
+      };
+    } else {
+      setShowLoading(false);
+    }
+  }, [isLoading, results.length]);
 
   // Empty state when no query
   if (!query.trim() && !isLoading) {
@@ -170,8 +186,8 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     );
   }
 
-  // Loading state with progress tracking
-  if (isLoading && results.length === 0) {
+  // Loading state with progress tracking (only show after 1 second)
+  if (showLoading && results.length === 0) {
     return <SearchProgress query={query} isRegex={regexSearch} className={className} />;
   }
 

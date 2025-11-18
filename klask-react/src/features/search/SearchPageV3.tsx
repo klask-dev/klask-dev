@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { SearchBar } from '../../components/search/SearchBar';
 import { SearchResults } from '../../components/search/SearchResults';
 import { useMultiSelectSearch, useSearchHistory } from '../../hooks/useSearch';
+import { useDebounce } from '../../hooks/useDebounce';
 import { getErrorMessage } from '../../lib/api';
 import type { SearchResult } from '../../types';
 import { useSearchFiltersContext } from '../../contexts/SearchFiltersContext';
@@ -24,6 +25,10 @@ const SearchPageV3: React.FC = () => {
   // Derive boolean flags from searchMode for backward compatibility
   const fuzzySearch = searchMode === 'fuzzy';
   const regexSearch = searchMode === 'regex';
+
+  // Debounce the query to avoid too many API calls while typing
+  // Use 300ms debounce for responsive feel but not excessive requests
+  const debouncedQuery = useDebounce(query, 300);
 
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
@@ -174,7 +179,7 @@ const SearchPageV3: React.FC = () => {
     isError,
     error,
     refetch,
-  } = useMultiSelectSearch(query, {
+  } = useMultiSelectSearch(debouncedQuery, {
     projects: filters?.project,     // Map 'project' (singular in context) to 'projects' (plural in API)
     versions: filters?.version,     // Map 'version' (singular in context) to 'versions' (plural in API)
     extensions: filters?.extension, // Map 'extension' (singular in context) to 'extensions' (plural in API)
