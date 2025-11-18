@@ -144,8 +144,12 @@ export const useMultiSelectSearch = (
   const pageSize = 20;
   const offset = (currentPage - 1) * pageSize;
 
+  // When query changes (new search), reset to page 1 by including a separate key segment
+  // This ensures keepPreviousData doesn't show old results from a completely different search
+  const isNewSearch = currentPage === 1;
+
   return useQuery({
-    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch],
+    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, isNewSearch ? 'new' : 'pagination'],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
 
