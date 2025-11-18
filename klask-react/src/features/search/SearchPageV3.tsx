@@ -21,6 +21,13 @@ const SearchPageV3: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchMode, setSearchMode] = useState<'normal' | 'fuzzy' | 'regex'>('normal');
 
+  // Regex flags state (i = case-insensitive, m = multiline, s = dotall)
+  const [regexFlags, setRegexFlags] = useState({
+    i: false, // case-insensitive
+    m: false, // multiline
+    s: false, // dotall (dot matches newlines)
+  });
+
   // Derive boolean flags from searchMode for backward compatibility
   const fuzzySearch = searchMode === 'fuzzy';
   const regexSearch = searchMode === 'regex';
@@ -167,6 +174,14 @@ const SearchPageV3: React.FC = () => {
     setCurrentQuery(query);
   }, [query, setCurrentQuery]);
 
+  // Convert regex flags object to string (e.g., {i: true, m: false, s: true} → "is")
+  const regexFlagsString = regexSearch
+    ? Object.entries(regexFlags)
+        .filter(([_, enabled]) => enabled)
+        .map(([flag]) => flag)
+        .join('')
+    : undefined;
+
   const {
     data: searchData,
     isLoading,
@@ -182,7 +197,7 @@ const SearchPageV3: React.FC = () => {
     sizeRange: filters?.size,
   }, currentPage, {
     enabled: !!query.trim(),
-  }, fuzzySearch, regexSearch);
+  }, fuzzySearch, regexSearch, regexFlagsString);
 
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
@@ -265,6 +280,14 @@ const SearchPageV3: React.FC = () => {
     setSearchMode(prev => (prev === 'regex' ? 'normal' : 'regex'));
   }, []);
 
+  // Regex flags toggle handlers
+  const handleRegexFlagToggle = useCallback((flag: 'i' | 'm' | 's') => {
+    setRegexFlags(prev => ({
+      ...prev,
+      [flag]: !prev[flag],
+    }));
+  }, []);
+
   const searchError = isError ? getErrorMessage(error) : null;
 
   // Count active size filter
@@ -341,6 +364,52 @@ const SearchPageV3: React.FC = () => {
             <span className="text-base">/</span>
             <span className="hidden sm:inline">Regex</span>
           </button>
+
+          {/* Regex Flags (only shown when regex mode is active) */}
+          {regexSearch && (
+            <div className="flex items-center gap-1.5 pl-2 border-l border-gray-200 dark:border-gray-700">
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Flags:</span>
+
+              {/* Case-insensitive flag */}
+              <button
+                onClick={() => handleRegexFlagToggle('i')}
+                title="Case-insensitive matching (e.g., 'test' matches 'Test', 'TEST', 'TeSt')"
+                className={`px-2 py-1 rounded text-xs font-mono font-semibold transition-all border ${
+                  regexFlags.i
+                    ? 'bg-purple-100 dark:bg-purple-800/40 border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-300'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                i
+              </button>
+
+              {/* Multiline flag */}
+              <button
+                onClick={() => handleRegexFlagToggle('m')}
+                title="Multiline mode (^ and $ match line boundaries)"
+                className={`px-2 py-1 rounded text-xs font-mono font-semibold transition-all border ${
+                  regexFlags.m
+                    ? 'bg-purple-100 dark:bg-purple-800/40 border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-300'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                m
+              </button>
+
+              {/* Dotall flag */}
+              <button
+                onClick={() => handleRegexFlagToggle('s')}
+                title="Dotall mode (. matches newlines)"
+                className={`px-2 py-1 rounded text-xs font-mono font-semibold transition-all border ${
+                  regexFlags.s
+                    ? 'bg-purple-100 dark:bg-purple-800/40 border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-300'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                s
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search History */}

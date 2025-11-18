@@ -102,7 +102,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query = SearchQuery { query: ".*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let results = service.search(query).await.expect("Search failed");
         assert_eq!(results.total, 6, "Pattern .* should match all 6 documents");
@@ -117,6 +123,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: "^[a-z".to_string(), // Invalid: unclosed bracket
             regex_search: true,
+            regex_flags: None,
             limit: 100,
             ..Default::default()
         };
@@ -139,7 +146,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query = SearchQuery { query: "".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: "".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let result = service.search(query).await;
         // Empty pattern may error or match all - check behavior
@@ -158,8 +171,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query =
-            SearchQuery { query: "ZZZZNOTFOUND".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: "ZZZZNOTFOUND".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let results = service.search(query).await;
         // Simple string might not work with regex, so we check if it works
@@ -180,6 +198,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             repository_filter: Some("backend".to_string()),
             limit: 100,
             ..Default::default()
@@ -200,6 +219,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             extension_filter: Some("rs".to_string()),
             limit: 100,
             ..Default::default()
@@ -220,6 +240,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             version_filter: Some("1.0".to_string()),
             limit: 100,
             ..Default::default()
@@ -240,6 +261,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             min_size: Some(200),
             max_size: Some(600),
             limit: 100,
@@ -258,6 +280,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             repository_filter: Some("backend".to_string()),
             extension_filter: Some("rs".to_string()),
             version_filter: Some("1.0".to_string()),
@@ -287,6 +310,7 @@ mod regex_search_final_tests {
         let regex_query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             fuzzy_search: false,
             limit: 100,
             ..Default::default()
@@ -295,6 +319,7 @@ mod regex_search_final_tests {
         let both_query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             fuzzy_search: true, // This should be ignored
             limit: 100,
             ..Default::default()
@@ -314,8 +339,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query =
-            SearchQuery { query: ".*Service.*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*Service.*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let result = service.search(query).await;
         // The regex pattern should be used for matching
@@ -339,8 +369,14 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query =
-            SearchQuery { query: ".*".to_string(), regex_search: true, limit: 3, offset: 0, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*".to_string(),
+            regex_search: true,
+            limit: 3,
+            offset: 0,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let results = service.search(query).await.expect("Search failed");
         assert!(results.results.len() <= 3, "Should respect limit");
@@ -352,11 +388,23 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let first_page =
-            SearchQuery { query: ".*".to_string(), regex_search: true, limit: 2, offset: 0, ..Default::default() };
+        let first_page = SearchQuery {
+            query: ".*".to_string(),
+            regex_search: true,
+            limit: 2,
+            offset: 0,
+            regex_flags: None,
+            ..Default::default()
+        };
 
-        let second_page =
-            SearchQuery { query: ".*".to_string(), regex_search: true, limit: 2, offset: 2, ..Default::default() };
+        let second_page = SearchQuery {
+            query: ".*".to_string(),
+            regex_search: true,
+            limit: 2,
+            offset: 2,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let first_results = service.search(first_page).await.expect("First search failed");
         let second_results = service.search(second_page).await.expect("Second search failed");
@@ -384,6 +432,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             include_facets: true,
             limit: 100,
             ..Default::default()
@@ -411,6 +460,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             include_facets: true,
             limit: 100,
             ..Default::default()
@@ -435,7 +485,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query = SearchQuery { query: ".*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let results = service.search(query).await.expect("Search failed");
 
@@ -468,7 +524,13 @@ mod regex_search_final_tests {
         service.upsert_file(file).await.expect("Failed to index");
         service.commit().await.expect("Failed to commit");
 
-        let query = SearchQuery { query: ".*test.*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*test.*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let results = service.search(query).await;
         if let Ok(results) = results {
@@ -491,7 +553,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query = SearchQuery { query: ".*".to_string(), regex_search: true, limit: 0, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*".to_string(),
+            regex_search: true,
+            limit: 0,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let results = service.search(query).await.expect("Search failed");
         assert_eq!(results.results.len(), 0, "Should return no results with limit=0");
@@ -503,8 +571,14 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query =
-            SearchQuery { query: ".*".to_string(), regex_search: true, limit: 100, offset: 1000, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*".to_string(),
+            regex_search: true,
+            limit: 100,
+            offset: 1000,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let results = service.search(query).await.expect("Search failed");
         assert!(results.results.is_empty(), "Large offset should return no results");
@@ -519,6 +593,7 @@ mod regex_search_final_tests {
         let query = SearchQuery {
             query: ".*".to_string(),
             regex_search: true,
+            regex_flags: None,
             include_facets: false,
             limit: 100,
             ..Default::default()
@@ -537,8 +612,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query =
-            SearchQuery { query: ".*Service.*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*Service.*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let result = service.search(query).await;
         match result {
@@ -558,7 +638,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query = SearchQuery { query: "[CR].*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: "[CR].*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let result = service.search(query).await;
         if let Ok(results) = result {
@@ -575,7 +661,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query = SearchQuery { query: ".*test.*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*test.*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let result = service.search(query).await;
         if let Ok(results) = result {
@@ -588,7 +680,13 @@ mod regex_search_final_tests {
         let (service, _temp_dir, _guard) = create_test_service().await;
         setup_test_documents(&service).await;
 
-        let query = SearchQuery { query: ".*src.*".to_string(), regex_search: true, limit: 100, ..Default::default() };
+        let query = SearchQuery {
+            query: ".*src.*".to_string(),
+            regex_search: true,
+            limit: 100,
+            regex_flags: None,
+            ..Default::default()
+        };
 
         let result = service.search(query).await;
         if let Ok(results) = result {
