@@ -459,9 +459,7 @@ impl SearchService {
 
         // Execute search in a blocking thread pool to avoid blocking the async runtime
         // This allows multiple concurrent searches to run in parallel
-        let search_future = tokio::task::spawn_blocking(move || {
-            service.search_blocking(search_query)
-        });
+        let search_future = tokio::task::spawn_blocking(move || service.search_blocking(search_query));
 
         // Apply timeout to prevent queries from running indefinitely
         match tokio::time::timeout(SEARCH_TIMEOUT, search_future).await {

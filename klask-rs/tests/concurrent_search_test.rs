@@ -92,10 +92,7 @@ async fn test_concurrent_queries_run_in_parallel() {
     let start = Instant::now();
 
     // Launch both queries concurrently
-    let (heavy_result, simple_result) = tokio::join!(
-        service1.search(heavy_query),
-        service2.search(simple_query2)
-    );
+    let (heavy_result, simple_result) = tokio::join!(service1.search(heavy_query), service2.search(simple_query2));
 
     let total_duration = start.elapsed();
 
