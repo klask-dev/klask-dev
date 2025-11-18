@@ -17,14 +17,37 @@ env:
   BACKEND_IMAGE_NAME: klask-backend
 
 jobs:
-  build-and-push:
-    # Condition pour exécuter ce job seulement si :
-    # - Le workflow précédent a réussi
-    # - Le push vient bien de main ou master
+  # Détecte quels répertoires ont été modifiés
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'klask-react/**'
+            backend:
+              - 'klask-rs/**'
+
+  build-frontend:
+    needs: detect-changes
+    # Condition pour exécuter ce job :
+    # - Sur main/master : toujours (pour garder les versions homogènes)
+    # - Sur autres branches : seulement si frontend modifié
+    # - Sur workflow_dispatch manuel : seulement si frontend modifié
     if: >
-        ${{ github.event.workflow_run.conclusion == 'success' &&
-            ( startsWith(github.event.workflow_run.head_branch, 'main')
-            || startsWith(github.event.workflow_run.head_branch, 'master') )
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.frontend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.frontend == 'true')
         }}
     runs-on: ubuntu-latest
 
@@ -60,6 +83,51 @@ jobs:
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
 
+    - name: Build and push frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./klask-react
+        file: ./klask-react/Dockerfile
+        push: true
+        tags: ${{ steps.meta-frontend.outputs.tags }}
+        labels: ${{ steps.meta-frontend.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  build-backend:
+    needs: detect-changes
+    # Condition pour exécuter ce job :
+    # - Sur main/master : toujours (pour garder les versions homogènes)
+    # - Sur autres branches : seulement si backend modifié
+    # - Sur workflow_dispatch manuel : seulement si backend modifié
+    if: >
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.backend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.backend == 'true')
+        }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Extract metadata (backend)
       id: meta-backend
       uses: docker/metadata-action@v5
@@ -73,17 +141,6 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
-
-    - name: Build and push frontend
-      uses: docker/build-push-action@v5
-      with:
-        context: ./klask-react
-        file: ./klask-react/Dockerfile
-        push: true
-        tags: ${{ steps.meta-frontend.outputs.tags }}
-        labels: ${{ steps.meta-frontend.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
 
     - name: Build and push backend
       uses: docker/build-push-action@v5
@@ -111,10 +168,18 @@ jobs:
     #   env:
     #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  security-scan:
-    needs: build-and-push
+  security-scan-frontend:
+    needs: [detect-changes, build-frontend]
+    # Même condition que build-frontend : scan si l'image a été construite
+    if: >
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.frontend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.frontend == 'true')
+        }}
     runs-on: ubuntu-latest
-    # Security scan pour tous les builds
 
     steps:
     - name: Checkout repository
@@ -138,6 +203,7 @@ jobs:
           CLEAN_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g')
           echo "tag=$CLEAN_BRANCH_NAME" >> $GITHUB_OUTPUT
         fi
+
     - name: Run Trivy vulnerability scanner (frontend)
       uses: aquasecurity/trivy-action@master
       with:
@@ -145,18 +211,54 @@ jobs:
         format: 'sarif'
         output: 'trivy-frontend.sarif'
 
+    - name: Upload Trivy scan results (frontend)
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-frontend.sarif'
+        category: 'trivy-frontend'
+
+  security-scan-backend:
+    needs: [detect-changes, build-backend]
+    # Même condition que build-backend : scan si l'image a été construite
+    if: >
+        ${{ (github.event.workflow_run.conclusion == 'success' &&
+            (startsWith(github.event.workflow_run.head_branch, 'main') ||
+             startsWith(github.event.workflow_run.head_branch, 'master') ||
+             needs.detect-changes.outputs.backend == 'true')) ||
+            (github.event_name == 'workflow_dispatch' &&
+             needs.detect-changes.outputs.backend == 'true')
+        }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Determine image tag for security scan
+      id: tag
+      run: |
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # Pour les PRs, utiliser pr-NUMBER
+          echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+          # Pour les tags Git (v1.0.0), utiliser la version
+          echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
+          # Pour main/master, utiliser latest
+          echo "tag=latest" >> $GITHUB_OUTPUT
+        else
+          # Pour les autres branches, utiliser le nom de la branche (nettoyé)
+          BRANCH_NAME="${{ github.ref_name }}"
+          CLEAN_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          echo "tag=$CLEAN_BRANCH_NAME" >> $GITHUB_OUTPUT
+        fi
+
     - name: Run Trivy vulnerability scanner (backend)
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
         format: 'sarif'
         output: 'trivy-backend.sarif'
-
-    - name: Upload Trivy scan results (frontend)
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: 'trivy-frontend.sarif'
-        category: 'trivy-frontend'
 
     - name: Upload Trivy scan results (backend)
       uses: github/codeql-action/upload-sarif@v3
