@@ -1,5 +1,5 @@
-import React from 'react';
-import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
+import React, { useRef, useEffect } from 'react';
+import { useQuery, useInfiniteQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
 import type {
   SearchQuery,
@@ -143,13 +143,24 @@ export const useMultiSelectSearch = (
 
   const pageSize = 20;
   const offset = (currentPage - 1) * pageSize;
+  const queryClient = useQueryClient();
+  const previousQueryRef = useRef<string>(query);
 
-  // When query changes (new search), reset to page 1 by including a separate key segment
-  // This ensures keepPreviousData doesn't show old results from a completely different search
-  const isNewSearch = currentPage === 1;
+  // Invalidate cache when the actual search query text changes (not just pagination)
+  // This ensures keepPreviousData doesn't persist when searching for completely different terms
+  useEffect(() => {
+    if (query !== previousQueryRef.current && currentPage === 1) {
+      // Query changed - invalidate the old search results to show loading state
+      queryClient.removeQueries({
+        queryKey: ['search', 'multiselect'],
+        exact: false,
+      });
+      previousQueryRef.current = query;
+    }
+  }, [query, currentPage, queryClient]);
 
   return useQuery({
-    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, isNewSearch ? 'new' : 'pagination'],
+    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
 
