@@ -146,18 +146,25 @@ export const useMultiSelectSearch = (
   const queryClient = useQueryClient();
   const previousQueryRef = useRef<string>(query);
 
-  // Invalidate cache when the actual search query text changes (not just pagination)
-  // This ensures keepPreviousData doesn't persist when searching for completely different terms
+  // Track if this is a fresh/new search to conditionally disable keepPreviousData
+  const [isNewSearch, setIsNewSearch] = React.useState(true);
+
+  // Invalidate and refetch when the actual search query text changes
   useEffect(() => {
     if (query !== previousQueryRef.current && currentPage === 1) {
-      // Query changed - invalidate the old search results to show loading state
-      queryClient.removeQueries({
+      // Mark as new search to skip keepPreviousData for this query
+      setIsNewSearch(true);
+      // Immediately invalidate ALL multiselect search queries so they refetch with no placeholder
+      queryClient.invalidateQueries({
         queryKey: ['search', 'multiselect'],
         exact: false,
       });
       previousQueryRef.current = query;
+    } else if (currentPage > 1 && isNewSearch) {
+      // After first page loads, enable keepPreviousData for subsequent pagination
+      setIsNewSearch(false);
     }
-  }, [query, currentPage, queryClient]);
+  }, [query, currentPage, queryClient, isNewSearch]);
 
   return useQuery({
     queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch],
@@ -221,8 +228,9 @@ export const useMultiSelectSearch = (
     enabled: enabled && !!query.trim(),
     refetchOnWindowFocus,
     staleTime,
-    // Keep previous data while fetching to prevent flickering counters during page refresh or filter changes
-    placeholderData: keepPreviousData,
+    // Keep previous data while fetching ONLY for pagination changes
+    // For new searches (page 1), don't use placeholder data so SearchProgress shows immediately
+    placeholderData: !isNewSearch ? keepPreviousData : undefined,
     retry: (failureCount, error) => {
       if (error && typeof error === 'object' && 'status' in error) {
         const status = (error as any).status;
