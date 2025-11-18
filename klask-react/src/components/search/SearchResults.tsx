@@ -1,6 +1,7 @@
 import React from 'react';
 import { SearchResult } from './SearchResult';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { SearchProgress } from './SearchProgress';
 import { Pagination } from '../ui/Pagination';
 import {
   MagnifyingGlassIcon,
@@ -83,42 +84,95 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
   // Error state
   if (error) {
+    // Detect if it's a timeout error
+    const isTimeout = error.toLowerCase().includes('timeout');
+
     return (
-      <div className={`bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-900 ${className}`}>
+      <div className={`bg-white dark:bg-gray-800 rounded-lg border ${isTimeout ? 'border-orange-200 dark:border-orange-900' : 'border-red-200 dark:border-red-900'} ${className}`}>
         <div className="flex flex-col items-center justify-center py-12 px-4">
-          <ExclamationTriangleIcon className="h-16 w-16 text-red-400 dark:text-red-500 mb-4" />
-          <h3 className="text-lg font-medium text-red-900 dark:text-red-300 mb-2">
-            Search Error
+          <ExclamationTriangleIcon className={`h-16 w-16 mb-4 ${isTimeout ? 'text-orange-400 dark:text-orange-500' : 'text-red-400 dark:text-red-500'}`} />
+
+          <h3 className={`text-lg font-medium mb-2 ${isTimeout ? 'text-orange-900 dark:text-orange-300' : 'text-red-900 dark:text-red-300'}`}>
+            {isTimeout ? 'Search Timeout' : 'Search Error'}
           </h3>
-          <p className="text-red-600 dark:text-red-400 text-center max-w-md mb-4">
-            {error}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="btn-secondary"
-          >
-            Try Again
-          </button>
+
+          {isTimeout ? (
+            <>
+              <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-3">
+                Your search took longer than 30 seconds and was automatically stopped.
+              </p>
+
+              {/* Display the query that caused the timeout */}
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-4 max-w-md">
+                <p className="text-sm font-medium text-orange-900 dark:text-orange-300 mb-2">
+                  Query that timed out:
+                </p>
+                <code className="block text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 rounded border border-orange-200 dark:border-orange-700 font-mono break-all">
+                  {query}
+                </code>
+                {regexSearch && (
+                  <p className="text-xs text-orange-700 dark:text-orange-400 mt-2">
+                    Mode: <span className="font-semibold">Regex Search</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Actionable suggestions */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-md">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
+                  💡 How to fix this:
+                </p>
+                <ul className="text-xs text-gray-700 dark:text-gray-300 space-y-1 list-disc list-inside">
+                  {regexSearch && query.trim().startsWith('.*') ? (
+                    <>
+                      <li>Remove the <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">.*</code> prefix from your regex pattern</li>
+                      <li>Try <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{query.replace(/^\.\*/, '')}</code> instead of <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{query}</code></li>
+                      <li>Use more specific patterns (e.g., <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">network.*</code> instead of <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">.*network</code>)</li>
+                    </>
+                  ) : regexSearch ? (
+                    <>
+                      <li>Simplify your regex pattern</li>
+                      <li>Try a normal search instead of regex mode</li>
+                      <li>Add more specific anchors or constraints</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Try using more specific search terms</li>
+                      <li>Add filters to narrow down results</li>
+                      <li>Search for shorter, more specific phrases</li>
+                    </>
+                  )}
+                </ul>
+              </div>
+
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors"
+              >
+                Try a Different Query
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-red-600 dark:text-red-400 text-center max-w-md mb-4">
+                {error}
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="btn-secondary"
+              >
+                Try Again
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
   }
 
-  // Loading state
+  // Loading state with progress tracking
   if (isLoading && results.length === 0) {
-    return (
-      <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
-        <div className="flex flex-col items-center justify-center py-12 px-4">
-          <LoadingSpinner size="lg" className="mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Searching...
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 text-center">
-            Looking for "{query}" in your codebase
-          </p>
-        </div>
-      </div>
-    );
+    return <SearchProgress query={query} isRegex={regexSearch} className={className} />;
   }
 
   // No results state
@@ -146,25 +200,26 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
   // Results display
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className} relative`}>
+      {/* Loading overlay banner when refetching with existing results */}
+      {isLoading && results.length > 0 && (
+        <div className="absolute top-0 left-0 right-0 z-10 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-700/50 px-4 py-2 rounded-t-lg">
+          <div className="flex items-center justify-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
+            <LoadingSpinner size="sm" />
+            <span className="font-medium">Updating search results...</span>
+          </div>
+        </div>
+      )}
+
       {/* Results Header */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className={`px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${isLoading && results.length > 0 ? 'mt-10' : ''}`}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
               Search Results
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isLoading ? (
-                <>
-                  Found {results.length} results so far for "{query}"
-                  <LoadingSpinner size="sm" className="ml-2 inline" />
-                </>
-              ) : (
-                <>
-                  {totalResults.toLocaleString()} {totalResults === 1 ? 'result' : 'results'} for "{query}"
-                </>
-              )}
+              {totalResults.toLocaleString()} {totalResults === 1 ? 'result' : 'results'} for "{query}"
             </p>
           </div>
 
