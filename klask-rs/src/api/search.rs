@@ -66,9 +66,9 @@ pub struct SearchRequest {
     pub min_size: Option<u64>,
     pub max_size: Option<u64>,
     pub include_facets: Option<bool>,
-    pub fuzzy_search: Option<bool>,    // Enable fuzzy search (1 char edit distance) - default: false
-    pub regex_search: Option<bool>,    // Enable regex search (pattern matching) - default: false
-    pub regex_flags: Option<String>,   // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
+    pub fuzzy_search: Option<bool>, // Enable fuzzy search (1 char edit distance) - default: false
+    pub regex_search: Option<bool>, // Enable regex search (pattern matching) - default: false
+    pub regex_flags: Option<String>, // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
 }
 
 #[derive(Debug, Serialize, Deserialize)]

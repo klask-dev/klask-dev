@@ -6,7 +6,9 @@ use std::sync::Arc;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::directory::MmapDirectory;
 use tantivy::query::{BooleanQuery, QueryParser, RegexQuery, TermQuery};
-use tantivy::schema::{FAST, Field, IndexRecordOption, STORED, STRING, Schema, TEXT, TextFieldIndexing, TextOptions, Value};
+use tantivy::schema::{
+    FAST, Field, IndexRecordOption, STORED, STRING, Schema, TEXT, TextFieldIndexing, TextOptions, Value,
+};
 use tantivy::snippet::SnippetGenerator;
 use tantivy::{Index, IndexReader, IndexWriter, Term, doc};
 use tokio::sync::RwLock;
@@ -42,10 +44,8 @@ fn build_regex_pattern(pattern: &str, flags: Option<&str>) -> String {
         // Build inline flags: only include valid flags (i, m, s)
         let mut inline_flags = String::new();
         for c in flags_str.chars() {
-            if c == 'i' || c == 'm' || c == 's' {
-                if !inline_flags.contains(c) {
-                    inline_flags.push(c);
-                }
+            if (c == 'i' || c == 'm' || c == 's') && !inline_flags.contains(c) {
+                inline_flags.push(c);
             }
         }
 
@@ -115,8 +115,8 @@ pub struct SearchQuery {
     pub limit: usize,
     pub offset: usize,
     pub include_facets: bool,
-    pub fuzzy_search: bool,       // Enable fuzzy search (1 char edit distance) - default: false
-    pub regex_search: bool,       // Enable regex search (pattern matching) - default: false
+    pub fuzzy_search: bool,          // Enable fuzzy search (1 char edit distance) - default: false
+    pub regex_search: bool,          // Enable regex search (pattern matching) - default: false
     pub regex_flags: Option<String>, // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
 }
 
@@ -253,9 +253,7 @@ impl SearchService {
         // Use raw tokenizer to preserve original case for case-sensitive regex matching
         let raw_text_options = TextOptions::default()
             .set_indexing_options(
-                TextFieldIndexing::default()
-                    .set_tokenizer("raw")
-                    .set_index_option(IndexRecordOption::Basic),
+                TextFieldIndexing::default().set_tokenizer("raw").set_index_option(IndexRecordOption::Basic),
             )
             .set_stored();
 
@@ -499,10 +497,7 @@ impl SearchService {
             debug!("Using regex search mode with pattern: {}", search_query.query);
 
             // Build regex pattern with inline flags (e.g., (?i) for case-insensitive)
-            let regex_pattern = build_regex_pattern(
-                &search_query.query,
-                search_query.regex_flags.as_deref(),
-            );
+            let regex_pattern = build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref());
             debug!("Regex pattern with flags: {}", regex_pattern);
 
             let mut regex_clauses = Vec::new();
@@ -1218,65 +1213,69 @@ impl SearchService {
             let mut clauses = vec![];
 
             // Always include text query
-            let text_query: Box<dyn tantivy::query::Query> = if search_query.query.trim().is_empty()
-                || search_query.query == "*"
-            {
-                Box::new(AllQuery)
-            } else if search_query.regex_search {
-                // Use RegexQuery for regex search mode - search on raw fields
-                use tantivy::query::RegexQuery;
-                match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
-                    Ok(_) => {
-                        // Valid regex - create RegexQuery queries for name and path
-                        let mut regex_clauses = vec![];
+            let text_query: Box<dyn tantivy::query::Query> =
+                if search_query.query.trim().is_empty() || search_query.query == "*" {
+                    Box::new(AllQuery)
+                } else if search_query.regex_search {
+                    // Use RegexQuery for regex search mode - search on raw fields
+                    use tantivy::query::RegexQuery;
+                    match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
+                        Ok(_) => {
+                            // Valid regex - create RegexQuery queries for name and path
+                            let mut regex_clauses = vec![];
 
-                        // Search in file_name_raw (non-tokenized)
-                        if let Ok(regex_query) =
-                            RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.file_name_raw)
-                        {
-                            regex_clauses
-                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                        }
+                            // Search in file_name_raw (non-tokenized)
+                            if let Ok(regex_query) = RegexQuery::from_pattern(
+                                &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                self.fields.file_name_raw,
+                            ) {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                            }
 
-                        // Search in file_path_raw (non-tokenized)
-                        if let Ok(regex_query) =
-                            RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.file_path_raw)
-                        {
-                            regex_clauses
-                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                        }
+                            // Search in file_path_raw (non-tokenized)
+                            if let Ok(regex_query) = RegexQuery::from_pattern(
+                                &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                self.fields.file_path_raw,
+                            ) {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                            }
 
-                        // Search in content (tokenized, regex on individual terms)
-                        if let Ok(regex_query) = RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.content) {
-                            regex_clauses
-                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                        }
+                            // Search in content (tokenized, regex on individual terms)
+                            if let Ok(regex_query) = RegexQuery::from_pattern(
+                                &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                self.fields.content,
+                            ) {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                            }
 
-                        if !regex_clauses.is_empty() {
-                            Box::new(BooleanQuery::from(regex_clauses))
-                        } else {
-                            Box::new(AllQuery)
+                            if !regex_clauses.is_empty() {
+                                Box::new(BooleanQuery::from(regex_clauses))
+                            } else {
+                                Box::new(AllQuery)
+                            }
                         }
+                        Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
                     }
-                    Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
-                }
-            } else {
-                // Use QueryParser for normal and fuzzy search modes
-                let mut query_parser = QueryParser::for_index(
-                    searcher.index(),
-                    vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                );
-                // For fuzzy search, enable fuzzy search on individual fields
-                if search_query.fuzzy_search {
-                    query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
-                    query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
-                    query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
-                }
-                match query_parser.parse_query(&search_query.query) {
-                    Ok(parsed) => parsed,
-                    Err(_) => Box::new(AllQuery),
-                }
-            };
+                } else {
+                    // Use QueryParser for normal and fuzzy search modes
+                    let mut query_parser = QueryParser::for_index(
+                        searcher.index(),
+                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                    );
+                    // For fuzzy search, enable fuzzy search on individual fields
+                    if search_query.fuzzy_search {
+                        query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
+                        query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
+                        query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+                    }
+                    match query_parser.parse_query(&search_query.query) {
+                        Ok(parsed) => parsed,
+                        Err(_) => Box::new(AllQuery),
+                    }
+                };
             clauses.push((Occur::Must, text_query));
 
             // Add repository filter if requested
@@ -1506,65 +1505,69 @@ impl SearchService {
             let mut size_clauses = vec![];
 
             // Always include text query - must match the same search mode as main query
-            let text_query: Box<dyn tantivy::query::Query> = if search_query.query.trim().is_empty()
-                || search_query.query == "*"
-            {
-                Box::new(AllQuery)
-            } else if search_query.regex_search {
-                // Use RegexQuery for regex search mode - search on raw fields
-                use tantivy::query::RegexQuery;
-                match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
-                    Ok(_) => {
-                        // Valid regex - create RegexQuery queries for name and path
-                        let mut regex_clauses = vec![];
+            let text_query: Box<dyn tantivy::query::Query> =
+                if search_query.query.trim().is_empty() || search_query.query == "*" {
+                    Box::new(AllQuery)
+                } else if search_query.regex_search {
+                    // Use RegexQuery for regex search mode - search on raw fields
+                    use tantivy::query::RegexQuery;
+                    match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
+                        Ok(_) => {
+                            // Valid regex - create RegexQuery queries for name and path
+                            let mut regex_clauses = vec![];
 
-                        // Search in file_name_raw (non-tokenized)
-                        if let Ok(regex_query) =
-                            RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.file_name_raw)
-                        {
-                            regex_clauses
-                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                        }
+                            // Search in file_name_raw (non-tokenized)
+                            if let Ok(regex_query) = RegexQuery::from_pattern(
+                                &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                self.fields.file_name_raw,
+                            ) {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                            }
 
-                        // Search in file_path_raw (non-tokenized)
-                        if let Ok(regex_query) =
-                            RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.file_path_raw)
-                        {
-                            regex_clauses
-                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                        }
+                            // Search in file_path_raw (non-tokenized)
+                            if let Ok(regex_query) = RegexQuery::from_pattern(
+                                &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                self.fields.file_path_raw,
+                            ) {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                            }
 
-                        // Search in content (tokenized, regex on individual terms)
-                        if let Ok(regex_query) = RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.content) {
-                            regex_clauses
-                                .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                        }
+                            // Search in content (tokenized, regex on individual terms)
+                            if let Ok(regex_query) = RegexQuery::from_pattern(
+                                &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                self.fields.content,
+                            ) {
+                                regex_clauses
+                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                            }
 
-                        if !regex_clauses.is_empty() {
-                            Box::new(BooleanQuery::from(regex_clauses))
-                        } else {
-                            Box::new(AllQuery)
+                            if !regex_clauses.is_empty() {
+                                Box::new(BooleanQuery::from(regex_clauses))
+                            } else {
+                                Box::new(AllQuery)
+                            }
                         }
+                        Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
                     }
-                    Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
-                }
-            } else {
-                // Use QueryParser for normal and fuzzy search modes
-                let mut query_parser = QueryParser::for_index(
-                    searcher.index(),
-                    vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                );
-                // For fuzzy search, enable fuzzy search on individual fields
-                if search_query.fuzzy_search {
-                    query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
-                    query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
-                    query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
-                }
-                match query_parser.parse_query(&search_query.query) {
-                    Ok(parsed) => parsed,
-                    Err(_) => Box::new(AllQuery),
-                }
-            };
+                } else {
+                    // Use QueryParser for normal and fuzzy search modes
+                    let mut query_parser = QueryParser::for_index(
+                        searcher.index(),
+                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                    );
+                    // For fuzzy search, enable fuzzy search on individual fields
+                    if search_query.fuzzy_search {
+                        query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
+                        query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
+                        query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+                    }
+                    match query_parser.parse_query(&search_query.query) {
+                        Ok(parsed) => parsed,
+                        Err(_) => Box::new(AllQuery),
+                    }
+                };
             size_clauses.push((Occur::Must, text_query));
 
             // Add repository filter if present
@@ -1673,66 +1676,69 @@ impl SearchService {
                 let mut query_clauses = Vec::new();
 
                 // Always include text query - must match the same search mode as main query
-                let text_query: Box<dyn tantivy::query::Query> = if search_query.query.trim().is_empty()
-                    || search_query.query == "*"
-                {
-                    Box::new(AllQuery)
-                } else if search_query.regex_search {
-                    // Use RegexQuery for regex search mode - search on raw fields
-                    use tantivy::query::RegexQuery;
-                    match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
-                        Ok(_) => {
-                            // Valid regex - create RegexQuery queries for name and path
-                            let mut regex_clauses = vec![];
+                let text_query: Box<dyn tantivy::query::Query> =
+                    if search_query.query.trim().is_empty() || search_query.query == "*" {
+                        Box::new(AllQuery)
+                    } else if search_query.regex_search {
+                        // Use RegexQuery for regex search mode - search on raw fields
+                        use tantivy::query::RegexQuery;
+                        match crate::api::regex_validator::validate_regex_pattern(&search_query.query) {
+                            Ok(_) => {
+                                // Valid regex - create RegexQuery queries for name and path
+                                let mut regex_clauses = vec![];
 
-                            // Search in file_name_raw (non-tokenized)
-                            if let Ok(regex_query) =
-                                RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.file_name_raw)
-                            {
-                                regex_clauses
-                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                            }
+                                // Search in file_name_raw (non-tokenized)
+                                if let Ok(regex_query) = RegexQuery::from_pattern(
+                                    &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                    self.fields.file_name_raw,
+                                ) {
+                                    regex_clauses
+                                        .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                                }
 
-                            // Search in file_path_raw (non-tokenized)
-                            if let Ok(regex_query) =
-                                RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.file_path_raw)
-                            {
-                                regex_clauses
-                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                            }
+                                // Search in file_path_raw (non-tokenized)
+                                if let Ok(regex_query) = RegexQuery::from_pattern(
+                                    &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                    self.fields.file_path_raw,
+                                ) {
+                                    regex_clauses
+                                        .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                                }
 
-                            // Search in content (tokenized, regex on individual terms)
-                            if let Ok(regex_query) = RegexQuery::from_pattern(&build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()), self.fields.content)
-                            {
-                                regex_clauses
-                                    .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
-                            }
+                                // Search in content (tokenized, regex on individual terms)
+                                if let Ok(regex_query) = RegexQuery::from_pattern(
+                                    &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
+                                    self.fields.content,
+                                ) {
+                                    regex_clauses
+                                        .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
+                                }
 
-                            if !regex_clauses.is_empty() {
-                                Box::new(BooleanQuery::from(regex_clauses))
-                            } else {
-                                Box::new(AllQuery)
+                                if !regex_clauses.is_empty() {
+                                    Box::new(BooleanQuery::from(regex_clauses))
+                                } else {
+                                    Box::new(AllQuery)
+                                }
                             }
+                            Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
                         }
-                        Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
-                    }
-                } else {
-                    // Use QueryParser for normal and fuzzy search modes
-                    let mut parser = QueryParser::for_index(
-                        searcher.index(),
-                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                    );
-                    // For fuzzy search, enable fuzzy search on individual fields
-                    if search_query.fuzzy_search {
-                        parser.set_field_fuzzy(self.fields.content, true, 1, true);
-                        parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
-                        parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
-                    }
-                    match parser.parse_query(&search_query.query) {
-                        Ok(parsed) => parsed,
-                        Err(_) => Box::new(AllQuery),
-                    }
-                };
+                    } else {
+                        // Use QueryParser for normal and fuzzy search modes
+                        let mut parser = QueryParser::for_index(
+                            searcher.index(),
+                            vec![self.fields.content, self.fields.file_name, self.fields.file_path],
+                        );
+                        // For fuzzy search, enable fuzzy search on individual fields
+                        if search_query.fuzzy_search {
+                            parser.set_field_fuzzy(self.fields.content, true, 1, true);
+                            parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
+                            parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+                        }
+                        match parser.parse_query(&search_query.query) {
+                            Ok(parsed) => parsed,
+                            Err(_) => Box::new(AllQuery),
+                        }
+                    };
                 query_clauses.push((Occur::Must, text_query));
 
                 // Add repository filter if present

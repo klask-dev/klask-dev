@@ -110,7 +110,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
         let search_result = service.search(search_query).await.unwrap();
         assert!(search_result.total >= 1, "Should find at least one result");
@@ -179,7 +179,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let results = service.search(query).await.unwrap();
@@ -273,7 +273,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let basic_results = service.search(basic_query).await.unwrap();
@@ -295,7 +295,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let _project_results = service.search(project_query).await.unwrap();
@@ -315,7 +315,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let _ext_results = service.search(ext_query).await.unwrap();
@@ -335,7 +335,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let _version_results = service.search(version_query).await.unwrap();
@@ -383,7 +383,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let first_results = service.search(first_page).await.unwrap();
@@ -405,7 +405,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let _second_results = service.search(second_page).await.unwrap();
@@ -425,7 +425,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let _last_results = service.search(last_page).await.unwrap();
@@ -466,7 +466,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let search_results = service.search(query).await.unwrap();
@@ -524,7 +524,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
         let search_result = service.search(search_query).await.unwrap();
         assert_eq!(search_result.total, 0);
@@ -648,7 +648,7 @@ mod search_service_tests {
                 include_facets: false,
                 fuzzy_search: false,
                 regex_search: false,
-        regex_flags: None,
+                regex_flags: None,
             };
 
             let results = service.search(query).await.unwrap();
@@ -695,7 +695,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         // Empty query should return no results but not error
@@ -716,7 +716,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let long_results = service.search(long_query).await;
@@ -771,7 +771,7 @@ mod search_service_tests {
             include_facets: false,
             fuzzy_search: false,
             regex_search: false,
-        regex_flags: None,
+            regex_flags: None,
         };
 
         let results = service.search(search_query).await.unwrap();
