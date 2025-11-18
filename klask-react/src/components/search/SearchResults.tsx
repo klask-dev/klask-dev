@@ -241,16 +241,19 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className} relative`}>
       {/* Loading overlay banner when refetching with existing results */}
       {isLoading && results.length > 0 && (
-        <div className="absolute top-0 left-0 right-0 z-10 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-700/50 px-4 py-2 rounded-t-lg">
-          <div className="flex items-center justify-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
-            <LoadingSpinner size="sm" />
-            <span className="font-medium">Updating search results...</span>
+        <div className="absolute top-0 left-0 right-0 z-10 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-700/50 px-4 py-3 rounded-t-lg">
+          <div className="flex items-center justify-between space-x-3">
+            <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
+              <LoadingSpinner size="sm" />
+              <span className="font-medium">Updating search results...</span>
+            </div>
+            <span className="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">Searching for "{query}"</span>
           </div>
         </div>
       )}
 
       {/* Results Header */}
-      <div className={`px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${isLoading && results.length > 0 ? 'mt-10' : ''}`}>
+      <div className={`px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${isLoading && results.length > 0 ? 'pt-14' : ''}`}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
