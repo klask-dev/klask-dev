@@ -50,11 +50,26 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 }) => {
   const usePagination = currentPage !== undefined && totalPages !== undefined && onPageChange !== undefined;
 
-  // Show loading indicator only after 1 second to avoid flashing on quick responses
+  // Track if results are stale (from previous query) vs fresh (current query)
+  // When loading starts with previous results, mark results as stale
+  const [staleResults, setStaleResults] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
 
+  // When loading starts, mark results as stale (they're from previous query)
+  // When loading finishes, results become fresh again
   useEffect(() => {
-    if (isLoading && results.length === 0) {
+    if (isLoading && results.length > 0) {
+      // We're loading a new query, so current results are stale
+      setStaleResults(true);
+    } else if (!isLoading) {
+      // Loading finished, results are now fresh
+      setStaleResults(false);
+    }
+  }, [isLoading, results.length]);
+
+  // Show loading indicator only after 1 second when actually waiting for new results
+  useEffect(() => {
+    if (isLoading && staleResults) {
       // Set timer to show loading indicator after 1 second
       const timer = setTimeout(() => setShowLoading(true), 1000);
       return () => {
@@ -64,7 +79,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     } else {
       setShowLoading(false);
     }
-  }, [isLoading, results.length]);
+  }, [isLoading, staleResults]);
 
   // Empty state when no query
   if (!query.trim() && !isLoading) {
@@ -186,8 +201,8 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     );
   }
 
-  // Loading state with progress tracking (only show after 1 second)
-  if (showLoading && results.length === 0) {
+  // Loading state with progress tracking (only show after 1 second when waiting for new results)
+  if (showLoading && staleResults) {
     return <SearchProgress query={query} isRegex={regexSearch} className={className} />;
   }
 
@@ -217,8 +232,8 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   // Results display
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className} relative`}>
-      {/* Loading overlay banner when refetching with existing results */}
-      {isLoading && results.length > 0 && (
+      {/* Loading overlay banner when refetching with existing results (before 1 second timeout) */}
+      {isLoading && results.length > 0 && !showLoading && (
         <div className="absolute top-0 left-0 right-0 z-10 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-700/50 px-4 py-3 rounded-t-lg">
           <div className="flex items-center justify-between space-x-3">
             <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
