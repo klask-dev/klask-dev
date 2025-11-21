@@ -70,10 +70,9 @@ spec:
         - protocol: UDP
           port: 53
     {{- if .Values.networkPolicy.backend.allowExternal }}
-    # Allow external egress (for external APIs, etc.)
-    - to:
-        - namespaceSelector: {}
-      ports:
+    # Allow external egress (for GitLab, GitHub, external APIs, etc.)
+    # This allows connections outside the Kubernetes cluster
+    - ports:
         - protocol: TCP
           port: 443
         - protocol: TCP
