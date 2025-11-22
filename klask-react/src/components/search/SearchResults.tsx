@@ -50,6 +50,41 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 }) => {
   const usePagination = currentPage !== undefined && totalPages !== undefined && onPageChange !== undefined;
 
+  // Track if search is taking longer than 1 second to avoid flickering on fast searches
+  const [isLongSearch, setIsLongSearch] = React.useState(false);
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    if (isLoading) {
+      // Clear any existing timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      // Reset the long search flag
+      setIsLongSearch(false);
+
+      // Set a timeout to mark this as a long search after 1 second
+      searchTimeoutRef.current = setTimeout(() => {
+        setIsLongSearch(true);
+      }, 1000);
+    } else {
+      // When search completes, clear timeout and reset flag
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      setIsLongSearch(false);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [isLoading]);
+
   // Empty state when no query
   if (!query.trim() && !isLoading) {
     return (
@@ -171,7 +206,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   }
 
   // Loading state with progress tracking
-  if (isLoading && results.length === 0) {
+  // Show SearchProgress if:
+  // 1. Initial search (no previous results), OR
+  // 2. Search is taking longer than 1 second (even with previous results)
+  if (isLoading && (results.length === 0 || isLongSearch)) {
     return <SearchProgress query={query} isRegex={regexSearch} className={className} />;
   }
 
