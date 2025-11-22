@@ -238,22 +238,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
   // Results display
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className} relative`}>
-      {/* Loading overlay banner when refetching with existing results */}
-      {isLoading && results.length > 0 && (
-        <div className="absolute top-0 left-0 right-0 z-10 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-700/50 px-4 py-3 rounded-t-lg">
-          <div className="flex items-center justify-between space-x-3">
-            <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
-              <LoadingSpinner size="sm" />
-              <span className="font-medium">Updating search results...</span>
-            </div>
-            <span className="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">Searching for "{query}"</span>
-          </div>
-        </div>
-      )}
-
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
       {/* Results Header */}
-      <div className={`px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${isLoading && results.length > 0 ? 'pt-14' : ''}`}>
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -264,11 +251,17 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             </p>
           </div>
 
-          {results.length > 0 && !usePagination && (
+          {/* Show loading indicator when refetching, or result count when not loading */}
+          {isLoading && results.length > 0 ? (
+            <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
+              <LoadingSpinner size="sm" />
+              <span className="font-medium">Updating...</span>
+            </div>
+          ) : results.length > 0 && !usePagination ? (
             <div className="text-sm text-gray-500 dark:text-gray-400">
               Showing {results.length} of {totalResults}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
