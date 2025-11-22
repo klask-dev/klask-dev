@@ -7,15 +7,31 @@ import RegisterPage from '../RegisterPage';
 import * as api from '../../../lib/api';
 
 // Mock the API client
-vi.mock('../../../lib/api', () => ({
-  apiClient: {
-    auth: {
-      register: vi.fn(),
-      checkRegistrationStatus: vi.fn(),
+vi.mock('../../../lib/api', () => {
+  // Create a simple ApiError class for tests
+  class ApiError extends Error {
+    public status: number;
+    public details?: Record<string, any>;
+
+    constructor(message: string, status: number, details?: Record<string, any>) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.details = details;
+    }
+  }
+
+  return {
+    apiClient: {
+      auth: {
+        register: vi.fn(),
+        checkRegistrationStatus: vi.fn(),
+      },
     },
-  },
-  extractFieldErrors: vi.fn(() => ({})),
-}));
+    ApiError,
+    extractFieldErrors: vi.fn(() => ({})),
+  };
+});
 
 // Mock useNavigate
 const mockNavigate = vi.fn();
@@ -51,8 +67,8 @@ const createWrapper = () => {
     );
 };
 
-// Note: These tests have been skipped due to complex integration issues
-// that require significant refactoring. The actual implementation works correctly.
+// Note: These tests are skipped due to complex timing and mock issues with fake timers
+// The ApiError mock is correct but tests timeout. Requires deeper investigation.
 describe.skip('RegisterPage - Registration Blocking Feature', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -232,7 +248,7 @@ describe.skip('RegisterPage - Registration Blocking Feature', () => {
 
   describe('Loading State Handling', () => {
     it('should show loading spinner while checking registration status', async () => {
-      const unresolvingPromise = new Promise(() => {});
+      const unresolvingPromise = new Promise(() => { });
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockReturnValueOnce(
         unresolvingPromise as any
       );
@@ -259,7 +275,7 @@ describe.skip('RegisterPage - Registration Blocking Feature', () => {
     });
 
     it('should show form with disabled submit button during submission', async () => {
-      const slowPromise = new Promise(() => {});
+      const slowPromise = new Promise(() => { });
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
         registration_allowed: true,
       });
@@ -315,7 +331,7 @@ describe.skip('RegisterPage - Registration Blocking Feature', () => {
     });
 
     it('should log error when registration status check fails', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
       const error = new Error('Failed to check registration status');
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockRejectedValueOnce(error);

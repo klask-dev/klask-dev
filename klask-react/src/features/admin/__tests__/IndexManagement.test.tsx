@@ -6,6 +6,7 @@ import { BrowserRouter } from 'react-router-dom';
 import IndexManagement from '../IndexManagement';
 import * as indexMetricsApi from '../../../api/indexMetrics';
 import * as indexHooks from '../../../hooks/useIndexMetrics';
+import { IndexHealthStatus, HealthLevel } from '../../../types/tantivy';
 import toast from 'react-hot-toast';
 
 // Mock dependencies
@@ -80,34 +81,45 @@ vi.mock('../components/AutoRefreshToggle', () => ({
 const createMockStats = (overrides = {}) => ({
   total_documents: 1000,
   total_size_mb: 250.0,
+  total_size_bytes: 262144000,
   segment_count: 10,
-  segments: {
-    total_segments: 10,
-    total_docs: 1000,
-    fragmentation_ratio: 0.3,
-    segments: [],
+  segments: [],
+  space_usage: {
+    postings_bytes: 1000,
+    store_bytes: 1000,
+    fast_fields_bytes: 1000,
+    positions_bytes: 1000,
+    other_bytes: 1000,
   },
-  cache_stats: { hits: 500, misses: 100, hit_ratio: 0.83 },
-  file_types: [{ extension: 'rs', count: 500 }],
-  repositories: [{ name: 'klask', count: 1000 }],
-  avg_query_time_ms: 25,
+  cache_stats: { num_entries: 100, hits: 500, misses: 100, hit_ratio: 0.83 },
   ...overrides,
 });
 
-const createMockHealth = (status = 'Healthy', overrides = {}) => ({
+const createMockHealth = (status = IndexHealthStatus.HEALTHY, overrides = {}) => ({
   status,
-  overall_score: 85,
-  last_check: new Date().toISOString(),
-  check_duration_ms: 45,
-  warnings: [],
-  recommendations: [],
+  status_message: 'All systems operational',
+  checked_at: new Date().toISOString(),
+  index_stats: createMockStats(),
+  health_checks: {
+    segment_count: 10,
+    segment_health: HealthLevel.HEALTHY,
+    cache_hit_ratio_percent: 83,
+    cache_health: HealthLevel.HEALTHY,
+    deleted_docs_ratio_percent: 5,
+    deletion_health: HealthLevel.HEALTHY,
+    index_size_mb: 250,
+    size_health: HealthLevel.HEALTHY,
+  },
+  issues: [],
   ...overrides,
 });
 
 const createMockTuning = (overrides = {}) => ({
-  settings: [],
+  current_metrics: createMockStats(),
+  health_status: IndexHealthStatus.HEALTHY,
   recommendations: [],
-  last_optimized: null,
+  analyzed_at: new Date().toISOString(),
+  summary: 'Index is optimized',
   ...overrides,
 });
 
@@ -137,9 +149,9 @@ describe('IndexManagement', () => {
   describe('Loading State', () => {
     it('should display loading spinner when data is loading', () => {
       vi.spyOn(indexHooks, 'useIndexMetrics').mockReturnValue({
-        stats: null,
-        health: null,
-        tuning: null,
+        stats: undefined,
+        health: undefined,
+        tuning: undefined,
         isLoading: true,
         error: null,
         autoRefreshEnabled: false,
@@ -164,9 +176,9 @@ describe('IndexManagement', () => {
     it('should display error message when data fetch fails', async () => {
       const error = new Error('Failed to load metrics');
       vi.spyOn(indexHooks, 'useIndexMetrics').mockReturnValue({
-        stats: null,
-        health: null,
-        tuning: null,
+        stats: undefined,
+        health: undefined,
+        tuning: undefined,
         isLoading: false,
         error,
         autoRefreshEnabled: false,
@@ -196,9 +208,9 @@ describe('IndexManagement', () => {
       const error = new Error('Test error');
 
       vi.spyOn(indexHooks, 'useIndexMetrics').mockReturnValue({
-        stats: null,
-        health: null,
-        tuning: null,
+        stats: undefined,
+        health: undefined,
+        tuning: undefined,
         isLoading: false,
         error,
         autoRefreshEnabled: false,
@@ -273,7 +285,7 @@ describe('IndexManagement', () => {
     });
 
     it('should display health indicator with correct status', () => {
-      const health = createMockHealth('Warning');
+      const health = createMockHealth(IndexHealthStatus.WARNING);
       vi.spyOn(indexHooks, 'useIndexMetrics').mockReturnValue({
         stats: createMockStats(),
         health,
@@ -500,7 +512,7 @@ describe('IndexManagement', () => {
   describe('Data Conditional Rendering', () => {
     it('should not display file types chart when empty', () => {
       vi.spyOn(indexHooks, 'useIndexMetrics').mockReturnValue({
-        stats: createMockStats({ file_types: [] }),
+        stats: createMockStats(),
         health: createMockHealth(),
         tuning: createMockTuning(),
         isLoading: false,
@@ -518,30 +530,11 @@ describe('IndexManagement', () => {
       expect(screen.queryByTestId('file-types-chart')).not.toBeInTheDocument();
     });
 
-    // Note: FileTypesChart component is no longer used in IndexManagement
-    it.skip('should display file types chart when data exists', () => {
-      vi.spyOn(indexHooks, 'useIndexMetrics').mockReturnValue({
-        stats: createMockStats({ file_types: [{ extension: 'rs', count: 100 }] }),
-        health: createMockHealth(),
-        tuning: createMockTuning(),
-        isLoading: false,
-        error: null,
-        autoRefreshEnabled: false,
-        autoRefreshInterval: 'off',
-        setAutoRefreshInterval: vi.fn(),
-        lastUpdateTime: new Date(),
-        nextRefreshTime: null,
-        manualRefresh: vi.fn(),
-      });
 
-      renderComponent();
-
-      expect(screen.getByTestId('file-types-chart')).toBeInTheDocument();
-    });
 
     it('should not display repositories chart when empty', () => {
       vi.spyOn(indexHooks, 'useIndexMetrics').mockReturnValue({
-        stats: createMockStats({ repositories: [] }),
+        stats: createMockStats(),
         health: createMockHealth(),
         tuning: createMockTuning(),
         isLoading: false,

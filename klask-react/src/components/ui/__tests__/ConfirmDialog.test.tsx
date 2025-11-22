@@ -70,25 +70,7 @@ describe('ConfirmDialog Component', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // Note: Backdrop click behavior is handled by Headless UI's Dialog component
-  // and is difficult to test in isolation. The library guarantees this behavior.
-  it.skip('should call onClose when backdrop is clicked', async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
 
-    const { container } = render(<ConfirmDialog {...defaultProps} onClose={onClose} />);
-
-    // Headless UI handles backdrop clicks automatically through onClose
-    // Click outside the dialog panel (on the backdrop)
-    const backdrop = container.querySelector('.fixed.inset-0.bg-black\\/25');
-    if (backdrop) {
-      await user.click(backdrop);
-    }
-
-    // Note: Headless UI's Dialog automatically calls onClose when clicking backdrop
-    // This behavior is built into the Dialog component
-    expect(onClose).toHaveBeenCalled();
-  });
 
   it('should show loading state when isLoading is true', () => {
     render(<ConfirmDialog {...defaultProps} isLoading={true} />);
@@ -99,7 +81,7 @@ describe('ConfirmDialog Component', () => {
     expect(confirmButton).toBeDisabled();
     expect(cancelButton).toBeDisabled();
     expect(screen.getByText('Loading...')).toBeInTheDocument();
-    
+
     // Should have loading spinner
     const spinner = confirmButton.querySelector('svg.animate-spin');
     expect(spinner).toBeInTheDocument();
@@ -162,21 +144,7 @@ describe('ConfirmDialog Component', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  // Note: Escape key behavior is handled by Headless UI's Dialog component
-  // and is difficult to test in isolation. The library guarantees this behavior.
-  it.skip('should handle escape key to close dialog', async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
 
-    render(<ConfirmDialog {...defaultProps} onClose={onClose} />);
-
-    // Focus the cancel button first to ensure dialog has focus
-    const cancelButton = screen.getByRole('button', { name: 'Cancel' });
-    cancelButton.focus();
-
-    await user.keyboard('{Escape}');
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
 
   it('should render with proper accessibility attributes', () => {
     render(<ConfirmDialog {...defaultProps} />);
@@ -188,14 +156,14 @@ describe('ConfirmDialog Component', () => {
     // Buttons should have proper types
     const confirmButton = screen.getByRole('button', { name: 'Confirm' });
     const cancelButton = screen.getByRole('button', { name: 'Cancel' });
-    
+
     expect(confirmButton).toHaveAttribute('type', 'button');
     expect(cancelButton).toHaveAttribute('type', 'button');
   });
 
   it('should maintain focus trap within dialog', async () => {
     const user = userEvent.setup();
-    
+
     render(<ConfirmDialog {...defaultProps} />);
 
     // Tab should cycle between cancel and confirm buttons
@@ -238,7 +206,7 @@ describe('ConfirmDialog Component', () => {
     render(<ConfirmDialog {...defaultProps} onConfirm={onConfirm} />);
 
     const confirmButton = screen.getByRole('button', { name: 'Confirm' });
-    
+
     // Click rapidly
     await user.click(confirmButton);
     await user.click(confirmButton);
@@ -305,7 +273,7 @@ describe('ConfirmDialog Component', () => {
 
   it('should apply correct styling based on variant', () => {
     const { rerender } = render(<ConfirmDialog {...defaultProps} variant="danger" />);
-    
+
     let confirmButton = screen.getByRole('button', { name: 'Confirm' });
     expect(confirmButton).toHaveClass('bg-red-600');
 

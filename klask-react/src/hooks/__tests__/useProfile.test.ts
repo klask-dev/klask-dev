@@ -153,12 +153,14 @@ describe('useUserActivity', () => {
     vi.clearAllMocks();
   });
 
-  // Note: Complex test with timing issues
-  it.skip('should fetch user activity', async () => {
+  it('should fetch user activity', async () => {
     const mockActivity = {
       login_count: 5,
       created_at: '2024-01-01',
       devices: [],
+      current_page: 1,
+      page_size: 20,
+      total_devices: 0,
     };
 
     vi.mocked(api.getUserActivity).mockResolvedValue(mockActivity);

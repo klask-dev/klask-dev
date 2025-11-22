@@ -10,6 +10,7 @@ vi.mock('../../../hooks/useAdmin', () => ({
 }));
 
 import { MetricCard } from '../../../components/admin/MetricCard';
+import { formatDateTime } from '../../../lib/utils';
 
 // Mock MetricCard component
 vi.mock('../../../components/admin/MetricCard', () => ({
@@ -86,12 +87,14 @@ describe('AdminDashboard', () => {
           username: 'john_doe',
           email: 'john@example.com',
           created_at: '2023-12-01T10:00:00Z',
+          last_seen: '2023-12-01T10:00:00Z',
           role: 'User',
         },
         {
           username: 'admin_user',
           email: 'admin@example.com',
           created_at: '2023-12-01T09:00:00Z',
+          last_seen: '2023-12-01T09:00:00Z',
           role: 'Admin',
         },
       ],
@@ -143,7 +146,7 @@ describe('AdminDashboard', () => {
 
     expect(screen.getByText('Admin Dashboard')).toBeInTheDocument();
     expect(screen.getByText('System Online')).toBeInTheDocument();
-    
+
     // Should show loading skeletons
     const loadingCards = screen.getAllByText((content, element) => {
       return element?.classList.contains('animate-pulse') ?? false;
@@ -431,7 +434,7 @@ describe('AdminDashboard', () => {
   });
 
   // Note: Date format test - depends on locale and data structure
-  it.skip('formats dates correctly in recent activity', () => {
+  it('formats dates correctly in recent activity', () => {
     mockUseAdminDashboard.mockReturnValue({
       data: mockDashboardData,
       isLoading: false,
@@ -440,9 +443,10 @@ describe('AdminDashboard', () => {
 
     renderComponent();
 
-    // Should format dates using toLocaleDateString
-    const dateElements = screen.getAllByText(/\d{1,2}\/\d{1,2}\/\d{4}/);
-    expect(dateElements.length).toBeGreaterThan(0);
+    // Should format dates using formatDateTime
+    // We check for the formatted date of the first recent user
+    const expectedDate = formatDateTime('2023-12-01T10:00:00Z');
+    expect(screen.getByText(expectedDate)).toBeInTheDocument();
   });
 
   it('handles crawl with no last_crawled date', () => {
