@@ -3,7 +3,7 @@ import { useParams, useLocation, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import OptimizedSyntaxHighlighter from '../../components/ui/OptimizedSyntaxHighlighter';
 import toast from 'react-hot-toast';
-import { 
+import {
   ArrowLeftIcon,
   DocumentTextIcon,
   FolderIcon,
@@ -35,16 +35,16 @@ const FileDetailPage: React.FC = () => {
   // Helper function to build search URL
   const buildSearchURL = (query?: string, state?: any) => {
     if (!query) return '/search';
-    
+
     const params = new URLSearchParams();
     params.set('q', query);
-    
+
     if (state?.filters?.project) params.set('project', state.filters.project);
     if (state?.filters?.version) params.set('version', state.filters.version);
     if (state?.filters?.extension) params.set('extension', state.filters.extension);
     if (state?.showAdvanced) params.set('advanced', 'true');
     if (state?.page && state.page > 1) params.set('page', state.page.toString());
-    
+
     return `/search?${params.toString()}`;
   };
 
@@ -97,7 +97,7 @@ const FileDetailPage: React.FC = () => {
       'md': 'markdown',
       'dockerfile': 'dockerfile',
     };
-    
+
     return languageMap[extension.toLowerCase()] || 'text';
   };
 
@@ -115,12 +115,12 @@ const FileDetailPage: React.FC = () => {
     const units = ['B', 'KB', 'MB', 'GB'];
     let size = bytes;
     let unitIndex = 0;
-    
+
     while (size >= 1024 && unitIndex < units.length - 1) {
       size /= 1024;
       unitIndex++;
     }
-    
+
     return `${size.toFixed(1)} ${units[unitIndex]}`;
   };
 
@@ -156,14 +156,14 @@ const FileDetailPage: React.FC = () => {
             {getErrorMessage(error) || 'The requested file could not be found.'}
           </p>
           <div className="space-x-3">
-            <Link 
-              to={buildSearchURL(searchQuery, searchState)} 
+            <Link
+              to={buildSearchURL(searchQuery, searchState)}
               className="btn-primary"
             >
               Back to Search
             </Link>
             {searchQuery && (
-              <Link 
+              <Link
                 to={buildSearchURL(searchQuery, searchState)}
                 className="btn-secondary"
               >
@@ -192,7 +192,7 @@ const FileDetailPage: React.FC = () => {
             <ArrowLeftIcon className="h-4 w-4 mr-1" />
             Back to Search
           </Link>
-          
+
           {searchQuery && (
             <>
               <ChevronRightIcon className="h-4 w-4 text-gray-400" />
@@ -211,26 +211,24 @@ const FileDetailPage: React.FC = () => {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setLineNumbersVisible(!lineNumbersVisible)}
-            className={`px-3 py-1 text-xs rounded ${
-              lineNumbersVisible
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-3 py-1 text-xs rounded ${lineNumbersVisible
+              ? 'bg-blue-100 text-blue-800'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             Line Numbers
           </button>
-          
+
           <button
             onClick={() => setWrapLines(!wrapLines)}
-            className={`px-3 py-1 text-xs rounded ${
-              wrapLines
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-3 py-1 text-xs rounded ${wrapLines
+              ? 'bg-blue-100 text-blue-800'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             Wrap Lines
           </button>
-          
+
           <button
             onClick={() => setIsDarkTheme(!isDarkTheme)}
             className="p-2 text-gray-500 hover:text-gray-700 rounded"
@@ -255,7 +253,7 @@ const FileDetailPage: React.FC = () => {
                 <span className="truncate">{directory}</span>
                 <ChevronRightIcon className="h-4 w-4 flex-shrink-0" />
               </div>
-              
+
               {/* File Name */}
               <h1 className="text-2xl font-bold text-gray-900 mb-3">
                 {filename}
@@ -270,7 +268,7 @@ const FileDetailPage: React.FC = () => {
                     .{file.extension}
                   </span>
                 </div>
-                
+
                 <div className="flex items-center space-x-1">
                   <DocumentTextIcon className="h-4 w-4" />
                   <span className="font-medium">Size:</span>
@@ -350,7 +348,7 @@ const FileDetailPage: React.FC = () => {
           </h3>
           <div className="text-sm text-blue-800">
             <p>
-              Found in search for "<span className="font-medium">{searchQuery}</span>" 
+              Found in search for "<span className="font-medium">{searchQuery}</span>"
               with a relevance score of {(searchResult.score * 100).toFixed(1)}%
             </p>
             {searchResult.line_number && (

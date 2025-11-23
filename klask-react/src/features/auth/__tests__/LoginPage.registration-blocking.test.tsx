@@ -213,7 +213,7 @@ describe('LoginPage - Registration Blocking Feature', () => {
   describe('Loading State Handling', () => {
     it('should show loading spinner while checking registration status', async () => {
       // Use a promise that doesn't resolve immediately
-      const unresolvingPromise = new Promise(() => {});
+      const unresolvingPromise = new Promise(() => { });
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockReturnValueOnce(
         unresolvingPromise as any
       );
@@ -264,7 +264,7 @@ describe('LoginPage - Registration Blocking Feature', () => {
     });
 
     it('should log error when registration status check fails', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
       const error = new Error('Failed to check registration status');
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockRejectedValueOnce(error);
@@ -347,7 +347,7 @@ describe('LoginPage - Registration Blocking Feature', () => {
 
   describe('Setup Check Error Handling', () => {
     it('should handle setup check failure gracefully', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
       mockFetch.mockRejectedValueOnce(new Error('Network error during setup check'));
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValueOnce({
@@ -366,42 +366,6 @@ describe('LoginPage - Registration Blocking Feature', () => {
   });
 
   describe('UI State Consistency', () => {
-    it.skip('should maintain consistent UI when toggling between enabled/disabled', async () => {
-      // Use mockResolvedValue() to provide unlimited mocks for both renders
-      // First call will return enabled, second call will return disabled
-      vi.mocked(api.apiClient.auth.checkRegistrationStatus)
-        .mockResolvedValueOnce({
-          registration_allowed: true,
-        })
-        .mockResolvedValueOnce({
-          registration_allowed: false,
-        });
-
-      const { rerender, unmount } = render(<LoginPage />, { wrapper: createWrapper() });
-
-      // Verify the create account link is present when enabled
-      await waitFor(() => {
-        expect(screen.getByRole('link', { name: /create a new account/i })).toBeInTheDocument();
-      });
-
-      // Cleanup the previous render
-      unmount();
-
-      render(<LoginPage />, { wrapper: createWrapper() });
-
-      // Verify the create account link is NOT present when disabled
-      await waitFor(() => {
-        expect(screen.getByText(/Sign in to Klask/i)).toBeInTheDocument();
-      });
-
-      const createAccountLink = screen.queryByRole('link', { name: /create a new account/i });
-      expect(createAccountLink).not.toBeInTheDocument();
-
-      // Verify the login form is still present
-      expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    });
-
     it('should keep form visible regardless of registration status', async () => {
       vi.mocked(api.apiClient.auth.checkRegistrationStatus).mockResolvedValue({
         registration_allowed: false,

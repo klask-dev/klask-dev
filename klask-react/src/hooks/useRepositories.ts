@@ -37,7 +37,7 @@ export const useRepository = (id: string) => {
 // Create repository mutation
 export const useCreateRepository = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: CreateRepositoryRequest) => apiClient.createRepository(data),
     onSuccess: () => {
@@ -53,9 +53,9 @@ export const useCreateRepository = () => {
 // Update repository mutation
 export const useUpdateRepository = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<CreateRepositoryRequest> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateRepositoryRequest> }) =>
       apiClient.updateRepository(id, data),
     onSuccess: (updatedRepo) => {
       console.log('Update success - updatedRepo:', updatedRepo);
@@ -75,7 +75,7 @@ export const useUpdateRepository = () => {
 // Delete repository mutation
 export const useDeleteRepository = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: string) => apiClient.deleteRepository(id),
     onSuccess: (_, deletedId) => {
@@ -130,7 +130,7 @@ export const useCrawlRepository = () => {
 // Stop crawl repository mutation
 export const useStopCrawl = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: string) => apiClient.stopCrawlRepository(id),
     onSuccess: (_, repositoryId) => {
@@ -152,10 +152,10 @@ export const useStopCrawl = () => {
 // Repository statistics (if needed)
 export const useRepositoryStats = () => {
   const { data: repositories } = useRepositories();
-  
+
   const stats = React.useMemo(() => {
     if (!repositories) return null;
-    
+
     const validRepos = repositories.filter(repoWithStats => repoWithStats?.repository);
     const total = validRepos.length;
     const enabled = validRepos.filter(repoWithStats => repoWithStats.repository.enabled).length;
@@ -179,7 +179,7 @@ export const useRepositoryStats = () => {
       },
     };
   }, [repositories]);
-  
+
   return stats;
 };
 
@@ -297,7 +297,7 @@ export const useActiveProgress = () => {
         data: [],
         isLoading: false,
         error: null,
-        refetch: async () => {},
+        refetch: async () => { },
       };
     }
 
@@ -307,7 +307,7 @@ export const useActiveProgress = () => {
       data: activeProgress || [],
       isLoading: isLoading || false,
       error: error || null,
-      refetch: refreshActiveProgress || (async () => {}),
+      refetch: refreshActiveProgress || (async () => { }),
     };
   } catch (e) {
     // In case of any error, return a safe default
@@ -315,7 +315,7 @@ export const useActiveProgress = () => {
       data: [],
       isLoading: false,
       error: null,
-      refetch: async () => {},
+      refetch: async () => { },
     };
   }
 };
