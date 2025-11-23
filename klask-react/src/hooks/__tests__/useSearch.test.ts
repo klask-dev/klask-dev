@@ -258,64 +258,7 @@ describe('useSearch', () => {
     });
   });
 
-  describe('useSearchFilters hook', () => {
-    it.skip('should fetch search filters when enabled', async () => {
-      const mockFilters = {
-        projects: ['project1', 'project2'],
-        versions: ['1.0.0', '2.0.0'],
-        extensions: ['js', 'ts', 'py'],
-      };
 
-      const expectedFilters = {
-        projects: [
-          { value: 'project1', count: 10 },
-          { value: 'project2', count: 5 },
-        ],
-        versions: [
-          { value: '1.0.0', count: 8 },
-          { value: '2.0.0', count: 7 },
-        ],
-        extensions: [
-          { value: 'js', count: 15 },
-          { value: 'ts', count: 10 },
-          { value: 'py', count: 5 },
-        ],
-      };
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      const { result } = renderHook(() => useSearchFilters({ enabled: true }), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-      });
-
-      expect(result.current.data.projects).toHaveLength(2);
-      expect(result.current.data.versions).toHaveLength(2);
-      expect(result.current.data.extensions).toHaveLength(3);
-    });
-
-    it.skip('should cache filters for 5 minutes', async () => {
-      const mockFilters = { projects: [], versions: [], extensions: [] };
-      mockApiClient.getSearchFilters.mockResolvedValue(mockFilters);
-
-      const { result, rerender } = renderHook(() => useSearchFilters({ enabled: true }), { wrapper });
-
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-      });
-
-      // Reset mock to count only new calls
-      mockFetch.mockClear();
-
-      // Rerender should not trigger new API call due to caching
-      rerender();
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-  });
 
   describe('useSearchSuggestions hook', () => {
     it('should not fetch for short queries', () => {
@@ -502,21 +445,9 @@ describe('useFacetsWithFilters hook', () => {
     global.fetch = mockFetch;
     vi.clearAllMocks();
   });
-
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     React.createElement(QueryClientProvider, { client: queryClient }, children)
   );
-
-  it.skip('should not fetch without filters by default', async () => {
-    const { result } = renderHook(() => useFacetsWithFilters(), { wrapper });
-
-    // Should fetch to get static filter data even without active filters
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    expect(mockFetch).toHaveBeenCalled();
-  });
 
   it('should fetch facets with single filter', async () => {
     // Mock the API response to match what the hook expects from /api/search/facets

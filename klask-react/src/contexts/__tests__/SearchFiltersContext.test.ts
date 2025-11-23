@@ -74,7 +74,7 @@ describe('SearchFiltersContext', () => {
 
     it('should throw error when used outside provider', () => {
       // Suppress console.error for this test
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
       expect(() => {
         renderHook(() => useSearchFiltersContext());
@@ -170,7 +170,7 @@ describe('SearchFiltersContext', () => {
 
   describe('Facet updates with filters', () => {
     // Note: Complex integration test with timing issues
-    it.skip('should call useFacetsWithFilters when filters are set', async () => {
+    it('should call useFacetsWithFilters when filters are set', async () => {
       const { result } = renderHook(() => useSearchFiltersContext(), { wrapper });
 
       act(() => {
@@ -184,6 +184,7 @@ describe('SearchFiltersContext', () => {
           expect.objectContaining({
             project: ['project1'],
           }),
+          expect.any(String),
           expect.any(Object)
         );
       });

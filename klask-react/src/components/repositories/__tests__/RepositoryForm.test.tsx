@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RepositoryForm } from '../RepositoryForm';
 import type { Repository } from '../../../types';
@@ -61,7 +61,7 @@ describe('RepositoryForm - Filtering Fields', () => {
     });
 
     // Note: Tab interaction timing issue with Headless UI
-    it.skip('should display branch selection section in filters tab', async () => {
+    it('should display branch selection section in filters tab', async () => {
       render(
         <RepositoryForm
           isOpen={true}
@@ -82,7 +82,7 @@ describe('RepositoryForm - Filtering Fields', () => {
     });
 
     // Note: Tab interaction timing issue with Headless UI
-    it.skip('should display type-specific selection sections in filters tab', async () => {
+    it('should display type-specific selection sections in filters tab', async () => {
       const { rerender } = render(
         <RepositoryForm
           isOpen={true}
@@ -112,6 +112,10 @@ describe('RepositoryForm - Filtering Fields', () => {
           isLoading={false}
         />
       );
+
+      // Switch back to Basic tab to see radio buttons
+      const basicTab = screen.getByRole('button', { name: /Basic Configuration/i });
+      fireEvent.click(basicTab);
 
       const githubRadio = screen.getByRole('radio', { name: /github/i });
       fireEvent.click(githubRadio);
@@ -665,7 +669,7 @@ describe('RepositoryForm - Filtering Fields', () => {
   // ============================================================================
   describe('Form Submission', () => {
     // Note: Skipped - empty string handling needs to be implemented in the form
-    it.skip('should convert empty strings to undefined before submission', async () => {
+    it('should convert empty strings to undefined before submission', async () => {
       const user = userEvent.setup();
 
       render(

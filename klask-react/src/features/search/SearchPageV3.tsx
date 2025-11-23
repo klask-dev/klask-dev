@@ -449,7 +449,7 @@ const SearchPageV3: React.FC = () => {
           <SearchResults
         results={results}
         query={query}
-        isLoading={isLoading}
+        isLoading={isLoading || isFetching}
         error={searchError}
         totalResults={totalResults}
         onFileClick={handleFileClick}

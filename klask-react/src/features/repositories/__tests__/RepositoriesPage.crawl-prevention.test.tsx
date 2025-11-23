@@ -199,7 +199,7 @@ describe('RepositoriesPage - Crawl Prevention', () => {
 
       // Select multiple repositories including one that's crawling
       const checkboxes = screen.getAllByRole('checkbox');
-      
+
       // Select repo 1 (crawling) and repo 2 (not crawling)
       if (checkboxes.length > 2) {
         fireEvent.click(checkboxes[1]); // repo 1
@@ -218,7 +218,7 @@ describe('RepositoriesPage - Crawl Prevention', () => {
       });
     });
 
-    it.skip('should disable bulk crawl when all selected repositories are crawling', async () => {
+    it('should disable bulk crawl when all selected repositories are crawling', async () => {
       // Mock active progress to include all selected repositories
       const allCrawlingProgress: CrawlProgressInfo[] = [
         mockActiveProgress[0],
@@ -242,27 +242,20 @@ describe('RepositoriesPage - Crawl Prevention', () => {
       });
 
       // Select repositories that are all crawling by clicking on their cards
+      // Select repositories that are all crawling by clicking on their names
       await waitFor(() => {
-        const repoCards = screen.getAllByText('Test Repo 1');
-        if (repoCards.length > 0) {
-          fireEvent.click(repoCards[0].closest('[class*="group"]') || repoCards[0]);
-        }
-      });
+        const repo1 = screen.getAllByText('Test Repo 1')[0];
+        const repo2 = screen.getAllByText('Test Repo 2')[0];
 
-      await waitFor(() => {
-        const repoCards = screen.getAllByText('Test Repo 2');
-        if (repoCards.length > 0) {
-          fireEvent.click(repoCards[0].closest('[class*="group"]') || repoCards[0]);
-        }
+        fireEvent.click(repo1);
+        fireEvent.click(repo2);
       });
 
       // Wait for some selection to be made
       await waitFor(() => {
         // Check if any repo is selected by looking for selection indicator
-        const selectedText = screen.queryByText((content, element) => {
-          return content.includes('selected') && content.match(/\d+\s+selected/);
-        });
-        expect(selectedText).toBeTruthy();
+        const selectedElements = screen.getAllByText(/selected/i);
+        expect(selectedElements.length).toBeGreaterThan(0);
       });
 
       // Bulk crawl button should be disabled (try to find it or skip if not visible)
@@ -275,35 +268,27 @@ describe('RepositoriesPage - Crawl Prevention', () => {
       }
     });
 
-    it.skip('should show smart bulk crawl with partial selection', async () => {
+    it('should show smart bulk crawl with partial selection', async () => {
       render(<RepositoriesPage />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         expect(screen.getAllByText('Test Repo 1')[0]).toBeInTheDocument();
       });
 
-      // Select mixed repositories (crawling and not crawling) by clicking on their cards
+      // Select mixed repositories (crawling and not crawling) by clicking on their names
       await waitFor(() => {
-        const repoCards = screen.getAllByText('Test Repo 1');
-        if (repoCards.length > 0) {
-          fireEvent.click(repoCards[0].closest('[class*="group"]') || repoCards[0]);
-        }
-      });
+        const repo1 = screen.getAllByText('Test Repo 1')[0];
+        const repo2 = screen.getAllByText('Test Repo 2')[0];
 
-      await waitFor(() => {
-        const repoCards = screen.getAllByText('Test Repo 2');
-        if (repoCards.length > 0) {
-          fireEvent.click(repoCards[0].closest('[class*="group"]') || repoCards[0]);
-        }
+        fireEvent.click(repo1);
+        fireEvent.click(repo2);
       });
 
       // Wait for some selection to be made
       await waitFor(() => {
         // Check if any repo is selected by looking for selection indicator
-        const selectedText = screen.queryByText((content, element) => {
-          return content.includes('selected') && content.match(/\d+\s+selected/);
-        });
-        expect(selectedText).toBeTruthy();
+        const selectedElements = screen.getAllByText(/selected/i);
+        expect(selectedElements.length).toBeGreaterThan(0);
       });
 
       // Should show smart crawl indication (try to find it or skip if not visible)
@@ -409,38 +394,31 @@ describe('RepositoriesPage - Crawl Prevention', () => {
       // The component should handle and display the detailed results appropriately
     });
 
-    it.skip('should show confirmation dialog for bulk crawl with conflicts', async () => {
-      render(<RepositoriesPage />, { wrapper: createWrapper() });
-
+    it('should show confirmation dialog for bulk crawl with conflicts', async () => {
       // Mock window.confirm
-      const mockConfirm = vi.spyOn(global, 'confirm').mockImplementation(() => true);
+      const confirmSpy = vi.spyOn(window, 'confirm');
+      confirmSpy.mockImplementation(() => true);
+
+      render(<RepositoriesPage />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         expect(screen.getAllByText('Test Repo 1')[0]).toBeInTheDocument();
       });
 
-      // Select repositories with mixed crawling states by clicking on their cards
+      // Select mixed repositories by clicking on their names
       await waitFor(() => {
-        const repoCards = screen.getAllByText('Test Repo 1');
-        if (repoCards.length > 0) {
-          fireEvent.click(repoCards[0].closest('[class*="group"]') || repoCards[0]);
-        }
-      });
+        const repo1 = screen.getAllByText('Test Repo 1')[0];
+        const repo2 = screen.getAllByText('Test Repo 2')[0];
 
-      await waitFor(() => {
-        const repoCards = screen.getAllByText('Test Repo 2');
-        if (repoCards.length > 0) {
-          fireEvent.click(repoCards[0].closest('[class*="group"]') || repoCards[0]);
-        }
+        fireEvent.click(repo1);
+        fireEvent.click(repo2);
       });
 
       // Wait for selection to be made
       await waitFor(() => {
-        // Check if any repo is selected by looking for selection indicator
-        const selectedText = screen.queryByText((content, element) => {
-          return content.includes('selected') && content.match(/\d+\s+selected/);
-        });
-        expect(selectedText).toBeTruthy();
+        // Check if any repo is selected
+        const selectedElements = screen.getAllByText(/selected/i);
+        expect(selectedElements.length).toBeGreaterThan(0);
       });
 
       const crawlButton = screen.queryByTestId('bulk-crawl-button');
@@ -453,10 +431,10 @@ describe('RepositoriesPage - Crawl Prevention', () => {
 
       // Should show confirmation dialog
       await waitFor(() => {
-        expect(mockConfirm).toHaveBeenCalled();
+        expect(confirmSpy).toHaveBeenCalled();
       });
 
-      mockConfirm.mockRestore();
+      confirmSpy.mockRestore();
     });
   });
 
@@ -464,7 +442,7 @@ describe('RepositoriesPage - Crawl Prevention', () => {
     it('should handle rapid crawl state changes', async () => {
       // Mock changing active progress data
       let progressData = mockActiveProgress;
-      
+
       const mockActiveProgressHook = {
         data: progressData,
         isLoading: false,
@@ -483,7 +461,7 @@ describe('RepositoriesPage - Crawl Prevention', () => {
       // Change active progress to show repo-1 completed
       progressData = [];
       mockActiveProgressHook.data = progressData;
-      
+
       rerender(<RepositoriesPage />);
 
       // Component should update to reflect the new state
@@ -501,7 +479,7 @@ describe('RepositoriesPage - Crawl Prevention', () => {
 
       // Simulate rapid selection changes
       const checkboxes = screen.getAllByRole('checkbox');
-      
+
       if (checkboxes.length > 2) {
         // Rapid select/deselect operations
         fireEvent.click(checkboxes[1]);

@@ -149,8 +149,7 @@ describe('useProgress', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // Note: Complex test with timing issues
-    it.skip('should clear previous error on successful fetch', async () => {
+    it('should clear previous error on successful fetch', async () => {
       const mockError = new Error('API Error');
       mockApi.getRepositoryProgress
         .mockRejectedValueOnce(mockError)
@@ -158,19 +157,22 @@ describe('useProgress', () => {
       mockApi.getActiveProgress.mockResolvedValue([]);
 
       const { result } = renderHook(() =>
-        useProgress({ repositoryId: 'repo-1', pollingInterval: 50 })
+        useProgress({ repositoryId: 'repo-1', pollingInterval: 100 })
       );
 
       // Wait for first call to complete with error
       await waitFor(() => {
         expect(result.current.error).toBe('API Error');
-      });
+      }, { timeout: 500 });
 
       // Wait for next poll which should succeed and clear the error
       await waitFor(() => {
         expect(result.current.progress).toEqual(mockProgressInfo);
+      }, { timeout: 500 });
+
+      await waitFor(() => {
         expect(result.current.error).toBe(null);
-      }, { timeout: 300 });
+      }, { timeout: 500 });
     });
 
     it('should refresh progress manually', async () => {

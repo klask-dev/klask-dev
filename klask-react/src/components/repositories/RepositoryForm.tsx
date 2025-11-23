@@ -288,8 +288,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
         fields: type === 'GitLab'
           ? ['gitlabExcludedProjects', 'gitlabExcludedPatterns']
           : type === 'GitHub'
-          ? ['githubExcludedRepositories', 'githubExcludedPatterns']
-          : []
+            ? ['githubExcludedRepositories', 'githubExcludedPatterns']
+            : []
       },
       {
         id: 'scheduling',
@@ -372,7 +372,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       // For comparison, treat undefined, null, and empty string as equivalent
       const areEqual = (a: string | null | undefined, b: string | null | undefined) => {
         if ((a === undefined || a === null || a === '') &&
-            (b === undefined || b === null || b === '')) {
+          (b === undefined || b === null || b === '')) {
           return true;
         }
         return a === b;
@@ -469,7 +469,10 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
     // Clean up empty strings from all filter fields and merge scheduling data
     // Note: We convert empty strings to "" (not undefined) so they are serialized in JSON.
     // The backend will then convert empty strings to NULL in the database.
-    const trimOrEmpty = (value: string | undefined) => value?.trim() || '';
+    const trimOrEmpty = (value: string | undefined) => {
+      const trimmed = value?.trim();
+      return trimmed === '' ? undefined : trimmed;
+    };
 
     const submitData: RepositoryFormSubmitData = {
       ...data,
@@ -488,8 +491,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       url: data.repositoryType === 'GitLab' && (!data.url || data.url.trim() === '')
         ? 'https://gitlab.com'
         : data.repositoryType === 'GitHub' && (!data.url || data.url.trim() === '')
-        ? 'https://api.github.com'
-        : data.url,
+          ? 'https://api.github.com'
+          : data.url,
       // If we're editing and not showing the token field, preserve the existing token
       accessToken: hasExistingToken && !showTokenField
         ? repository?.accessToken
@@ -580,15 +583,13 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`group inline-flex items-center py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                      isActive
+                    className={`group inline-flex items-center py-2 px-1 border-b-2 font-medium text-sm transition-colors ${isActive
                         ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
+                      }`}
                   >
-                    <tab.icon className={`mr-2 h-5 w-5 ${
-                      isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
-                    }`} />
+                    <tab.icon className={`mr-2 h-5 w-5 ${isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
+                      }`} />
                     {tab.name}
                     {validation.hasErrors && (
                       <ExclamationTriangleIcon className="ml-2 h-4 w-4 text-red-500 dark:text-red-400" />
@@ -637,11 +638,10 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                       {(['Git', 'GitLab', 'GitHub', 'FileSystem'] as const).map((type) => (
                         <label
                           key={type}
-                          className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                            watchedType === type
+                          className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${watchedType === type
                               ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
                               : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                          }`}
+                            }`}
                         >
                           <input
                             {...register('repositoryType')}
@@ -1041,11 +1041,10 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                           <input
                             {...register(watchedType === 'GitLab' ? 'gitlabExcludedProjects' : 'githubExcludedRepositories')}
                             type="text"
-                            className={`input-field ${
-                              watchedType === 'GitLab'
+                            className={`input-field ${watchedType === 'GitLab'
                                 ? errors.gitlabExcludedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
                                 : errors.githubExcludedRepositories ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
-                            }`}
+                              }`}
                             placeholder={watchedType === 'GitLab' ? 'team/project-archive, old/legacy-system' : 'org/repo-archive, user/legacy-project'}
                           />
                           {watchedType === 'GitLab' && errors.gitlabExcludedProjects && (
@@ -1070,11 +1069,10 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                           <input
                             {...register(watchedType === 'GitLab' ? 'gitlabExcludedPatterns' : 'githubExcludedPatterns')}
                             type="text"
-                            className={`input-field ${
-                              watchedType === 'GitLab'
+                            className={`input-field ${watchedType === 'GitLab'
                                 ? errors.gitlabExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
                                 : errors.githubExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
-                            }`}
+                              }`}
                             placeholder="*-archive, test-*, *-temp"
                           />
                           {watchedType === 'GitLab' && errors.gitlabExcludedPatterns && (

@@ -52,8 +52,14 @@ impl AppConfig {
                 port: std::env::var("PORT").unwrap_or_else(|_| "3000".to_string()).parse().unwrap_or(3000),
             },
             database: DatabaseConfig {
-                url: std::env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| "postgres://klask:klask@localhost/klask".to_string()),
+                url: {
+                    let url = std::env::var("DATABASE_URL")
+                        .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable must be set"))?;
+                    if url.is_empty() {
+                        return Err(anyhow::anyhow!("DATABASE_URL environment variable cannot be empty"));
+                    }
+                    url
+                },
                 max_connections: std::env::var("DATABASE_MAX_CONNECTIONS")
                     .unwrap_or_else(|_| "10".to_string())
                     .parse()
@@ -71,7 +77,14 @@ impl AppConfig {
                     .unwrap_or_else(|_| std::env::temp_dir().join("klask-crawler").to_string_lossy().to_string()),
             },
             auth: AuthConfig {
-                jwt_secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string()),
+                jwt_secret: {
+                    let secret = std::env::var("JWT_SECRET")
+                        .map_err(|_| anyhow::anyhow!("JWT_SECRET environment variable must be set"))?;
+                    if secret.is_empty() {
+                        return Err(anyhow::anyhow!("JWT_SECRET environment variable cannot be empty"));
+                    }
+                    secret
+                },
                 jwt_expires_in: std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "24h".to_string()),
                 allow_registration: std::env::var("ALLOW_REGISTRATION")
                     .unwrap_or_else(|_| "true".to_string())

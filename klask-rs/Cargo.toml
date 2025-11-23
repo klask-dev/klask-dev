@@ -27,7 +27,7 @@ regex = "1.12"
 
 # Authentication and security
 # Using rust_crypto feature for pure Rust cryptography (no OpenSSL)
-jsonwebtoken = { version = "10.1", features = ["rust_crypto"] }
+jsonwebtoken = { version = "10.2", features = ["rust_crypto"] }
 argon2 = "0.5"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
@@ -47,7 +47,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Repository crawling - using pure Rust gitoxide instead of git2
 # Using reqwest for HTTP transport to avoid OpenSSL dependency
-gix = { version = "0.74", default-features = false, features = ["blocking-http-transport-reqwest", "max-performance"] }
+gix = { version = "0.75", default-features = false, features = ["blocking-http-transport-reqwest", "max-performance"] }
 
 # File processing
 walkdir = "2.5"
@@ -78,4 +78,4 @@ test-utils = []
 tokio-test = "0.4"
 tempfile = "3.0"
 httpmock = "0.8"
-axum-test = "18.2"
+axum-test = "18.3"
