@@ -554,10 +554,10 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Backdrop */}
-        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+        <div className="fixed inset-0 transition-opacity bg-gray-500/75" onClick={onClose} />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
+        <div className="relative z-10 inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -584,8 +584,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
                     className={`group inline-flex items-center py-2 px-1 border-b-2 font-medium text-sm transition-colors ${isActive
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                   >
                     <tab.icon className={`mr-2 h-5 w-5 ${isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
@@ -639,8 +639,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         <label
                           key={type}
                           className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${watchedType === type
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                             }`}
                         >
                           <input
@@ -1042,8 +1042,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                             {...register(watchedType === 'GitLab' ? 'gitlabExcludedProjects' : 'githubExcludedRepositories')}
                             type="text"
                             className={`input-field ${watchedType === 'GitLab'
-                                ? errors.gitlabExcludedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
-                                : errors.githubExcludedRepositories ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                              ? errors.gitlabExcludedProjects ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                              : errors.githubExcludedRepositories ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
                               }`}
                             placeholder={watchedType === 'GitLab' ? 'team/project-archive, old/legacy-system' : 'org/repo-archive, user/legacy-project'}
                           />
@@ -1070,8 +1070,8 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                             {...register(watchedType === 'GitLab' ? 'gitlabExcludedPatterns' : 'githubExcludedPatterns')}
                             type="text"
                             className={`input-field ${watchedType === 'GitLab'
-                                ? errors.gitlabExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
-                                : errors.githubExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                              ? errors.gitlabExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
+                              : errors.githubExcludedPatterns ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''
                               }`}
                             placeholder="*-archive, test-*, *-temp"
                           />

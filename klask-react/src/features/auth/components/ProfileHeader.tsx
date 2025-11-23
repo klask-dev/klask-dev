@@ -62,9 +62,8 @@ const ProfileHeader: React.FC = () => {
         {/* Avatar Section */}
         <div className="flex flex-col items-center">
           <div
-            className={`relative w-32 h-32 rounded-full mb-4 overflow-hidden border-4 ${
-              dragOver ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-600'
-            } cursor-pointer transition-colors`}
+            className={`relative w-32 h-32 rounded-full mb-4 overflow-hidden border-4 ${dragOver ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-600'
+              } cursor-pointer transition-colors`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -85,7 +84,7 @@ const ProfileHeader: React.FC = () => {
             )}
 
             {/* Upload overlay */}
-            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-40 flex items-center justify-center transition-all">
+            <div className="absolute inset-0 bg-black/0 hover:bg-black/40 flex items-center justify-center transition-all">
               <svg
                 className="w-8 h-8 text-white opacity-0 hover:opacity-100 transition-opacity"
                 fill="none"
@@ -102,7 +101,7 @@ const ProfileHeader: React.FC = () => {
             </div>
 
             {uploadAvatarMutation.isPending && (
-              <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center">
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
                 <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}

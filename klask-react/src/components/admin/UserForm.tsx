@@ -118,10 +118,10 @@ export const UserForm: React.FC<UserFormProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Backdrop */}
-        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={onClose} />
+        <div className="fixed inset-0 transition-opacity bg-gray-500/75 dark:bg-gray-900/75" onClick={onClose} />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
+        <div className="relative z-10 inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -215,11 +215,10 @@ export const UserForm: React.FC<UserFormProps> = ({
                 {(['User', 'Admin'] as const).map((role) => (
                   <label
                     key={role}
-                    className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                      watchedRole === role
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400 text-blue-700 dark:text-blue-200'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                    }`}
+                    className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${watchedRole === role
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400 text-blue-700 dark:text-blue-200'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                      }`}
                   >
                     <input
                       {...register('role')}
