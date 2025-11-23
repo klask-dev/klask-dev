@@ -104,6 +104,7 @@ impl GitOperations {
                 // This is critical for public repositories and server environments
                 let mut config_overrides = vec![
                     "credential.helper=".to_string(), // Disable credential helpers
+                    "gitoxide.credentials.terminalPrompt=0".to_string(),
                 ];
 
                 // Configure authentication using http.extraHeader if we have a token
