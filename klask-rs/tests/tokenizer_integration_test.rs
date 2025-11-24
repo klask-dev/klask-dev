@@ -106,7 +106,7 @@ mod tokenizer_integration_tests {
     }
 
     #[tokio::test]
-    async fn test_tokenizer_netbox_url() {
+    async fn test_tokenizer_nginx_url() {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         let file_id = Uuid::new_v4();
@@ -114,7 +114,7 @@ mod tokenizer_integration_tests {
             file_id,
             file_name: "config.rs",
             file_path: "src/config.rs",
-            content: "const NETBOX_URL: &str = \"https://netbox.example.com\";",
+            content: "const NETBOX_URL: &str = \"https://nginx.example.com\";",
             repository: "test-project",
             project: "test-project",
             version: "1.0.0",
@@ -125,7 +125,7 @@ mod tokenizer_integration_tests {
         service.upsert_file(file_data).await.unwrap();
         service.commit().await.unwrap();
 
-        // Search lowercase
+        // Search lowercase (with complete token preservation, both work)
         let results = service.search(build_search_query("netbox_url")).await.unwrap();
         assert!(
             !results.results.is_empty(),
@@ -431,14 +431,14 @@ mod tokenizer_integration_tests {
         service.commit().await.unwrap();
 
         // Verify all can be found by searching for their token parts
-        // HTMLParser is tokenized as ["html", "parser"]
+        // HTMLParser is tokenized as ["html", "parser", "htmlparser"]
         assert!(!service.search(build_search_query("html")).await.unwrap().results.is_empty());
 
-        // NETBOX_URL is tokenized as ["netbox_url"] (underscores are preserved)
-        // So search for the full identifier, not just the partial
+        // NETBOX_URL is tokenized as ["netbox_url"] (underscores are preserved, no split)
+        // With complete token preservation, can search by full identifier
         assert!(!service.search(build_search_query("netbox_url")).await.unwrap().results.is_empty());
 
-        // parseJSONData is tokenized as ["parse", "json", "data"]
+        // parseJSONData is tokenized as ["parse", "json", "data", "parsejsondata"]
         assert!(!service.search(build_search_query("parse")).await.unwrap().results.is_empty());
     }
 
