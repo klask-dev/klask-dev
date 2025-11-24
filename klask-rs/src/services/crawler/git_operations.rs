@@ -96,33 +96,59 @@ impl GitOperations {
         tokio::time::timeout(
             std::time::Duration::from_secs(300),
             tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
-                // Prepare clone with authentication header if provided
-                let mut prepare_clone = gix::prepare_clone(clone_url, &repo_path_owned)
+                // Prepare clone
+                let mut prep = gix::prepare_clone(clone_url, &repo_path_owned)
                     .map_err(|e| anyhow!("Failed to prepare clone: {}", e))?;
 
                 // Configure for non-interactive mode (no credential prompts)
-                // This is critical for public repositories and server environments
-                let mut config_overrides = vec![
-                    "credential.helper=".to_string(), // Disable credential helpers
-                    "gitoxide.credentials.terminalPrompt=0".to_string(),
-                ];
+                let mut config_overrides = vec!["gitoxide.credentials.terminalPrompt=0"];
+                let accept_invalid_certs = std::env::var("KLASK_GITLAB_ACCEPT_INVALID_CERTS")
+                    .map(|v| v.to_lowercase() == "true")
+                    .unwrap_or(false);
 
-                // Configure authentication using http.extraHeader if we have a token
-                // This is more secure than embedding the token in the URL
-                if let Some(token) = access_token {
-                    config_overrides.push(format!("http.extraHeader=Authorization: Bearer {}", token));
+                if accept_invalid_certs {
+                    config_overrides.push("gitoxide.http.sslNoVerify=true");
                 }
 
-                prepare_clone =
-                    prepare_clone.with_in_memory_config_overrides(config_overrides.iter().map(|s| s.as_str()));
+                prep = prep.with_in_memory_config_overrides(config_overrides.iter().copied());
+
+                // Configure credential helper to provide token or refuse explicitly
+                if let Some(ref token) = access_token {
+                    let token_for_creds = token.clone();
+                    prep = prep.configure_connection(move |connection| {
+                        let token_for_closure = token_for_creds.clone();
+                        connection.set_credentials(move |action| {
+                            // Extract context from the action
+                            if let gix::credentials::helper::Action::Get(ctx) = action {
+                                Ok(Some(gix::credentials::protocol::Outcome {
+                                    identity: gix::sec::identity::Account {
+                                        username: "oauth2".to_string(),
+                                        password: token_for_closure.clone(),
+                                        oauth_refresh_token: None,
+                                    },
+                                    next: ctx.into(),
+                                }))
+                            } else {
+                                // Ignore store/erase operations
+                                Ok(None)
+                            }
+                        });
+
+                        Ok(())
+                    });
+                } else {
+                    // No token - refuse credentials to prevent prompting
+                    prep = prep.configure_connection(move |connection| {
+                        connection.set_credentials(move |_action| Err(gix::credentials::protocol::Error::Quit));
+                        Ok(())
+                    });
+                }
 
                 // Configure shallow clone (depth=1) to speed up large repositories
-                // This clones only the latest commit, significantly reducing download time
-                prepare_clone =
-                    prepare_clone.configure_remote(|remote| Ok(remote.with_fetch_tags(gix::remote::fetch::Tags::None)));
+                prep = prep.configure_remote(|remote| Ok(remote.with_fetch_tags(gix::remote::fetch::Tags::None)));
 
-                // Perform the fetch with shallow clone
-                let (_prepared_clone, _outcome) = prepare_clone
+                // Perform the fetch
+                let (_prepared_clone, _outcome) = prep
                     .fetch_only(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
                     .map_err(|e| anyhow!("fetch_only failed: {}", e))?;
 
