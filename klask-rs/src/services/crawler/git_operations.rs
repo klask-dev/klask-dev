@@ -96,16 +96,21 @@ impl GitOperations {
         tokio::time::timeout(
             std::time::Duration::from_secs(300),
             tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
-                // Disable ALL interactive prompts for server-mode operation
-                // SAFETY: Setting environment variables is safe in this single-threaded spawn_blocking context
-                unsafe {
-                    std::env::set_var("GIT_TERMINAL_PROMPT", "0");
-                    std::env::set_var("GIT_ASKPASS", "");
-                    std::env::set_var("SSH_ASKPASS", "");
+                // Prepare clone
+                let mut prep = gix::prepare_clone(clone_url, &repo_path_owned)
+                    .map_err(|e| anyhow!("Failed to prepare clone: {}", e))?;
+
+                // Configure for non-interactive mode (no credential prompts)
+                let mut config_overrides = vec!["gitoxide.credentials.terminalPrompt=0"];
+                let accept_invalid_certs = std::env::var("KLASK_GITLAB_ACCEPT_INVALID_CERTS")
+                    .map(|v| v.to_lowercase() == "true")
+                    .unwrap_or(false);
+
+                if accept_invalid_certs {
+                    config_overrides.push("gitoxide.http.sslNoVerify=true");
                 }
 
-                let mut prep = gix::prepare_clone(clone_url, &repo_path_owned)
-                    .map_err(|e| anyhow!("prepare_clone failed: {}", e))?;
+                prep = prep.with_in_memory_config_overrides(config_overrides.iter().copied());
 
                 // Configure credential helper to provide token or refuse explicitly
                 if let Some(ref token) = access_token {
@@ -128,6 +133,7 @@ impl GitOperations {
                                 Ok(None)
                             }
                         });
+
                         Ok(())
                     });
                 } else {
@@ -138,9 +144,11 @@ impl GitOperations {
                     });
                 }
 
+                // Configure shallow clone (depth=1) to speed up large repositories
                 prep = prep.configure_remote(|remote| Ok(remote.with_fetch_tags(gix::remote::fetch::Tags::None)));
 
-                let (_prep, _outcome) = prep
+                // Perform the fetch
+                let (_prepared_clone, _outcome) = prep
                     .fetch_only(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
                     .map_err(|e| anyhow!("fetch_only failed: {}", e))?;
 

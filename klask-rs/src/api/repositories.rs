@@ -814,8 +814,10 @@ async fn update_repository(
                 }
             }
 
-            info!("Updated repository: {} ({})", updated_repo.name, updated_repo.id);
-            info!("Returning updated repository: {:?}", updated_repo);
+            info!(
+                "Updated repository: {} ({}) ({})",
+                updated_repo.name, updated_repo.id, updated_repo.url
+            );
             Ok(Json(updated_repo))
         }
         Err(e) => {
