@@ -73,7 +73,7 @@ impl TokenStream for CodeTokenStream {
 /// - `"getHTTPResponse"` → `["get", "http", "response"]`
 /// - `"my_function_name"` → `["my_function_name"]`
 /// - `"snake-case"` → `["snake-case"]`
-/// - `"NETBOX_URL"` → `["netbox_url"]`
+/// - `"NETBOX_URL"` → `["nginx_url"]`
 /// - `"class HTMLParser"` → `["class", "html", "parser"]` (splits on whitespace AND camelCase)
 fn tokenize_code(text: &str) -> Vec<Token> {
     if text.is_empty() {
@@ -117,6 +117,11 @@ fn tokenize_code(text: &str) -> Vec<Token> {
 }
 
 /// Tokenizes a single word (no whitespace) by splitting on camelCase boundaries while preserving underscores and hyphens
+///
+/// In addition to the split tokens, also emits the complete lowercased identifier as a token.
+/// This allows searching for both individual components and the complete identifier.
+///
+/// Example: "readerTemplate" → ["reader", "template", "readertemplate"]
 fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize) -> Vec<Token> {
     if text.is_empty() {
         return Vec::new();
@@ -181,7 +186,7 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
         i += 1;
     }
 
-    // Emit the final token
+    // Emit the final split token
     if !current_token.is_empty() {
         let token = Token {
             offset_from: token_byte_start,
@@ -191,6 +196,19 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
             position_length: 1,
         };
         tokens.push(token);
+    }
+
+    // If we generated multiple tokens (i.e., the word was split), add the complete lowercased identifier as an additional token
+    // This allows users to search for either individual components or the complete identifier
+    if tokens.len() > 1 {
+        let complete_token = Token {
+            offset_from: byte_offset_base,
+            offset_to: byte_pos,
+            position: position_base + tokens.len(),
+            text: text.to_lowercase(),
+            position_length: 1,
+        };
+        tokens.push(complete_token);
     }
 
     tokens
@@ -244,46 +262,51 @@ mod tests {
     #[test]
     fn test_camel_case_basic() {
         let tokens = tokenize_code("camelCase");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // camel, case, camelcase (complete)
         assert_eq!(tokens[0].text, "camel");
         assert_eq!(tokens[1].text, "case");
+        assert_eq!(tokens[2].text, "camelcase"); // complete token
     }
 
     #[test]
     fn test_camel_case_three_parts() {
         let tokens = tokenize_code("myVariableName");
-        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens.len(), 4); // my, variable, name, myvariablename (complete)
         assert_eq!(tokens[0].text, "my");
         assert_eq!(tokens[1].text, "variable");
         assert_eq!(tokens[2].text, "name");
+        assert_eq!(tokens[3].text, "myvariablename"); // complete token
     }
 
     #[test]
     fn test_camel_case_four_parts() {
         let tokens = tokenize_code("parseJSONFromAPIResponse");
-        assert_eq!(tokens.len(), 5);
+        assert_eq!(tokens.len(), 6); // parse, json, from, api, response, parsejsonfromapiresponse (complete)
         assert_eq!(tokens[0].text, "parse");
         assert_eq!(tokens[1].text, "json");
         assert_eq!(tokens[2].text, "from");
         assert_eq!(tokens[3].text, "api");
         assert_eq!(tokens[4].text, "response");
+        assert_eq!(tokens[5].text, "parsejsonfromapiresponse"); // complete token
     }
 
     #[test]
     fn test_pascal_case() {
         let tokens = tokenize_code("PascalCase");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // pascal, case, pascalcase (complete)
         assert_eq!(tokens[0].text, "pascal");
         assert_eq!(tokens[1].text, "case");
+        assert_eq!(tokens[2].text, "pascalcase"); // complete token
     }
 
     #[test]
     fn test_pascal_case_three_parts() {
         let tokens = tokenize_code("MyVariableName");
-        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens.len(), 4); // my, variable, name, myvariablename (complete)
         assert_eq!(tokens[0].text, "my");
         assert_eq!(tokens[1].text, "variable");
         assert_eq!(tokens[2].text, "name");
+        assert_eq!(tokens[3].text, "myvariablename"); // complete token
     }
 
     // ==================== Acronym Cases ====================
@@ -291,74 +314,83 @@ mod tests {
     #[test]
     fn test_html_parser() {
         let tokens = tokenize_code("HTMLParser");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // html, parser, htmlparser (complete)
         assert_eq!(tokens[0].text, "html");
         assert_eq!(tokens[1].text, "parser");
+        assert_eq!(tokens[2].text, "htmlparser"); // complete token
     }
 
     #[test]
     fn test_http_response() {
         let tokens = tokenize_code("HTTPResponse");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // http, response, httpresponse (complete)
         assert_eq!(tokens[0].text, "http");
         assert_eq!(tokens[1].text, "response");
+        assert_eq!(tokens[2].text, "httpresponse"); // complete token
     }
 
     #[test]
     fn test_get_http_response() {
         let tokens = tokenize_code("getHTTPResponse");
-        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens.len(), 4); // get, http, response, gethttpresponse (complete)
         assert_eq!(tokens[0].text, "get");
         assert_eq!(tokens[1].text, "http");
         assert_eq!(tokens[2].text, "response");
+        assert_eq!(tokens[3].text, "gethttpresponse"); // complete token
     }
 
     #[test]
     fn test_xml_parser() {
         let tokens = tokenize_code("XMLParser");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // xml, parser, xmlparser (complete)
         assert_eq!(tokens[0].text, "xml");
         assert_eq!(tokens[1].text, "parser");
+        assert_eq!(tokens[2].text, "xmlparser"); // complete token
     }
 
     #[test]
     fn test_io_error() {
         let tokens = tokenize_code("IOError");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // io, error, ioerror (complete)
         assert_eq!(tokens[0].text, "io");
         assert_eq!(tokens[1].text, "error");
+        assert_eq!(tokens[2].text, "ioerror"); // complete token
     }
 
     #[test]
     fn test_https_connection() {
         let tokens = tokenize_code("HTTPSConnection");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // https, connection, httpsconnection (complete)
         assert_eq!(tokens[0].text, "https");
         assert_eq!(tokens[1].text, "connection");
+        assert_eq!(tokens[2].text, "httpsconnection"); // complete token
     }
 
     #[test]
     fn test_url_handler() {
         let tokens = tokenize_code("URLHandler");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // url, handler, urlhandler (complete)
         assert_eq!(tokens[0].text, "url");
         assert_eq!(tokens[1].text, "handler");
+        assert_eq!(tokens[2].text, "urlhandler"); // complete token
     }
 
     #[test]
     fn test_api_client() {
         let tokens = tokenize_code("APIClient");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // api, client, apiclient (complete)
         assert_eq!(tokens[0].text, "api");
         assert_eq!(tokens[1].text, "client");
+        assert_eq!(tokens[2].text, "apiclient"); // complete token
     }
 
     #[test]
     fn test_json_object() {
         let tokens = tokenize_code("JSONObject");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // json, object, jsonobject (complete)
         assert_eq!(tokens[0].text, "json");
         assert_eq!(tokens[1].text, "object");
+        assert_eq!(tokens[2].text, "jsonobject"); // complete token
     }
 
     // ==================== Underscore & Hyphen Cases ====================
@@ -381,7 +413,7 @@ mod tests {
     }
 
     #[test]
-    fn test_netbox_url() {
+    fn test_nginx_url() {
         let tokens = tokenize_code("NETBOX_URL");
         assert_eq!(tokens.len(), 1);
         assert_eq!(
@@ -430,31 +462,34 @@ mod tests {
     #[test]
     fn test_mixed_snake_and_camel() {
         let tokens = tokenize_code("my_functionName");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // my_function, name, my_functionname (complete)
         assert_eq!(
             tokens[0].text, "my_function",
             "Snake case before camelCase should split on case transition"
         );
         assert_eq!(tokens[1].text, "name");
+        assert_eq!(tokens[2].text, "my_functionname"); // complete token
     }
 
     #[test]
     fn test_mixed_hyphen_and_camel() {
         let tokens = tokenize_code("my-functionName");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // my-function, name, my-functionname (complete)
         assert_eq!(
             tokens[0].text, "my-function",
             "Hyphen followed by camelCase should preserve hyphen"
         );
         assert_eq!(tokens[1].text, "name");
+        assert_eq!(tokens[2].text, "my-functionname"); // complete token
     }
 
     #[test]
     fn test_snake_case_with_camel() {
         let tokens = tokenize_code("snake_camelCase");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // snake_camel, case, snake_camelcase (complete)
         assert_eq!(tokens[0].text, "snake_camel");
         assert_eq!(tokens[1].text, "case");
+        assert_eq!(tokens[2].text, "snake_camelcase"); // complete token
     }
 
     #[test]
@@ -470,9 +505,10 @@ mod tests {
     #[test]
     fn test_number_at_start() {
         let tokens = tokenize_code("1stPlace");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // 1st, place, 1stplace (complete)
         assert_eq!(tokens[0].text, "1st");
         assert_eq!(tokens[1].text, "place");
+        assert_eq!(tokens[2].text, "1stplace"); // complete token
     }
 
     #[test]
@@ -495,9 +531,10 @@ mod tests {
     fn test_consecutive_numbers() {
         // Split happens on lowercase to uppercase: "Base" vs "64URLSafe"
         let tokens = tokenize_code("Base64URLSafe");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // base64url, safe, base64urlsafe (complete)
         assert_eq!(tokens[0].text, "base64url");
         assert_eq!(tokens[1].text, "safe");
+        assert_eq!(tokens[2].text, "base64urlsafe"); // complete token
     }
 
     // ==================== Edge Cases ====================
@@ -519,17 +556,19 @@ mod tests {
     #[test]
     fn test_leading_underscore() {
         let tokens = tokenize_code("_privateFunction");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // _private, function, _privatefunction (complete)
         assert_eq!(tokens[0].text, "_private");
         assert_eq!(tokens[1].text, "function");
+        assert_eq!(tokens[2].text, "_privatefunction"); // complete token
     }
 
     #[test]
     fn test_trailing_underscore() {
         let tokens = tokenize_code("functionName_");
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3); // function, name_, functionname_ (complete)
         assert_eq!(tokens[0].text, "function");
         assert_eq!(tokens[1].text, "name_");
+        assert_eq!(tokens[2].text, "functionname_"); // complete token
     }
 
     #[test]
@@ -564,7 +603,7 @@ mod tests {
     #[test]
     fn test_mixed_case_all_lower() {
         let tokens = tokenize_code("MixedCaseValue");
-        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens.len(), 4); // mixed, case, value, mixedcasevalue (complete)
         for token in tokens {
             assert!(
                 token.text.chars().all(|c| !c.is_uppercase() || c == '_' || c == '-'),
@@ -578,11 +617,12 @@ mod tests {
     #[test]
     fn test_java_style_getter() {
         let tokens = tokenize_code("getHTTPServerConnection");
-        assert_eq!(tokens.len(), 4);
+        assert_eq!(tokens.len(), 5); // get, http, server, connection, gethttpserverconnection (complete)
         assert_eq!(tokens[0].text, "get");
         assert_eq!(tokens[1].text, "http");
         assert_eq!(tokens[2].text, "server");
         assert_eq!(tokens[3].text, "connection");
+        assert_eq!(tokens[4].text, "gethttpserverconnection"); // complete token
     }
 
     #[test]
@@ -677,5 +717,120 @@ mod tests {
                 "Token offset_to should be > offset_from"
             );
         }
+    }
+
+    // ==================== Complete Token Cases ====================
+
+    #[test]
+    fn test_camel_case_with_complete_token() {
+        let tokens = tokenize_code("readerTemplate");
+        let token_texts: Vec<_> = tokens.iter().map(|t| t.text.clone()).collect();
+
+        // Should have individual split tokens
+        assert!(
+            token_texts.contains(&"reader".to_string()),
+            "Should have 'reader' token"
+        );
+        assert!(
+            token_texts.contains(&"template".to_string()),
+            "Should have 'template' token"
+        );
+
+        // Should also have the complete lowercased identifier
+        assert!(
+            token_texts.contains(&"readertemplate".to_string()),
+            "Should have complete 'readertemplate' token"
+        );
+    }
+
+    #[test]
+    fn test_pascal_case_with_complete_token() {
+        let tokens = tokenize_code("HTMLParser");
+        let token_texts: Vec<_> = tokens.iter().map(|t| t.text.clone()).collect();
+
+        // Should have individual split tokens
+        assert!(token_texts.contains(&"html".to_string()), "Should have 'html' token");
+        assert!(
+            token_texts.contains(&"parser".to_string()),
+            "Should have 'parser' token"
+        );
+
+        // Should also have the complete lowercased identifier
+        assert!(
+            token_texts.contains(&"htmlparser".to_string()),
+            "Should have complete 'htmlparser' token"
+        );
+    }
+
+    #[test]
+    fn test_three_part_camel_case_with_complete_token() {
+        let tokens = tokenize_code("myVariableName");
+        let token_texts: Vec<_> = tokens.iter().map(|t| t.text.clone()).collect();
+
+        // Should have individual split tokens
+        assert!(token_texts.contains(&"my".to_string()), "Should have 'my' token");
+        assert!(
+            token_texts.contains(&"variable".to_string()),
+            "Should have 'variable' token"
+        );
+        assert!(token_texts.contains(&"name".to_string()), "Should have 'name' token");
+
+        // Should also have the complete lowercased identifier
+        assert!(
+            token_texts.contains(&"myvariablename".to_string()),
+            "Should have complete 'myvariablename' token"
+        );
+    }
+
+    #[test]
+    fn test_get_http_response_with_complete_token() {
+        let tokens = tokenize_code("getHTTPResponse");
+        let token_texts: Vec<_> = tokens.iter().map(|t| t.text.clone()).collect();
+
+        // Should have individual split tokens
+        assert!(token_texts.contains(&"get".to_string()), "Should have 'get' token");
+        assert!(token_texts.contains(&"http".to_string()), "Should have 'http' token");
+        assert!(
+            token_texts.contains(&"response".to_string()),
+            "Should have 'response' token"
+        );
+
+        // Should also have the complete lowercased identifier
+        assert!(
+            token_texts.contains(&"gethttpresponse".to_string()),
+            "Should have complete 'gethttpresponse' token"
+        );
+    }
+
+    #[test]
+    fn test_snake_case_no_extra_complete_token() {
+        let tokens = tokenize_code("snake_case");
+        let token_texts: Vec<_> = tokens.iter().map(|t| t.text.clone()).collect();
+
+        // Snake case doesn't split, so only one token
+        assert_eq!(token_texts.len(), 1, "Snake case should have only 1 token");
+        assert!(
+            token_texts.contains(&"snake_case".to_string()),
+            "Should have 'snake_case' token"
+        );
+    }
+
+    #[test]
+    fn test_mixed_snake_and_camel_with_complete_token() {
+        let tokens = tokenize_code("my_functionName");
+        let token_texts: Vec<_> = tokens.iter().map(|t| t.text.clone()).collect();
+
+        // Should have individual split tokens
+        assert!(
+            token_texts.contains(&"my_function".to_string()),
+            "Should have 'my_function' token"
+        );
+        assert!(token_texts.contains(&"name".to_string()), "Should have 'name' token");
+
+        // The word boundary is on the second word, so complete token should be for "my_functionName"
+        assert!(
+            token_texts.contains(&"my_functionname".to_string()),
+            "Should have complete 'my_functionname' token"
+        );
     }
 }
