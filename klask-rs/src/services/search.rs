@@ -17,6 +17,8 @@ use uuid::Uuid;
 
 use tracing::{debug, warn};
 
+use crate::services::tokenizer::CodeTokenizer;
+
 // Search timeout: maximum time allowed for a single search query (30 seconds)
 // This prevents heavy regex queries (e.g., .*pattern) from blocking other requests
 const SEARCH_TIMEOUT: Duration = Duration::from_secs(30);
@@ -198,6 +200,16 @@ impl SearchService {
         let mmap_directory = MmapDirectory::open(&index_dir)?;
         let index = Index::open_or_create(mmap_directory, schema.clone())?;
 
+        // Register custom tokenizer for code search
+        // This MUST be done immediately after opening the index and before creating reader/writer
+        // The tokenizer must be registered on the index so QueryParser can access it during search
+        {
+            let tokenizer_manager = index.tokenizers();
+            tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
+            debug!("Registered custom code_tokenizer for code-aware search");
+        }
+
+        // Create reader AFTER tokenizer registration so it has access to the registered tokenizer
         let reader = index.reader()?;
 
         // Configure Tantivy IndexWriter with environment variables
@@ -237,13 +249,23 @@ impl SearchService {
     fn build_schema() -> Schema {
         let mut schema_builder = Schema::builder();
 
-        // File metadata fields
+        // File ID field with default tokenizer
         schema_builder.add_text_field("file_id", TEXT | STORED | FAST);
-        schema_builder.add_text_field("file_name", TEXT | STORED);
-        schema_builder.add_text_field("file_path", TEXT | STORED);
 
-        // Content field with custom analyzer for code search
-        schema_builder.add_text_field("content", TEXT | STORED);
+        // Configure custom code tokenizer for code-specific text fields
+        // This tokenizer handles camelCase splitting, preserves underscores/hyphens,
+        // and lowercases tokens for case-insensitive search
+        let code_text_options = TextOptions::default()
+            .set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_tokenizer("code_tokenizer")
+                    .set_index_option(IndexRecordOption::WithFreqs),
+            )
+            .set_stored();
+
+        schema_builder.add_text_field("file_name", code_text_options.clone());
+        schema_builder.add_text_field("file_path", code_text_options.clone());
+        schema_builder.add_text_field("content", code_text_options);
 
         // Filter fields - use STRING for exact matching, not TEXT which tokenizes
         schema_builder.add_text_field("repository", STRING | STORED | FAST);
@@ -308,6 +330,16 @@ impl SearchService {
 
     /// Upsert a file - delete existing and add new version if it exists, otherwise just add
     pub async fn upsert_file(&self, file_data: FileData<'_>) -> Result<()> {
+        // Ensure custom tokenizer is registered on the index
+        // This is critical because the tokenizer must be available when indexing documents
+        {
+            let tokenizer_manager = self.index.tokenizers();
+            if tokenizer_manager.get("code_tokenizer").is_none() {
+                tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
+                debug!("Re-registered custom code_tokenizer for indexing");
+            }
+        }
+
         let writer = self.writer.write().await;
 
         // Delete ALL existing documents with the same file_id to ensure no duplicates
@@ -519,6 +551,16 @@ impl SearchService {
 
     // Blocking search implementation - runs in a dedicated thread pool
     fn search_blocking(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
+        // Ensure custom tokenizer is registered on the index
+        // This is critical because the tokenizer must be available when QueryParser is created
+        {
+            let tokenizer_manager = self.index.tokenizers();
+            if tokenizer_manager.get("code_tokenizer").is_none() {
+                tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
+                debug!("Re-registered custom code_tokenizer for search");
+            }
+        }
+
         let searcher = self.reader.searcher();
 
         // Notes on search modes:
