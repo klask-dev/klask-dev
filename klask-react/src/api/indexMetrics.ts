@@ -8,12 +8,20 @@ import type {
   OptimizeIndexRequest
 } from '../types/tantivy';
 
+// Search Status Response
+export interface SearchStatusResponse {
+  schema_mismatch: boolean;
+  index_available: boolean;
+  message?: string;
+}
+
 // Query Keys
 const indexMetricsKeys = {
   all: ['index-metrics'] as const,
   stats: () => [...indexMetricsKeys.all, 'stats'] as const,
   health: () => [...indexMetricsKeys.all, 'health'] as const,
   tuning: () => [...indexMetricsKeys.all, 'tuning'] as const,
+  status: () => [...indexMetricsKeys.all, 'status'] as const,
 };
 
 // Response validators
@@ -74,7 +82,23 @@ function validateOptimizeIndexResponse(data: unknown): OptimizeIndexResponse {
   return obj as OptimizeIndexResponse;
 }
 
+function validateSearchStatusResponse(data: unknown): SearchStatusResponse {
+  const obj = data as any;
+  if (
+    typeof obj?.schema_mismatch !== 'boolean' ||
+    typeof obj?.index_available !== 'boolean'
+  ) {
+    throw new Error('Invalid SearchStatusResponse structure from backend');
+  }
+  return obj as SearchStatusResponse;
+}
+
 // Fetch Functions
+async function fetchSearchStatus(): Promise<SearchStatusResponse> {
+  const response = await api.get<SearchStatusResponse>('/api/admin/search/status');
+  return validateSearchStatusResponse(response);
+}
+
 async function fetchIndexStats(): Promise<IndexStatsResponse> {
   const response = await api.get<IndexStatsResponse>('/api/admin/search/index-stats');
   return validateIndexStatsResponse(response);
@@ -149,7 +173,26 @@ export function useOptimizeIndex() {
       // Invalidate related queries to refetch updated data
       queryClient.invalidateQueries({ queryKey: indexMetricsKeys.stats() });
       queryClient.invalidateQueries({ queryKey: indexMetricsKeys.health() });
+      queryClient.invalidateQueries({ queryKey: indexMetricsKeys.status() });
     },
+  });
+}
+
+/**
+ * Hook to fetch search index status
+ * Auto-refetch on schema mismatch to detect when rebuild is complete
+ * Handles errors gracefully - assumes index is available if endpoint fails
+ */
+export function useSearchStatus(refetchInterval?: number | false) {
+  return useQuery({
+    queryKey: indexMetricsKeys.status(),
+    queryFn: fetchSearchStatus,
+    staleTime: 5000, // 5 seconds
+    refetchInterval: refetchInterval !== undefined ? refetchInterval : false,
+    retry: 1,
+    retryDelay: 1000,
+    // Gracefully handle errors - assume index is available if endpoint fails
+    throwOnError: false,
   });
 }
 
