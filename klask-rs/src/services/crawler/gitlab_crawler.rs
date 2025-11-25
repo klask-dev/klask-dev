@@ -392,20 +392,23 @@ impl GitLabCrawler {
             .discover_projects(&gitlab_url, &access_token, repository.gitlab_namespace.as_deref())
             .await?;
 
-        // Filter out excluded projects using repository-specific exclusions
-        let excluded_projects: Vec<String> = repository
-            .gitlab_excluded_projects
-            .as_ref()
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-            .unwrap_or_default();
-        let excluded_patterns: Vec<String> = repository
-            .gitlab_excluded_patterns
-            .as_ref()
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-            .unwrap_or_default();
+        // Extract project paths and apply filtering logic: included filters first, then exclusions
+        // This mirrors the same filtering approach as the main crawl to ensure consistency
+        let project_paths: Vec<String> = projects.iter().map(|p| p.path_with_namespace.clone()).collect();
 
-        let filtered_projects =
-            gitlab_service.filter_excluded_projects_with_config(projects, &excluded_projects, &excluded_patterns);
+        let filtered_project_paths = filter_projects(
+            project_paths,
+            repository.included_projects.as_deref(),
+            repository.included_projects_patterns.as_deref(),
+            repository.gitlab_excluded_projects.as_deref(),
+            repository.gitlab_excluded_patterns.as_deref(),
+        );
+
+        // Map back from filtered paths to GitLab project objects
+        let filtered_projects: Vec<_> = projects
+            .into_iter()
+            .filter(|p| filtered_project_paths.contains(&p.path_with_namespace))
+            .collect();
 
         // Find where to resume from
         let resume_index = if let Some(ref last_project) = repository.last_processed_project {
