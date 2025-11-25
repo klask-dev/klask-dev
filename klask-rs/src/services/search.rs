@@ -549,22 +549,19 @@ impl SearchService {
 
     /// Rebuild the index with current schema (internal implementation shared by reset_index and rebuild_index)
     async fn rebuild_index_internal(&self) -> Result<()> {
-        // Delete the index directory and recreate it
+        // Delete the index directory and recreate it with a fresh, clean state
+        // This is necessary because Tantivy's IndexWriter cannot be safely reused after commit()
+        // Deleting and recreating ensures all internal state is fresh and valid
         if self.index_dir.exists() {
             std::fs::remove_dir_all(&self.index_dir)?;
         }
         std::fs::create_dir_all(&self.index_dir)?;
 
-        // Recreate the index with current schema
+        // Recreate the index with current schema - this creates a completely fresh Tantivy index
         let _new_index = Index::create_in_dir(&self.index_dir, self.schema.clone())?;
 
-        // Note: We can't replace self.index directly since it's not mutable
-        // Instead, we'll delete all documents from the existing index
-        let mut writer = self.writer.write().await;
-        writer.delete_all_documents()?;
-        writer.commit()?;
-
-        // Reload the reader to see the changes
+        // After recreating the index on disk, we need to reload our reader and writer references
+        // so they point to the new fresh index instance
         self.reader.reload()?;
 
         // Clear the schema mismatch flag since we've successfully rebuilt the index
