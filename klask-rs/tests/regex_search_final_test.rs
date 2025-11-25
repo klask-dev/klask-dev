@@ -107,6 +107,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -124,6 +125,7 @@ mod regex_search_final_tests {
             query: "^[a-z".to_string(), // Invalid: unclosed bracket
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             limit: 100,
             ..Default::default()
         };
@@ -151,6 +153,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -176,6 +179,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -199,6 +203,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             repository_filter: Some("backend".to_string()),
             limit: 100,
             ..Default::default()
@@ -220,6 +225,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             extension_filter: Some("rs".to_string()),
             limit: 100,
             ..Default::default()
@@ -241,6 +247,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             version_filter: Some("1.0".to_string()),
             limit: 100,
             ..Default::default()
@@ -262,6 +269,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             min_size: Some(200),
             max_size: Some(600),
             limit: 100,
@@ -281,6 +289,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             repository_filter: Some("backend".to_string()),
             extension_filter: Some("rs".to_string()),
             version_filter: Some("1.0".to_string()),
@@ -311,6 +320,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             fuzzy_search: false,
             limit: 100,
             ..Default::default()
@@ -320,6 +330,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             fuzzy_search: true, // This should be ignored
             limit: 100,
             ..Default::default()
@@ -344,6 +355,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -375,6 +387,7 @@ mod regex_search_final_tests {
             limit: 3,
             offset: 0,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -394,6 +407,7 @@ mod regex_search_final_tests {
             limit: 2,
             offset: 0,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -403,6 +417,7 @@ mod regex_search_final_tests {
             limit: 2,
             offset: 2,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -433,6 +448,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             include_facets: true,
             limit: 100,
             ..Default::default()
@@ -461,6 +477,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             include_facets: true,
             limit: 100,
             ..Default::default()
@@ -490,6 +507,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -529,6 +547,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -558,6 +577,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 0,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -577,6 +597,7 @@ mod regex_search_final_tests {
             limit: 100,
             offset: 1000,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -594,6 +615,7 @@ mod regex_search_final_tests {
             query: ".*".to_string(),
             regex_search: true,
             regex_flags: None,
+            case_sensitive: false,
             include_facets: false,
             limit: 100,
             ..Default::default()
@@ -617,6 +639,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -643,6 +666,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -666,6 +690,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 
@@ -685,6 +710,7 @@ mod regex_search_final_tests {
             regex_search: true,
             limit: 100,
             regex_flags: None,
+            case_sensitive: false,
             ..Default::default()
         };
 

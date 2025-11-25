@@ -33,6 +33,7 @@ mod tokenizer_integration_tests {
             fuzzy_search: false,
             regex_search: false,
             regex_flags: None,
+            case_sensitive: false,
         }
     }
 

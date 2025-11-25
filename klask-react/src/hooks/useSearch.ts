@@ -134,7 +134,8 @@ export const useMultiSelectSearch = (
   options: UseSearchOptions = {},
   fuzzySearch: boolean = false,
   regexSearch: boolean = false,
-  regexFlags?: string  // Regex flags: "i", "m", "s", or combinations like "ims"
+  regexFlags?: string,  // Regex flags: "i", "m", "s", or combinations like "ims"
+  caseSensitive: boolean = false
 ) => {
   const {
     enabled = true,
@@ -146,7 +147,7 @@ export const useMultiSelectSearch = (
   const offset = (currentPage - 1) * pageSize;
 
   return useQuery({
-    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, regexFlags],
+    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, regexFlags, caseSensitive],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
 
@@ -198,6 +199,9 @@ export const useMultiSelectSearch = (
       }
       if (regexFlags && regexFlags.trim()) {
         searchParams.set('regex_flags', regexFlags.trim());
+      }
+      if (caseSensitive) {
+        searchParams.set('case_sensitive', 'true');
       }
 
       const response = await fetchWithAuth(`/api/search?${searchParams.toString()}`);

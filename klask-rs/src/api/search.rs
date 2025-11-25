@@ -69,6 +69,7 @@ pub struct SearchRequest {
     pub fuzzy_search: Option<bool>, // Enable fuzzy search (1 char edit distance) - default: false
     pub regex_search: Option<bool>, // Enable regex search (pattern matching) - default: false
     pub regex_flags: Option<String>, // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
+    pub case_sensitive: Option<bool>, // Enable case-sensitive search - default: false
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -167,6 +168,7 @@ async fn search_files(
         fuzzy_search: params.fuzzy_search.unwrap_or(false),
         regex_search: params.regex_search.unwrap_or(false),
         regex_flags: params.regex_flags,
+        case_sensitive: params.case_sensitive.unwrap_or(false),
     };
 
     // Perform search using Tantivy
@@ -287,10 +289,11 @@ async fn get_facets_with_filters(
         max_size: params.max_size,
         limit: 0, // We only need facets, not results
         offset: 0,
-        include_facets: true, // Always include facets for this endpoint
-        fuzzy_search: false,  // Facets request doesn't use fuzzy search
-        regex_search: false,  // Facets request doesn't use regex search
-        regex_flags: None,    // Facets request doesn't use regex flags
+        include_facets: true,  // Always include facets for this endpoint
+        fuzzy_search: false,   // Facets request doesn't use fuzzy search
+        regex_search: false,   // Facets request doesn't use regex search
+        regex_flags: None,     // Facets request doesn't use regex flags
+        case_sensitive: false, // Facets request doesn't use case-sensitive search
     };
 
     // Perform search using Tantivy

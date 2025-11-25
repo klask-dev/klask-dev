@@ -28,6 +28,8 @@ const SearchPageV3: React.FC = () => {
     s: false, // dotall (dot matches newlines)
   });
 
+  const [caseSensitive, setCaseSensitive] = useState(false);
+
   // Derive boolean flags from searchMode for backward compatibility
   const fuzzySearch = searchMode === 'fuzzy';
   const regexSearch = searchMode === 'regex';
@@ -92,6 +94,9 @@ const SearchPageV3: React.FC = () => {
     if (regexSearch) {
       params.set('regexSearch', 'true');
     }
+    if (caseSensitive) {
+      params.set('case_sensitive', 'true');
+    }
 
     if (page > 1) {
       params.set('page', page.toString());
@@ -99,7 +104,7 @@ const SearchPageV3: React.FC = () => {
 
     const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState(null, '', newURL);
-  }, [fuzzySearch, regexSearch]);
+  }, [fuzzySearch, regexSearch, caseSensitive]);
 
   // Track if we're initializing to avoid double URL updates
   const [isInitializing, setIsInitializing] = useState(true);
@@ -123,6 +128,7 @@ const SearchPageV3: React.FC = () => {
     // Parse search mode flags
     const urlFuzzySearch = urlParams.get('fuzzySearch') === 'true';
     const urlRegexSearch = urlParams.get('regexSearch') === 'true';
+    const urlCaseSensitive = urlParams.get('case_sensitive') === 'true';
 
     const urlPage = parseInt(urlParams.get('page') || '1', 10);
 
@@ -159,6 +165,7 @@ const SearchPageV3: React.FC = () => {
       setSearchMode('normal');
     }
 
+    setCaseSensitive(urlCaseSensitive);
     setCurrentPage(urlPage);
     setIsInitializing(false);
   }, [location.search, setFilters]);
@@ -167,7 +174,7 @@ const SearchPageV3: React.FC = () => {
   useEffect(() => {
     if (isInitializing) return;
     updateURL(query, filters, currentPage);
-  }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch]);
+  }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch, caseSensitive]);
 
   // Sync query to context for facet fetching
   useEffect(() => {
@@ -197,7 +204,7 @@ const SearchPageV3: React.FC = () => {
     sizeRange: filters?.size,
   }, currentPage, {
     enabled: !!query.trim(),
-  }, fuzzySearch, regexSearch, regexFlagsString);
+  }, fuzzySearch, regexSearch, regexFlagsString, caseSensitive);
 
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
@@ -278,6 +285,10 @@ const SearchPageV3: React.FC = () => {
 
   const handleRegexToggle = useCallback(() => {
     setSearchMode(prev => (prev === 'regex' ? 'normal' : 'regex'));
+  }, []);
+
+  const handleCaseSensitiveToggle = useCallback(() => {
+    setCaseSensitive(prev => !prev);
   }, []);
 
   // Regex flags toggle handlers
@@ -363,6 +374,22 @@ const SearchPageV3: React.FC = () => {
           >
             <span className="text-base">/</span>
             <span className="hidden sm:inline">Regex</span>
+          </button>
+
+          {/* Case Sensitive Toggle */}
+          <button
+            onClick={handleCaseSensitiveToggle}
+            title={caseSensitive
+              ? "Disable case-sensitive search (matches Test, test, TEST)"
+              : "Enable case-sensitive search (matches exact case)"}
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+              caseSensitive
+                ? 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-700/50 text-orange-700 dark:text-orange-300 shadow-sm'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            }`}
+          >
+            <span className="text-base">Aa</span>
+            <span className="hidden sm:inline">Case</span>
           </button>
 
           {/* Regex Flags (only shown when regex mode is active) */}

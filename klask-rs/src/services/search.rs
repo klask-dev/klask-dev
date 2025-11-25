@@ -125,10 +125,11 @@ pub struct SearchQuery {
     pub fuzzy_search: bool,          // Enable fuzzy search (1 char edit distance) - default: false
     pub regex_search: bool,          // Enable regex search (pattern matching) - default: false
     pub regex_flags: Option<String>, // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
+    pub case_sensitive: bool,        // Enable case-sensitive search - default: false
 }
 
 impl SearchQuery {
-    /// Create a SearchQuery with default search options (no fuzzy, no regex)
+    /// Create a SearchQuery with default search options (no fuzzy, no regex, no case-sensitive)
     #[allow(dead_code)]
     pub fn new(query: String) -> Self {
         SearchQuery {
@@ -145,6 +146,7 @@ impl SearchQuery {
             fuzzy_search: false,
             regex_search: false,
             regex_flags: None,
+            case_sensitive: false,
         }
     }
 
@@ -159,6 +161,13 @@ impl SearchQuery {
     #[allow(dead_code)]
     pub fn with_regex(mut self, regex: bool) -> Self {
         self.regex_search = regex;
+        self
+    }
+
+    /// Set case-sensitive search option
+    #[allow(dead_code)]
+    pub fn with_case_sensitive(mut self, case_sensitive: bool) -> Self {
+        self.case_sensitive = case_sensitive;
         self
     }
 }
@@ -186,6 +195,7 @@ struct SearchFields {
     size: Field,          // File content size in bytes
     file_name_raw: Field, // Non-tokenized file_name for regex search
     file_path_raw: Field, // Non-tokenized file_path for regex search
+    content_raw: Field,   // Non-tokenized content for case-sensitive search
 }
 
 impl SearchService {
@@ -285,7 +295,8 @@ impl SearchService {
             .set_stored();
 
         schema_builder.add_text_field("file_name_raw", raw_text_options.clone());
-        schema_builder.add_text_field("file_path_raw", raw_text_options);
+        schema_builder.add_text_field("file_path_raw", raw_text_options.clone());
+        schema_builder.add_text_field("content_raw", raw_text_options);
 
         schema_builder.build()
     }
@@ -303,6 +314,7 @@ impl SearchService {
             size: schema.get_field("size").expect("size field should exist"),
             file_name_raw: schema.get_field("file_name_raw").expect("file_name_raw field should exist"),
             file_path_raw: schema.get_field("file_path_raw").expect("file_path_raw field should exist"),
+            content_raw: schema.get_field("content_raw").expect("content_raw field should exist"),
         }
     }
 
@@ -322,6 +334,7 @@ impl SearchService {
             self.fields.size => file_data.size,
             self.fields.file_name_raw => file_data.file_name,
             self.fields.file_path_raw => file_data.file_path,
+            self.fields.content_raw => file_data.content,
         );
 
         writer.add_document(doc)?;
@@ -368,6 +381,7 @@ impl SearchService {
             self.fields.size => file_data.size,
             self.fields.file_name_raw => file_data.file_name,
             self.fields.file_path_raw => file_data.file_path,
+            self.fields.content_raw => file_data.content,
         );
 
         writer.add_document(doc)?;
@@ -569,8 +583,66 @@ impl SearchService {
         // - SnippetGenerator doesn't work well with RegexQuery (uses fallback query)
         // - Regex patterns must be valid Rust regex syntax (e.g., ^pattern$, .*test.*)
 
-        // Build the base query - choose between RegexQuery or QueryParser
-        let base_query: Box<dyn tantivy::query::Query> = if search_query.regex_search {
+        // Build the base query - choose between RegexQuery, case-sensitive search, or QueryParser
+        let base_query: Box<dyn tantivy::query::Query> = if search_query.case_sensitive {
+            // Mode CASE-SENSITIVE: Use RegexQuery with escaped pattern for exact matching
+            // This preserves case by using regex without the case-insensitive (?i) flag
+            debug!("Using case-sensitive search mode for query: {}", search_query.query);
+
+            // Escape the pattern to avoid regex interpretation of special chars
+            let escaped_pattern = regex::escape(&search_query.query);
+            debug!("Case-sensitive regex pattern (escaped): {}", escaped_pattern);
+
+            let mut case_sensitive_clauses = Vec::new();
+
+            // Search in file_name_raw (case-preserving field)
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_name_raw) {
+                Ok(regex_q) => {
+                    case_sensitive_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Case-sensitive pattern doesn't match file_name_raw: {}", e);
+                }
+            }
+
+            // Search in file_path_raw (case-preserving field)
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_path_raw) {
+                Ok(regex_q) => {
+                    case_sensitive_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Case-sensitive pattern doesn't match file_path_raw: {}", e);
+                }
+            }
+
+            // Search in content_raw (case-preserving field for content)
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.content_raw) {
+                Ok(regex_q) => {
+                    case_sensitive_clauses.push((
+                        tantivy::query::Occur::Should,
+                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                    ));
+                }
+                Err(e) => {
+                    debug!("Case-sensitive pattern doesn't match content_raw: {}", e);
+                }
+            }
+
+            if case_sensitive_clauses.is_empty() {
+                return Err(anyhow!(
+                    "Case-sensitive search for '{}' did not match any searchable fields",
+                    search_query.query
+                ));
+            }
+
+            Box::new(BooleanQuery::new(case_sensitive_clauses))
+        } else if search_query.regex_search {
             // Mode REGEX: Use RegexQuery for pattern matching (mutually exclusive with fuzzy)
             debug!("Using regex search mode with pattern: {}", search_query.query);
 
