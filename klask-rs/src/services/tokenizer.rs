@@ -32,6 +32,75 @@ impl Tokenizer for CodeTokenizer {
     }
 }
 
+/// Custom tokenizer that preserves case exactly - treats entire input as a single token
+/// This is used for fields where we need exact case-sensitive matching (via RegexQuery)
+#[derive(Clone)]
+pub struct RawCasePreservingTokenizer;
+
+impl RawCasePreservingTokenizer {
+    /// Creates a new RawCasePreservingTokenizer instance
+    pub fn new() -> Self {
+        RawCasePreservingTokenizer
+    }
+}
+
+impl Default for RawCasePreservingTokenizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Tokenizer for RawCasePreservingTokenizer {
+    type TokenStream<'a> = RawCasePreservingTokenStream;
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
+        RawCasePreservingTokenStream::new(text)
+    }
+}
+
+/// Token stream for the raw case-preserving tokenizer
+pub struct RawCasePreservingTokenStream {
+    token: Option<Token>,
+    consumed: bool,
+}
+
+impl RawCasePreservingTokenStream {
+    fn new(text: &str) -> Self {
+        // Create a single token that spans the entire text, preserving case
+        let token = if text.is_empty() {
+            None
+        } else {
+            Some(Token {
+                offset_from: 0,
+                offset_to: text.len(), // Use byte length, not character count
+                position: 0,
+                text: text.to_string(), // Preserve original case - do NOT lowercase
+                position_length: 1,
+            })
+        };
+        RawCasePreservingTokenStream { token, consumed: false }
+    }
+}
+
+impl TokenStream for RawCasePreservingTokenStream {
+    fn advance(&mut self) -> bool {
+        if self.token.is_some() && !self.consumed {
+            self.consumed = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn token(&self) -> &Token {
+        self.token.as_ref().expect("token should be available")
+    }
+
+    fn token_mut(&mut self) -> &mut Token {
+        self.token.as_mut().expect("token should be available")
+    }
+}
+
 /// Token stream for the code tokenizer
 pub struct CodeTokenStream {
     tokens: Vec<Token>,

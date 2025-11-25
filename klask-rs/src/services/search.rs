@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use tracing::{debug, warn};
 
-use crate::services::tokenizer::CodeTokenizer;
+use crate::services::tokenizer::{CodeTokenizer, RawCasePreservingTokenizer};
 
 // Search timeout: maximum time allowed for a single search query (30 seconds)
 // This prevents heavy regex queries (e.g., .*pattern) from blocking other requests
@@ -210,13 +210,14 @@ impl SearchService {
         let mmap_directory = MmapDirectory::open(&index_dir)?;
         let index = Index::open_or_create(mmap_directory, schema.clone())?;
 
-        // Register custom tokenizer for code search
+        // Register custom tokenizers
         // This MUST be done immediately after opening the index and before creating reader/writer
-        // The tokenizer must be registered on the index so QueryParser can access it during search
+        // The tokenizers must be registered on the index so QueryParser can access them during search
         {
             let tokenizer_manager = index.tokenizers();
             tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
-            debug!("Registered custom code_tokenizer for code-aware search");
+            tokenizer_manager.register("raw_case_preserving", RawCasePreservingTokenizer::new());
+            debug!("Registered custom tokenizers: code_tokenizer, raw_case_preserving");
         }
 
         // Create reader AFTER tokenizer registration so it has access to the registered tokenizer
@@ -287,10 +288,11 @@ impl SearchService {
         schema_builder.add_u64_field("size", FAST | STORED);
 
         // Raw (non-tokenized, case-preserving) versions of file_name and file_path for regex search
-        // Use raw tokenizer to preserve original case for case-sensitive regex matching
+        // Use custom raw_case_preserving tokenizer to ensure case is preserved (not lowercased)
+        // This is critical for case-sensitive RegexQuery matching
         let raw_text_options = TextOptions::default()
             .set_indexing_options(
-                TextFieldIndexing::default().set_tokenizer("raw").set_index_option(IndexRecordOption::Basic),
+                TextFieldIndexing::default().set_tokenizer("raw_case_preserving").set_index_option(IndexRecordOption::Basic),
             )
             .set_stored();
 
@@ -343,13 +345,17 @@ impl SearchService {
 
     /// Upsert a file - delete existing and add new version if it exists, otherwise just add
     pub async fn upsert_file(&self, file_data: FileData<'_>) -> Result<()> {
-        // Ensure custom tokenizer is registered on the index
-        // This is critical because the tokenizer must be available when indexing documents
+        // Ensure custom tokenizers are registered on the index
+        // This is critical because the tokenizers must be available when indexing documents
         {
             let tokenizer_manager = self.index.tokenizers();
             if tokenizer_manager.get("code_tokenizer").is_none() {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
                 debug!("Re-registered custom code_tokenizer for indexing");
+            }
+            if tokenizer_manager.get("raw_case_preserving").is_none() {
+                tokenizer_manager.register("raw_case_preserving", RawCasePreservingTokenizer::new());
+                debug!("Re-registered custom raw_case_preserving tokenizer for indexing");
             }
         }
 
@@ -565,13 +571,17 @@ impl SearchService {
 
     // Blocking search implementation - runs in a dedicated thread pool
     fn search_blocking(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
-        // Ensure custom tokenizer is registered on the index
-        // This is critical because the tokenizer must be available when QueryParser is created
+        // Ensure custom tokenizers are registered on the index
+        // This is critical because the tokenizers must be available when QueryParser is created
         {
             let tokenizer_manager = self.index.tokenizers();
             if tokenizer_manager.get("code_tokenizer").is_none() {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
                 debug!("Re-registered custom code_tokenizer for search");
+            }
+            if tokenizer_manager.get("raw_case_preserving").is_none() {
+                tokenizer_manager.register("raw_case_preserving", RawCasePreservingTokenizer::new());
+                debug!("Re-registered custom raw_case_preserving tokenizer for search");
             }
         }
 
