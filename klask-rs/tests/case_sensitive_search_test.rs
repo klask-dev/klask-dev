@@ -48,7 +48,6 @@ async fn test_case_sensitive_search_rejects_wrong_case() {
     );
 }
 
-
 #[tokio::test]
 async fn test_case_sensitive_camelcase_variant_mismatch() {
     let (service, _temp_dir, _guard) = create_test_search_service().await;
@@ -300,7 +299,6 @@ async fn test_case_sensitive_pagination_with_mismatch() {
         "Case-sensitive search for 'testvalue' should not find 'TestValue'"
     );
 }
-
 
 // ============================================================================
 // EDGE CASE TESTS

@@ -246,7 +246,8 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
         if should_split {
             // Emit the current token if it's not empty
             if !current_token.is_empty() {
-                // Emit lowercased version
+                // Emit only lowercased version - QueryParser expects one token per position
+                // Case-sensitive search is handled by content_raw field with RawCasePreservingTokenizer
                 let token = Token {
                     offset_from: token_byte_start,
                     offset_to: byte_pos,
@@ -255,16 +256,6 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
                     position_length: 1,
                 };
                 tokens.push(token);
-
-                // Emit case-preserved version
-                let token_original = Token {
-                    offset_from: token_byte_start,
-                    offset_to: byte_pos,
-                    position: position_base + tokens.len(),
-                    text: current_token_original.clone(),
-                    position_length: 1,
-                };
-                tokens.push(token_original);
 
                 current_token.clear();
                 current_token_original.clear();
@@ -280,7 +271,7 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
 
     // Emit the final split token
     if !current_token.is_empty() {
-        // Emit lowercased version
+        // Emit only lowercased version - QueryParser expects one token per position
         let token = Token {
             offset_from: token_byte_start,
             offset_to: byte_pos,
@@ -289,21 +280,12 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
             position_length: 1,
         };
         tokens.push(token);
-
-        // Emit case-preserved version
-        let token_original = Token {
-            offset_from: token_byte_start,
-            offset_to: byte_pos,
-            position: position_base + tokens.len(),
-            text: current_token_original,
-            position_length: 1,
-        };
-        tokens.push(token_original);
     }
 
-    // If we generated multiple tokens (i.e., the word was split), add complete tokens
-    if tokens.len() > 2 {
-        // Add the complete lowercased identifier
+    // If we generated multiple tokens (i.e., the word was split), add complete lowercased token
+    if tokens.len() > 1 {
+        // Add the complete lowercased identifier to allow searching for the whole identifier
+        // e.g., searching for "readertemplate" should find "readerTemplate" when split into ["reader", "template"]
         let complete_token = Token {
             offset_from: byte_offset_base,
             offset_to: byte_pos,
@@ -312,16 +294,6 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
             position_length: 1,
         };
         tokens.push(complete_token);
-
-        // Add the complete case-preserved identifier
-        let complete_token_original = Token {
-            offset_from: byte_offset_base,
-            offset_to: byte_pos,
-            position: position_base + tokens.len(),
-            text: text.to_string(),
-            position_length: 1,
-        };
-        tokens.push(complete_token_original);
     }
 
     tokens
@@ -342,33 +314,29 @@ mod tests {
     #[test]
     fn test_single_char_lowercase() {
         let tokens = tokenize_code("a");
-        assert_eq!(tokens.len(), 2); // lowercased, case-preserved
+        assert_eq!(tokens.len(), 1); // lowercased only
         assert_eq!(tokens[0].text, "a");
-        assert_eq!(tokens[1].text, "a");
     }
 
     #[test]
     fn test_single_char_uppercase() {
         let tokens = tokenize_code("A");
-        assert_eq!(tokens.len(), 2); // lowercased, case-preserved
+        assert_eq!(tokens.len(), 1); // lowercased only
         assert_eq!(tokens[0].text, "a", "Lowercased version");
-        assert_eq!(tokens[1].text, "A", "Case-preserved version");
     }
 
     #[test]
     fn test_single_word_lowercase() {
         let tokens = tokenize_code("hello");
-        assert_eq!(tokens.len(), 2); // lowercased, case-preserved
+        assert_eq!(tokens.len(), 1); // lowercased only
         assert_eq!(tokens[0].text, "hello");
-        assert_eq!(tokens[1].text, "hello");
     }
 
     #[test]
     fn test_single_word_uppercase() {
         let tokens = tokenize_code("HELLO");
-        assert_eq!(tokens.len(), 2); // lowercased, case-preserved
+        assert_eq!(tokens.len(), 1); // lowercased only
         assert_eq!(tokens[0].text, "hello", "Lowercased version");
-        assert_eq!(tokens[1].text, "HELLO", "Case-preserved version");
     }
 
     // ==================== CamelCase Cases ====================
@@ -376,86 +344,68 @@ mod tests {
     #[test]
     fn test_camel_case_basic() {
         let tokens = tokenize_code("camelCase");
-        // 2 (camel) + 2 (case) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (camel) + 1 (case) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "camel");
-        assert_eq!(tokens[1].text, "camel");
-        assert_eq!(tokens[2].text, "case");
-        assert_eq!(tokens[3].text, "Case");
-        assert_eq!(tokens[4].text, "camelcase");
-        assert_eq!(tokens[5].text, "camelCase");
+        assert_eq!(tokens[1].text, "case");
+        assert_eq!(tokens[2].text, "camelcase");
     }
 
     #[test]
     fn test_camel_case_basic_simple() {
         let tokens = tokenize_code("camelCase");
-        // Count: 2 (camel split) + 2 (case split) + 2 (complete)
-        assert_eq!(tokens.len(), 6);
+        // Count: 1 (camel) + 1 (case) + 1 (complete)
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "camel"); // lowercased camel
-        assert_eq!(tokens[1].text, "camel"); // case-preserved camel
-        assert_eq!(tokens[2].text, "case"); // lowercased case
-        assert_eq!(tokens[3].text, "Case"); // case-preserved case
-        assert_eq!(tokens[4].text, "camelcase"); // complete lowercased
-        assert_eq!(tokens[5].text, "camelCase"); // complete case-preserved
+        assert_eq!(tokens[1].text, "case"); // lowercased case
+        assert_eq!(tokens[2].text, "camelcase"); // complete lowercased
     }
 
     #[test]
     fn test_camel_case_three_parts() {
         let tokens = tokenize_code("myVariableName");
-        // 2 (my) + 2 (variable) + 2 (name) + 2 (complete) = 8
-        assert_eq!(tokens.len(), 8);
+        // 1 (my) + 1 (variable) + 1 (name) + 1 (complete) = 4
+        assert_eq!(tokens.len(), 4);
         assert_eq!(tokens[0].text, "my");
-        assert_eq!(tokens[1].text, "my");
-        assert_eq!(tokens[2].text, "variable");
-        assert_eq!(tokens[3].text, "Variable");
-        assert_eq!(tokens[4].text, "name");
-        assert_eq!(tokens[5].text, "Name");
-        assert_eq!(tokens[6].text, "myvariablename");
-        assert_eq!(tokens[7].text, "myVariableName");
+        assert_eq!(tokens[1].text, "variable");
+        assert_eq!(tokens[2].text, "name");
+        assert_eq!(tokens[3].text, "myvariablename");
     }
 
     #[test]
     fn test_camel_case_four_parts() {
         let tokens = tokenize_code("parseJSONFromAPIResponse");
-        // 2 (parse) + 2 (json) + 2 (from) + 2 (api) + 2 (response) + 2 (complete) = 12
-        assert_eq!(tokens.len(), 12);
+        // 1 (parse) + 1 (json) + 1 (from) + 1 (api) + 1 (response) + 1 (complete) = 6
+        assert_eq!(tokens.len(), 6);
         assert_eq!(tokens[0].text, "parse");
-        assert_eq!(tokens[1].text, "parse");
-        assert_eq!(tokens[2].text, "json");
-        assert_eq!(tokens[3].text, "JSON");
-        // Check that complete tokens exist
+        assert_eq!(tokens[1].text, "json");
+        assert_eq!(tokens[2].text, "from");
+        assert_eq!(tokens[3].text, "api");
+        assert_eq!(tokens[4].text, "response");
+        // Check that complete lowercase token exists
         let has_lowercase_complete = tokens.iter().any(|t| t.text == "parsejsonfromapiresponse");
-        let has_case_preserved = tokens.iter().any(|t| t.text == "parseJSONFromAPIResponse");
         assert!(has_lowercase_complete, "Should have lowercase complete token");
-        assert!(has_case_preserved, "Should have case-preserved complete token");
     }
 
     #[test]
     fn test_pascal_case() {
         let tokens = tokenize_code("PascalCase");
-        // 2 (Pascal) + 2 (Case) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (pascal) + 1 (case) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "pascal");
-        assert_eq!(tokens[1].text, "Pascal");
-        assert_eq!(tokens[2].text, "case");
-        assert_eq!(tokens[3].text, "Case");
-        assert_eq!(tokens[4].text, "pascalcase");
-        assert_eq!(tokens[5].text, "PascalCase");
+        assert_eq!(tokens[1].text, "case");
+        assert_eq!(tokens[2].text, "pascalcase");
     }
 
     #[test]
     fn test_pascal_case_three_parts() {
         let tokens = tokenize_code("MyVariableName");
-        // 2 (My) + 2 (Variable) + 2 (Name) + 2 (complete) = 8
-        assert_eq!(tokens.len(), 8);
+        // 1 (my) + 1 (variable) + 1 (name) + 1 (complete) = 4
+        assert_eq!(tokens.len(), 4);
         assert_eq!(tokens[0].text, "my");
-        assert_eq!(tokens[1].text, "My");
-        assert_eq!(tokens[2].text, "variable");
-        assert_eq!(tokens[3].text, "Variable");
-        assert_eq!(tokens[4].text, "name");
-        assert_eq!(tokens[5].text, "Name");
-        assert_eq!(tokens[6].text, "myvariablename");
-        assert_eq!(tokens[7].text, "MyVariableName");
+        assert_eq!(tokens[1].text, "variable");
+        assert_eq!(tokens[2].text, "name");
+        assert_eq!(tokens[3].text, "myvariablename");
     }
 
     // ==================== Acronym Cases ====================
@@ -463,120 +413,92 @@ mod tests {
     #[test]
     fn test_html_parser() {
         let tokens = tokenize_code("HTMLParser");
-        // 2 (HTML) + 2 (Parser) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (html) + 1 (parser) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "html");
-        assert_eq!(tokens[1].text, "HTML");
-        assert_eq!(tokens[2].text, "parser");
-        assert_eq!(tokens[3].text, "Parser");
-        assert_eq!(tokens[4].text, "htmlparser");
-        assert_eq!(tokens[5].text, "HTMLParser");
+        assert_eq!(tokens[1].text, "parser");
+        assert_eq!(tokens[2].text, "htmlparser");
     }
 
     #[test]
     fn test_http_response() {
         let tokens = tokenize_code("HTTPResponse");
-        // 2 (HTTP) + 2 (Response) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (http) + 1 (response) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "http");
-        assert_eq!(tokens[1].text, "HTTP");
-        assert_eq!(tokens[2].text, "response");
-        assert_eq!(tokens[3].text, "Response");
-        assert_eq!(tokens[4].text, "httpresponse");
-        assert_eq!(tokens[5].text, "HTTPResponse");
+        assert_eq!(tokens[1].text, "response");
+        assert_eq!(tokens[2].text, "httpresponse");
     }
 
     #[test]
     fn test_get_http_response() {
         let tokens = tokenize_code("getHTTPResponse");
-        // 2 (get) + 2 (HTTP) + 2 (Response) + 2 (complete) = 8
-        assert_eq!(tokens.len(), 8);
+        // 1 (get) + 1 (http) + 1 (response) + 1 (complete) = 4
+        assert_eq!(tokens.len(), 4);
         assert_eq!(tokens[0].text, "get");
-        assert_eq!(tokens[1].text, "get");
-        assert_eq!(tokens[2].text, "http");
-        assert_eq!(tokens[3].text, "HTTP");
-        assert_eq!(tokens[4].text, "response");
-        assert_eq!(tokens[5].text, "Response");
-        assert_eq!(tokens[6].text, "gethttpresponse");
-        assert_eq!(tokens[7].text, "getHTTPResponse");
+        assert_eq!(tokens[1].text, "http");
+        assert_eq!(tokens[2].text, "response");
+        assert_eq!(tokens[3].text, "gethttpresponse");
     }
 
     #[test]
     fn test_xml_parser() {
         let tokens = tokenize_code("XMLParser");
-        // 2 (XML) + 2 (Parser) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (xml) + 1 (parser) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "xml");
-        assert_eq!(tokens[1].text, "XML");
-        assert_eq!(tokens[2].text, "parser");
-        assert_eq!(tokens[3].text, "Parser");
-        assert_eq!(tokens[4].text, "xmlparser");
-        assert_eq!(tokens[5].text, "XMLParser");
+        assert_eq!(tokens[1].text, "parser");
+        assert_eq!(tokens[2].text, "xmlparser");
     }
 
     #[test]
     fn test_io_error() {
         let tokens = tokenize_code("IOError");
-        // 2 (IO) + 2 (Error) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (io) + 1 (error) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "io");
-        assert_eq!(tokens[1].text, "IO");
-        assert_eq!(tokens[2].text, "error");
-        assert_eq!(tokens[3].text, "Error");
-        assert_eq!(tokens[4].text, "ioerror");
-        assert_eq!(tokens[5].text, "IOError");
+        assert_eq!(tokens[1].text, "error");
+        assert_eq!(tokens[2].text, "ioerror");
     }
 
     #[test]
     fn test_https_connection() {
         let tokens = tokenize_code("HTTPSConnection");
-        // 2 (HTTPS) + 2 (Connection) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (https) + 1 (connection) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "https");
-        assert_eq!(tokens[1].text, "HTTPS");
-        assert_eq!(tokens[2].text, "connection");
-        assert_eq!(tokens[3].text, "Connection");
-        assert_eq!(tokens[4].text, "httpsconnection");
-        assert_eq!(tokens[5].text, "HTTPSConnection");
+        assert_eq!(tokens[1].text, "connection");
+        assert_eq!(tokens[2].text, "httpsconnection");
     }
 
     #[test]
     fn test_url_handler() {
         let tokens = tokenize_code("URLHandler");
-        // 2 (URL) + 2 (Handler) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (url) + 1 (handler) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "url");
-        assert_eq!(tokens[1].text, "URL");
-        assert_eq!(tokens[2].text, "handler");
-        assert_eq!(tokens[3].text, "Handler");
-        assert_eq!(tokens[4].text, "urlhandler");
-        assert_eq!(tokens[5].text, "URLHandler");
+        assert_eq!(tokens[1].text, "handler");
+        assert_eq!(tokens[2].text, "urlhandler");
     }
 
     #[test]
     fn test_api_client() {
         let tokens = tokenize_code("APIClient");
-        // 2 (API) + 2 (Client) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (api) + 1 (client) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "api");
-        assert_eq!(tokens[1].text, "API");
-        assert_eq!(tokens[2].text, "client");
-        assert_eq!(tokens[3].text, "Client");
-        assert_eq!(tokens[4].text, "apiclient");
-        assert_eq!(tokens[5].text, "APIClient");
+        assert_eq!(tokens[1].text, "client");
+        assert_eq!(tokens[2].text, "apiclient");
     }
 
     #[test]
     fn test_json_object() {
         let tokens = tokenize_code("JSONObject");
-        // 2 (JSON) + 2 (Object) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (json) + 1 (object) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "json");
-        assert_eq!(tokens[1].text, "JSON");
-        assert_eq!(tokens[2].text, "object");
-        assert_eq!(tokens[3].text, "Object");
-        assert_eq!(tokens[4].text, "jsonobject");
-        assert_eq!(tokens[5].text, "JSONObject");
+        assert_eq!(tokens[1].text, "object");
+        assert_eq!(tokens[2].text, "jsonobject");
     }
 
     // ==================== Underscore & Hyphen Cases ====================
@@ -584,73 +506,63 @@ mod tests {
     #[test]
     fn test_snake_case() {
         let tokens = tokenize_code("snake_case");
-        // 2 (lowercased, case-preserved) - no split because of underscore
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split because of underscore
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "snake_case", "Lowercased version");
-        assert_eq!(tokens[1].text, "snake_case", "Case-preserved version");
     }
 
     #[test]
     fn test_snake_case_three_parts() {
         let tokens = tokenize_code("my_variable_name");
-        // 2 (lowercased, case-preserved) - no split because of underscores
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split because of underscores
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "my_variable_name", "Lowercased version");
-        assert_eq!(tokens[1].text, "my_variable_name", "Case-preserved version");
     }
 
     #[test]
     fn test_nginx_url() {
         let tokens = tokenize_code("NETBOX_URL");
-        // 2 (lowercased, case-preserved) - no split because of underscores
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split because of underscores
+        assert_eq!(tokens.len(), 1);
         assert_eq!(
             tokens[0].text, "netbox_url",
             "Uppercase with underscores should be lowercased"
         );
-        assert_eq!(tokens[1].text, "NETBOX_URL", "Case-preserved version");
     }
 
     #[test]
     fn test_all_caps_with_underscore() {
         let tokens = tokenize_code("AWS_REGION_NAME");
-        // 2 (lowercased, case-preserved) - no split because of underscores
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split because of underscores
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "aws_region_name", "Lowercase version");
-        assert_eq!(tokens[1].text, "AWS_REGION_NAME", "Case-preserved version");
     }
 
     #[test]
     fn test_hyphenated_basic() {
         let tokens = tokenize_code("my-module");
-        // 2 (lowercased, case-preserved) - no split because of hyphen
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split because of hyphen
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "my-module", "Lowercased version");
-        assert_eq!(tokens[1].text, "my-module", "Case-preserved version");
     }
 
     #[test]
     fn test_hyphenated_three_parts() {
         let tokens = tokenize_code("my-function-name");
-        // 2 (lowercased, case-preserved) - no split because of hyphens
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split because of hyphens
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "my-function-name", "Lowercased version");
-        assert_eq!(tokens[1].text, "my-function-name", "Case-preserved version");
     }
 
     #[test]
     fn test_config_service() {
         // Hyphens prevent splitting, so the whole thing stays as one token
         let tokens = tokenize_code("config-Service");
-        // 2 (lowercased, case-preserved) - hyphen prevents splitting
-        assert_eq!(tokens.len(), 2);
+        // 1 - hyphen prevents splitting
+        assert_eq!(tokens.len(), 1);
         assert_eq!(
             tokens[0].text, "config-service",
             "Hyphen prevents splitting - lowercase"
-        );
-        assert_eq!(
-            tokens[1].text, "config-Service",
-            "Hyphen prevents splitting - case-preserved"
         );
     }
 
@@ -659,50 +571,40 @@ mod tests {
     #[test]
     fn test_mixed_snake_and_camel() {
         let tokens = tokenize_code("my_functionName");
-        // 2 (my_function) + 2 (name) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (my_function) + 1 (name) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "my_function", "Lowercase with underscore");
-        assert_eq!(tokens[1].text, "my_function", "Case-preserved with underscore");
-        assert_eq!(tokens[2].text, "name", "Split on case transition");
-        assert_eq!(tokens[3].text, "Name", "Case-preserved Name");
-        assert_eq!(tokens[4].text, "my_functionname", "Complete lowercase");
-        assert_eq!(tokens[5].text, "my_functionName", "Complete case-preserved");
+        assert_eq!(tokens[1].text, "name", "Split on case transition");
+        assert_eq!(tokens[2].text, "my_functionname", "Complete lowercase");
     }
 
     #[test]
     fn test_mixed_hyphen_and_camel() {
         let tokens = tokenize_code("my-functionName");
-        // 2 (my-function) + 2 (name) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (my-function) + 1 (name) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "my-function", "Lowercase with hyphen");
-        assert_eq!(tokens[1].text, "my-function", "Case-preserved with hyphen");
-        assert_eq!(tokens[2].text, "name", "Split on case transition");
-        assert_eq!(tokens[3].text, "Name", "Case-preserved Name");
-        assert_eq!(tokens[4].text, "my-functionname", "Complete lowercase");
-        assert_eq!(tokens[5].text, "my-functionName", "Complete case-preserved");
+        assert_eq!(tokens[1].text, "name", "Split on case transition");
+        assert_eq!(tokens[2].text, "my-functionname", "Complete lowercase");
     }
 
     #[test]
     fn test_snake_case_with_camel() {
         let tokens = tokenize_code("snake_camelCase");
-        // 2 (snake_camel) + 2 (case) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (snake_camel) + 1 (case) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "snake_camel", "Lowercase with underscore");
-        assert_eq!(tokens[1].text, "snake_camel", "Case-preserved with underscore");
-        assert_eq!(tokens[2].text, "case", "Split on case transition");
-        assert_eq!(tokens[3].text, "Case", "Case-preserved Case");
-        assert_eq!(tokens[4].text, "snake_camelcase", "Complete lowercase");
-        assert_eq!(tokens[5].text, "snake_camelCase", "Complete case-preserved");
+        assert_eq!(tokens[1].text, "case", "Split on case transition");
+        assert_eq!(tokens[2].text, "snake_camelcase", "Complete lowercase");
     }
 
     #[test]
     fn test_complex_mixed_naming() {
         // Underscores prevent splitting, so everything stays as one token
         let tokens = tokenize_code("my_api_Handler");
-        // 2 (lowercased, case-preserved) - underscores prevent splitting
-        assert_eq!(tokens.len(), 2);
+        // 1 - underscores prevent splitting
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "my_api_handler", "Lowercase version");
-        assert_eq!(tokens[1].text, "my_api_Handler", "Case-preserved version");
     }
 
     // ==================== Numbers Cases ====================
@@ -710,14 +612,11 @@ mod tests {
     #[test]
     fn test_number_at_start() {
         let tokens = tokenize_code("1stPlace");
-        // 2 (1st) + 2 (place) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (1st) + 1 (place) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "1st");
-        assert_eq!(tokens[1].text, "1st");
-        assert_eq!(tokens[2].text, "place");
-        assert_eq!(tokens[3].text, "Place");
-        assert_eq!(tokens[4].text, "1stplace");
-        assert_eq!(tokens[5].text, "1stPlace");
+        assert_eq!(tokens[1].text, "place");
+        assert_eq!(tokens[2].text, "1stplace");
     }
 
     #[test]
@@ -725,38 +624,32 @@ mod tests {
         // Numbers don't trigger splits since they're neither lowercase nor uppercase
         // "base64Encode" -> "base64encode" doesn't split at 4->E because 4 is not lowercase
         let tokens = tokenize_code("base64Encode");
-        // No split happens, so: 2 (base64encode, case-preserved)
-        assert_eq!(tokens.len(), 2);
+        // No split happens, so: 1 (base64encode)
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "base64encode");
-        assert_eq!(tokens[1].text, "base64Encode");
     }
 
     #[test]
     fn test_multiple_numbers() {
         // Numbers don't cause splits; only lowercase->uppercase does
-        // "var1Name2Value" splits at "1->N" and "2->V" (both lowercase->uppercase transitions)
-        // Actually wait: "1" is not lowercase, so "1N" doesn't split
+        // "var1Name2Value" splits at "r->N" (lowercase->uppercase transition)
+        // "1" is not lowercase, so "1N" doesn't split
         // "2" is not lowercase, so "2V" doesn't split
-        // The only split is "r->N" but that's followed by "ame2V"
-        // So: var1Name2Value as single token (no split because 1 and 2 are not lowercase)
         let tokens = tokenize_code("var1Name2Value");
-        assert_eq!(tokens.len(), 2); // Just lowercased and case-preserved
+        // 1 (var1name2value) - single token because number->uppercase doesn't split
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "var1name2value");
-        assert_eq!(tokens[1].text, "var1Name2Value");
     }
 
     #[test]
     fn test_consecutive_numbers() {
         // Split happens on lowercase to uppercase: "Base64URL" vs "Safe"
         let tokens = tokenize_code("Base64URLSafe");
-        // 2 (base64url) + 2 (safe) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (base64url) + 1 (safe) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "base64url");
-        assert_eq!(tokens[1].text, "Base64URL");
-        assert_eq!(tokens[2].text, "safe");
-        assert_eq!(tokens[3].text, "Safe");
-        assert_eq!(tokens[4].text, "base64urlsafe");
-        assert_eq!(tokens[5].text, "Base64URLSafe");
+        assert_eq!(tokens[1].text, "safe");
+        assert_eq!(tokens[2].text, "base64urlsafe");
     }
 
     // ==================== Edge Cases ====================
@@ -764,83 +657,70 @@ mod tests {
     #[test]
     fn test_double_underscore() {
         let tokens = tokenize_code("test__double");
-        // 2 (lowercased, case-preserved) - underscores prevent splitting
-        assert_eq!(tokens.len(), 2);
+        // 1 - underscores prevent splitting
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "test__double", "Lowercased");
-        assert_eq!(tokens[1].text, "test__double", "Case-preserved");
     }
 
     #[test]
     fn test_double_hyphen() {
         let tokens = tokenize_code("test--double");
-        // 2 (lowercased, case-preserved) - hyphens prevent splitting
-        assert_eq!(tokens.len(), 2);
+        // 1 - hyphens prevent splitting
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "test--double", "Lowercased");
-        assert_eq!(tokens[1].text, "test--double", "Case-preserved");
     }
 
     #[test]
     fn test_leading_underscore() {
         let tokens = tokenize_code("_privateFunction");
-        // 2 (_private) + 2 (function) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (_private) + 1 (function) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "_private");
-        assert_eq!(tokens[1].text, "_private");
-        assert_eq!(tokens[2].text, "function");
-        assert_eq!(tokens[3].text, "Function");
-        assert_eq!(tokens[4].text, "_privatefunction");
-        assert_eq!(tokens[5].text, "_privateFunction");
+        assert_eq!(tokens[1].text, "function");
+        assert_eq!(tokens[2].text, "_privatefunction");
     }
 
     #[test]
     fn test_trailing_underscore() {
         let tokens = tokenize_code("functionName_");
-        // 2 (function) + 2 (name_) + 2 (complete) = 6
-        assert_eq!(tokens.len(), 6);
+        // 1 (function) + 1 (name_) + 1 (complete) = 3
+        assert_eq!(tokens.len(), 3);
         assert_eq!(tokens[0].text, "function");
-        assert_eq!(tokens[1].text, "function");
-        assert_eq!(tokens[2].text, "name_");
-        assert_eq!(tokens[3].text, "Name_");
-        assert_eq!(tokens[4].text, "functionname_");
-        assert_eq!(tokens[5].text, "functionName_");
+        assert_eq!(tokens[1].text, "name_");
+        assert_eq!(tokens[2].text, "functionname_");
     }
 
     #[test]
     fn test_only_underscores() {
         let tokens = tokenize_code("___");
-        // 2 (lowercased, case-preserved) - no split
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "___");
-        assert_eq!(tokens[1].text, "___");
     }
 
     #[test]
     fn test_only_hyphens() {
         let tokens = tokenize_code("---");
-        // 2 (lowercased, case-preserved) - no split
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "---");
-        assert_eq!(tokens[1].text, "---");
     }
 
     #[test]
     fn test_whitespace_splits_words() {
         let tokens = tokenize_code("hello world");
-        // 2 (hello) + 2 (world) = 4
-        assert_eq!(tokens.len(), 4);
+        // 1 (hello) + 1 (world) = 2
+        assert_eq!(tokens.len(), 2);
         assert_eq!(tokens[0].text, "hello");
-        assert_eq!(tokens[1].text, "hello");
-        assert_eq!(tokens[2].text, "world");
-        assert_eq!(tokens[3].text, "world");
+        assert_eq!(tokens[1].text, "world");
     }
 
     #[test]
     fn test_uppercase_preserved_case_insensitive() {
         let tokens = tokenize_code("UPPERCASE");
-        // 2 (lowercased, case-preserved) - single word, no split
-        assert_eq!(tokens.len(), 2);
+        // 1 - single word, no split
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "uppercase", "Lowercased version");
-        assert_eq!(tokens[1].text, "UPPERCASE", "Case-preserved version");
     }
 
     #[test]
@@ -858,12 +738,12 @@ mod tests {
     #[test]
     fn test_java_style_getter() {
         let tokens = tokenize_code("getHTTPServerConnection");
-        // 2 (get) + 2 (http) + 2 (server) + 2 (connection) + 2 (complete) = 10
-        assert_eq!(tokens.len(), 10);
+        // 1 (get) + 1 (http) + 1 (server) + 1 (connection) + 1 (complete) = 5
+        assert_eq!(tokens.len(), 5);
         assert_eq!(tokens[0].text, "get");
-        assert_eq!(tokens[1].text, "get");
-        assert_eq!(tokens[2].text, "http");
-        assert_eq!(tokens[3].text, "HTTP");
+        assert_eq!(tokens[1].text, "http");
+        assert_eq!(tokens[2].text, "server");
+        assert_eq!(tokens[3].text, "connection");
         // Check lowercase complete exists
         let has_lowercase_complete = tokens.iter().any(|t| t.text == "gethttpserverconnection");
         assert!(has_lowercase_complete);
@@ -872,37 +752,33 @@ mod tests {
     #[test]
     fn test_rust_style_snake() {
         let tokens = tokenize_code("parse_json_from_file");
-        // 2 (lowercased, case-preserved) - no split due to underscores
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split due to underscores
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "parse_json_from_file");
-        assert_eq!(tokens[1].text, "parse_json_from_file");
     }
 
     #[test]
     fn test_css_class_name() {
         let tokens = tokenize_code("btn-primary-lg");
-        // 2 (lowercased, case-preserved) - no split due to hyphens
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split due to hyphens
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "btn-primary-lg");
-        assert_eq!(tokens[1].text, "btn-primary-lg");
     }
 
     #[test]
     fn test_environment_variable() {
         let tokens = tokenize_code("DATABASE_CONNECTION_TIMEOUT");
-        // 2 (lowercased, case-preserved) - no split due to underscores
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split due to underscores
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "database_connection_timeout");
-        assert_eq!(tokens[1].text, "DATABASE_CONNECTION_TIMEOUT");
     }
 
     #[test]
     fn test_kubernetes_pod_name() {
         let tokens = tokenize_code("klask-backend-prod");
-        // 2 (lowercased, case-preserved) - no split due to hyphens
-        assert_eq!(tokens.len(), 2);
+        // 1 - no split due to hyphens
+        assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].text, "klask-backend-prod");
-        assert_eq!(tokens[1].text, "klask-backend-prod");
     }
 
     #[test]
@@ -1060,20 +936,11 @@ mod tests {
         let tokens = tokenize_code("snake_case");
         let token_texts: Vec<_> = tokens.iter().map(|t| t.text.clone()).collect();
 
-        // Snake case doesn't split, so we have 2 tokens (lowercased and case-preserved)
-        assert_eq!(
-            token_texts.len(),
-            2,
-            "Snake case should have 2 tokens (lowercase + case-preserved)"
-        );
+        // Snake case doesn't split, so we have 1 token (lowercased only)
+        assert_eq!(token_texts.len(), 1, "Snake case should have 1 token (lowercase only)");
         assert!(
             token_texts.contains(&"snake_case".to_string()),
             "Should have 'snake_case' token"
-        );
-        // The case-preserved version is the same for snake_case (all lowercase anyway)
-        assert_eq!(
-            token_texts[0], token_texts[1],
-            "Both versions should be identical for all-lowercase"
         );
     }
 

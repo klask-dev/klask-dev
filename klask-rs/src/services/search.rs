@@ -292,7 +292,9 @@ impl SearchService {
         // This is critical for case-sensitive RegexQuery matching
         let raw_text_options = TextOptions::default()
             .set_indexing_options(
-                TextFieldIndexing::default().set_tokenizer("raw_case_preserving").set_index_option(IndexRecordOption::Basic),
+                TextFieldIndexing::default()
+                    .set_tokenizer("raw_case_preserving")
+                    .set_index_option(IndexRecordOption::Basic),
             )
             .set_stored();
 
