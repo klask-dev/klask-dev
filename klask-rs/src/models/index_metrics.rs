@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
 
+/// Response structure for search service status (schema mismatch detection).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchStatusResponse {
+    /// Whether a schema mismatch was detected in the index
+    pub schema_mismatch: bool,
+    /// Whether the index is currently available for searching
+    pub index_available: bool,
+    /// Optional message providing more details about the status
+    pub message: Option<String>,
+}
+
 /// Response structure for detailed index statistics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexStatsResponse {

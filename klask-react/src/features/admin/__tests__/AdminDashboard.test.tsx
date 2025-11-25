@@ -4,13 +4,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AdminDashboard from '../AdminDashboard';
 import { useAdminDashboard } from '../../../hooks/useAdmin';
 
-// Mock the useAdminDashboard hook
+// Mock the useAdminDashboard hook and useSearchStatus
 vi.mock('../../../hooks/useAdmin', () => ({
   useAdminDashboard: vi.fn(),
 }));
 
+vi.mock('../../../api/indexMetrics', () => ({
+  useSearchStatus: vi.fn(),
+}));
+
 import { MetricCard } from '../../../components/admin/MetricCard';
 import { formatDateTime } from '../../../lib/utils';
+import * as indexMetricsApi from '../../../api/indexMetrics';
 
 // Mock MetricCard component
 vi.mock('../../../components/admin/MetricCard', () => ({
@@ -45,6 +50,7 @@ vi.mock('@heroicons/react/24/outline', () => ({
 describe('AdminDashboard', () => {
   let queryClient: QueryClient;
   const mockUseAdminDashboard = vi.mocked(useAdminDashboard);
+  const mockUseSearchStatus = vi.mocked(indexMetricsApi.useSearchStatus);
 
   const mockDashboardData = {
     system: {
@@ -125,6 +131,18 @@ describe('AdminDashboard', () => {
       },
     });
     vi.clearAllMocks();
+    // Default mock - no schema mismatch
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: false,
+        index_available: true,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
   });
 
   const renderComponent = () => {
@@ -534,5 +552,213 @@ describe('AdminDashboard', () => {
       }),
       undefined
     );
+  });
+
+  // Schema Mismatch Tests - Tests 12-14
+
+  describe('Search Status with Schema Mismatch', () => {
+    // Test 12: Search status badge shows "Healthy" when no mismatch
+    it('should display "Healthy" badge when schema_mismatch is false', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: false,
+          index_available: true,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      renderComponent();
+
+      expect(screen.getByText('Healthy')).toBeInTheDocument();
+    });
+
+    // Test 13: Search status badge shows "Needs Rebuild" when mismatch
+    it('should display "Needs Rebuild" badge when schema_mismatch is true', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: true,
+          index_available: false,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      renderComponent();
+
+      expect(screen.getByText('Needs Rebuild')).toBeInTheDocument();
+    });
+
+    // Test 13b: Badge has correct styling for schema mismatch
+    it('should have red/warning styling for "Needs Rebuild" badge', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: true,
+          index_available: false,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = renderComponent();
+
+      const needsRebuildBadge = screen.getByText('Needs Rebuild').closest('[class*="bg-"]');
+      expect(needsRebuildBadge).toHaveClass('bg-red-100');
+    });
+
+    // Test 13c: Schema mismatch indicator text in search card
+    it('should display schema mismatch indicator in search status card', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: true,
+          index_available: false,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      renderComponent();
+
+      expect(screen.getByText('(schema mismatch)')).toBeInTheDocument();
+    });
+
+    // Test 13d: Action prompt shown for rebuild
+    it('should show action prompt when schema_mismatch is true', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: true,
+          index_available: false,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      renderComponent();
+
+      expect(screen.getByText('Click to rebuild index')).toBeInTheDocument();
+    });
+
+    // Test 14: Search status card is clickable link to IndexManagement
+    it('should be clickable link to index management page', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: false,
+          index_available: true,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = renderComponent();
+
+      // Find the search status card link
+      const searchStatusLink = container.querySelector('a[href="/admin/index"]');
+      expect(searchStatusLink).toBeInTheDocument();
+    });
+
+    // Test 14b: No action prompt when healthy
+    it('should not show action prompt when schema_mismatch is false', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: false,
+          index_available: true,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      renderComponent();
+
+      expect(screen.queryByText('Click to rebuild index')).not.toBeInTheDocument();
+    });
+
+    // Test 14c: Green "Healthy" badge styling
+    it('should have green styling for "Healthy" badge', () => {
+      mockUseSearchStatus.mockReturnValue({
+        data: {
+          schema_mismatch: false,
+          index_available: true,
+        },
+        isLoading: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as any);
+
+      mockUseAdminDashboard.mockReturnValue({
+        data: mockDashboardData,
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = renderComponent();
+
+      const healthyBadge = screen.getByText('Healthy').closest('[class*="bg-"]');
+      expect(healthyBadge).toHaveClass('bg-green-100');
+    });
   });
 });

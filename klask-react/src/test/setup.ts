@@ -2,6 +2,25 @@ import '@testing-library/jest-dom';
 import { cleanup, configure } from '@testing-library/react';
 import { afterEach, afterAll, vi } from 'vitest';
 
+// Fix React 19 compatibility with testing-library
+// React 19 doesn't export act, but React Testing Library expects it
+// Provide a simple act implementation that just executes the callback
+import React from 'react';
+
+const mockAct = (callback: (() => void) | (() => Promise<void>)): any => {
+  const result = callback();
+  // If the callback returns a promise, return that promise
+  // Otherwise return the result (which might be undefined)
+  return result;
+};
+
+Object.defineProperty(React, 'act', {
+  value: mockAct,
+  writable: true,
+  enumerable: true,
+  configurable: true,
+});
+
 // Configure testing-library to be less verbose
 configure({
   getElementError: (message) => {
@@ -68,16 +87,8 @@ global.console = {
   error: vi.fn(),
 };
 
-// Mock react-router-dom
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => vi.fn(),
-    useLocation: () => ({ pathname: '/' }),
-    useParams: () => ({}),
-  };
-});
+// Note: react-router-dom is mocked in individual test files as needed
+// Don't mock it globally here as it can conflict with test-specific mocks
 
 // Enhanced timeout for async operations - reduced for better test performance
 vi.setConfig({ testTimeout: 5000 });

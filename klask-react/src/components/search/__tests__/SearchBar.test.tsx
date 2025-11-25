@@ -3,13 +3,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '../../../test/utils';
 import userEvent from '@testing-library/user-event';
 import { SearchBar } from '../SearchBar';
+import * as indexMetricsApi from '../../../api/indexMetrics';
+
+// Mock useSearchStatus hook
+vi.mock('../../../api/indexMetrics', () => ({
+  useSearchStatus: vi.fn(),
+}));
 
 describe('SearchBar Component', () => {
   const mockOnChange = vi.fn();
   const mockOnSearch = vi.fn();
+  const mockUseSearchStatus = vi.mocked(indexMetricsApi.useSearchStatus);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock - no schema mismatch
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: false,
+        index_available: true,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
   });
 
   const defaultProps = {
@@ -318,5 +337,225 @@ describe('SearchBar Component', () => {
     await user.keyboard('{Enter}');
 
     expect(mockOnSearch).toHaveBeenCalledWith('test');
+  });
+
+  // Schema Mismatch Tests - Tests 4-7
+
+  // Test 4: Search input disabled during schema mismatch
+  it('should disable input when schema_mismatch is true', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox');
+    expect(input).toBeDisabled();
+  });
+
+  // Test 5: Search input enabled when no mismatch
+  it('should enable input when schema_mismatch is false', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: false,
+        index_available: true,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox');
+    expect(input).not.toBeDisabled();
+  });
+
+  // Test 6: Placeholder changes when schema mismatch
+  it('should show unavailable message in placeholder when schema_mismatch is true', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveAttribute('placeholder', 'Search unavailable - index being rebuilt');
+  });
+
+  // Test 7: Input styling changes during schema mismatch
+  it('should have warning styling when schema_mismatch is true', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveClass('border-yellow-300');
+    expect(input).toHaveClass('bg-yellow-50');
+  });
+
+  // Test 7b: Clear button hidden during schema mismatch
+  it('should not show clear button when schema_mismatch is true even with text', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} value="test" />);
+
+    // Clear button should not be visible when disabled
+    const buttons = screen.queryAllByRole('button');
+    expect(buttons.length).toBe(0);
+  });
+
+  // Test 7c: Warning icon displayed during schema mismatch
+  it('should display warning icon when schema_mismatch is true', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    const { container } = render(<SearchBar {...defaultProps} />);
+
+    // Check that warning icon is present (yellow warning icon)
+    const leftIcon = container.querySelector('.absolute.inset-y-0.left-0');
+    expect(leftIcon).toBeInTheDocument();
+    // The warning icon should be inside
+    expect(leftIcon?.querySelector('svg')).toHaveClass('text-yellow-500');
+  });
+
+  // Test 8: Tooltip/title attribute explains the disabled state
+  it('should have title attribute explaining disabled state', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveAttribute('title', 'The search index schema has changed. Go to admin settings to rebuild it.');
+  });
+
+  // Test 8b: No tooltip when not disabled
+  it('should not have title attribute when schema_mismatch is false', () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: false,
+        index_available: true,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveAttribute('title', '');
+  });
+
+  // Test 9: Cannot type in input when disabled
+  it('should not allow typing when schema_mismatch is true', async () => {
+    const user = userEvent.setup();
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+
+    // Try to type - should fail because input is disabled
+    await user.type(input, 'test');
+
+    // onChange should not have been called
+    expect(mockOnChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('');
+  });
+
+  // Test 10: Cannot submit form when disabled
+  it('should not submit search when schema_mismatch is true', async () => {
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: true,
+        index_available: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByRole('textbox');
+    const form = input.closest('form');
+
+    fireEvent.change(input, { target: { value: 'submit test' } });
+    fireEvent.submit(form!);
+
+    // onSearch should not have been called (input is disabled)
+    expect(mockOnSearch).not.toHaveBeenCalled();
   });
 });

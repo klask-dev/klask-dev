@@ -180,6 +180,7 @@ pub struct SearchService {
     schema: Schema,
     fields: SearchFields,
     index_dir: std::path::PathBuf,
+    schema_mismatch: Arc<RwLock<bool>>,
 }
 
 #[derive(Clone)]
@@ -208,7 +209,22 @@ impl SearchService {
 
         // Use MmapDirectory with open_or_create - the elegant Tantivy way
         let mmap_directory = MmapDirectory::open(&index_dir)?;
-        let index = Index::open_or_create(mmap_directory, schema.clone())?;
+        let mut schema_mismatch_detected = false;
+        let index = match Index::open_or_create(mmap_directory, schema.clone()) {
+            Ok(idx) => idx,
+            Err(e) => {
+                let error_msg = e.to_string();
+                if error_msg.contains("schema does not match") {
+                    tracing::warn!("Schema mismatch detected in existing index. The index will be available but searches will be blocked until the index is rebuilt. Error: {}", error_msg);
+                    schema_mismatch_detected = true;
+                    // Try to open the existing index with its original schema to allow graceful operation
+                    // This allows the service to still function and report the mismatch
+                    Index::open_in_dir(&index_dir)?
+                } else {
+                    return Err(e.into());
+                }
+            }
+        };
 
         // Register custom tokenizers
         // This MUST be done immediately after opening the index and before creating reader/writer
@@ -254,7 +270,15 @@ impl SearchService {
             Arc::new(RwLock::new(index.writer(memory_bytes)?))
         };
 
-        Ok(Self { index, reader, writer, schema, fields, index_dir: index_dir.as_ref().to_path_buf() })
+        Ok(Self {
+            index,
+            reader,
+            writer,
+            schema,
+            fields,
+            index_dir: index_dir.as_ref().to_path_buf(),
+            schema_mismatch: Arc::new(RwLock::new(schema_mismatch_detected)),
+        })
     }
 
     fn build_schema() -> Schema {
@@ -520,13 +544,18 @@ impl SearchService {
 
     /// Reset the entire search index (delete all documents)
     pub async fn reset_index(&self) -> Result<()> {
+        self.rebuild_index_internal().await
+    }
+
+    /// Rebuild the index with current schema (internal implementation shared by reset_index and rebuild_index)
+    async fn rebuild_index_internal(&self) -> Result<()> {
         // Delete the index directory and recreate it
         if self.index_dir.exists() {
             std::fs::remove_dir_all(&self.index_dir)?;
         }
         std::fs::create_dir_all(&self.index_dir)?;
 
-        // Recreate the index
+        // Recreate the index with current schema
         let _new_index = Index::create_in_dir(&self.index_dir, self.schema.clone())?;
 
         // Note: We can't replace self.index directly since it's not mutable
@@ -538,10 +567,37 @@ impl SearchService {
         // Reload the reader to see the changes
         self.reader.reload()?;
 
+        // Clear the schema mismatch flag since we've successfully rebuilt the index
+        *self.schema_mismatch.write().await = false;
+
         Ok(())
     }
 
+    /// Check if index has a schema mismatch (indicates rebuild needed)
+    pub fn has_schema_mismatch(&self) -> bool {
+        // Try to read the flag, default to false if there's any issue
+        match self.schema_mismatch.try_read() {
+            Ok(mismatch) => *mismatch,
+            Err(_) => false,
+        }
+    }
+
+    /// Get the index directory path
+    pub fn get_index_dir(&self) -> Result<std::path::PathBuf> {
+        Ok(self.index_dir.clone())
+    }
+
+    /// Rebuild the index to resolve schema mismatch
+    pub async fn rebuild_index(&self) -> Result<()> {
+        self.rebuild_index_internal().await
+    }
+
     pub async fn search(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
+        // Check for schema mismatch before attempting search
+        if self.has_schema_mismatch() {
+            return Err(anyhow!("Index schema mismatch detected. Please rebuild the index in admin settings."));
+        }
+
         // Detect inefficient regex patterns (.*prefix or .*) that cause full index scans
         if search_query.regex_search {
             let pattern = search_query.query.trim();

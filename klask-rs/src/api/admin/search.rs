@@ -8,7 +8,8 @@
 
 use crate::auth::extractors::{AdminUser, AppState};
 use crate::models::{
-    HealthStatus, IndexHealthResponse, IndexStatsResponse, OptimizeIndexResponse, TuningRecommendationsResponse,
+    HealthStatus, IndexHealthResponse, IndexStatsResponse, OptimizeIndexResponse, SearchStatusResponse,
+    TuningRecommendationsResponse,
 };
 use anyhow::Result;
 use axum::{
@@ -23,12 +24,50 @@ use tracing::{debug, error, info};
 /// Create admin search API router with all endpoints.
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
+        .route("/status", get(get_search_status))
         .route("/index-stats", get(get_index_stats))
         .route("/index-health", get(get_index_health))
         .route("/optimize-index", post(optimize_index))
         .route("/tuning-recommendations", get(get_tuning_recommendations));
 
     Ok(router)
+}
+
+/// GET /api/admin/search/status
+///
+/// Returns the current status of the search service, including:
+/// - Whether a schema mismatch was detected
+/// - Whether the index is available for searching
+/// - Status message with details
+///
+/// This endpoint does not require admin authentication to allow the frontend
+/// to check status frequently for displaying warnings.
+async fn get_search_status(State(app_state): State<AppState>) -> Result<Json<SearchStatusResponse>, StatusCode> {
+    debug!("Checking search service status");
+
+    let has_mismatch = app_state.search_service.has_schema_mismatch();
+
+    let (index_available, message) = if has_mismatch {
+        (
+            false,
+            Some(
+                "Index schema mismatch detected. Please rebuild the index in admin settings.".to_string(),
+            ),
+        )
+    } else {
+        (true, None)
+    };
+
+    info!(
+        "Search status: schema_mismatch={}, index_available={}",
+        has_mismatch, index_available
+    );
+
+    Ok(Json(SearchStatusResponse {
+        schema_mismatch: has_mismatch,
+        index_available,
+        message,
+    }))
 }
 
 /// GET /api/admin/search/index-stats
