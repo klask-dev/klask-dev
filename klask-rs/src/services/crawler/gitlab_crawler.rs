@@ -405,10 +405,8 @@ impl GitLabCrawler {
         );
 
         // Map back from filtered paths to GitLab project objects
-        let filtered_projects: Vec<_> = projects
-            .into_iter()
-            .filter(|p| filtered_project_paths.contains(&p.path_with_namespace))
-            .collect();
+        let filtered_projects: Vec<_> =
+            projects.into_iter().filter(|p| filtered_project_paths.contains(&p.path_with_namespace)).collect();
 
         // Find where to resume from
         let resume_index = if let Some(ref last_project) = repository.last_processed_project {

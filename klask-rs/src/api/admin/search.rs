@@ -50,9 +50,7 @@ async fn get_search_status(State(app_state): State<AppState>) -> Result<Json<Sea
     let (index_available, message) = if has_mismatch {
         (
             false,
-            Some(
-                "Index schema mismatch detected. Please rebuild the index in admin settings.".to_string(),
-            ),
+            Some("Index schema mismatch detected. Please rebuild the index in admin settings.".to_string()),
         )
     } else {
         (true, None)

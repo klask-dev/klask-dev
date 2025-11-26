@@ -19,9 +19,7 @@ mod schema_mismatch_integration_tests {
 
     impl MockAppState {
         fn new(has_mismatch: bool) -> Self {
-            Self {
-                schema_mismatch: Arc::new(AsyncMutex::new(has_mismatch)),
-            }
+            Self { schema_mismatch: Arc::new(AsyncMutex::new(has_mismatch)) }
         }
 
         async fn set_mismatch(&self, value: bool) {
@@ -44,10 +42,7 @@ mod schema_mismatch_integration_tests {
         let (index_available, message) = if has_mismatch {
             (
                 false,
-                Some(
-                    "Index schema mismatch detected. Please rebuild the index in admin settings."
-                        .to_string(),
-                ),
+                Some("Index schema mismatch detected. Please rebuild the index in admin settings.".to_string()),
             )
         } else {
             (true, None)
@@ -68,10 +63,7 @@ mod schema_mismatch_integration_tests {
         let (index_available, message) = if has_mismatch {
             (
                 false,
-                Some(
-                    "Index schema mismatch detected. Please rebuild the index in admin settings."
-                        .to_string(),
-                ),
+                Some("Index schema mismatch detected. Please rebuild the index in admin settings.".to_string()),
             )
         } else {
             (true, None)
@@ -348,10 +340,7 @@ mod schema_mismatch_integration_tests {
             // Should be sub-millisecond
             let elapsed = start.elapsed();
             if elapsed.as_millis() > 100 {
-                panic!(
-                    "Status check took {}ms, expected < 100ms",
-                    elapsed.as_millis()
-                );
+                panic!("Status check took {}ms, expected < 100ms", elapsed.as_millis());
             }
         }
 

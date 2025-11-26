@@ -914,10 +914,7 @@ mod search_service_tests {
 
         // After rebuild, index should be empty
         let doc_count_after = service.get_document_count().unwrap();
-        assert_eq!(
-            doc_count_after, 0,
-            "Index should be empty after rebuild_index"
-        );
+        assert_eq!(doc_count_after, 0, "Index should be empty after rebuild_index");
     }
 
     #[tokio::test]
@@ -994,10 +991,7 @@ mod search_service_tests {
         };
 
         let results = service.search(search_query).await.unwrap();
-        assert_eq!(
-            results.total, 1,
-            "Should find one result after rebuild and reindex"
-        );
+        assert_eq!(results.total, 1, "Should find one result after rebuild and reindex");
     }
 
     #[tokio::test]
@@ -1007,11 +1001,7 @@ mod search_service_tests {
         // Perform rebuild multiple times in sequence
         for i in 0..3 {
             let result = service.rebuild_index().await;
-            assert!(
-                result.is_ok(),
-                "rebuild_index iteration {} should succeed",
-                i
-            );
+            assert!(result.is_ok(), "rebuild_index iteration {} should succeed", i);
 
             assert!(
                 !service.has_schema_mismatch(),
@@ -1190,11 +1180,7 @@ mod search_service_tests {
             };
 
             let results = service.search(search_query).await.unwrap();
-            assert_eq!(
-                results.total, 1,
-                "Should find document in cycle {}",
-                cycle
-            );
+            assert_eq!(results.total, 1, "Should find document in cycle {}", cycle);
         }
     }
 }

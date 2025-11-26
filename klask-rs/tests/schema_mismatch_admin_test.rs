@@ -12,11 +12,7 @@ mod schema_mismatch_admin_tests {
     #[test]
     fn test_search_status_response_structure_no_mismatch() {
         // Simulate response when there's no schema mismatch
-        let response = SearchStatusResponse {
-            schema_mismatch: false,
-            index_available: true,
-            message: None,
-        };
+        let response = SearchStatusResponse { schema_mismatch: false, index_available: true, message: None };
 
         assert_eq!(response.schema_mismatch, false);
         assert_eq!(response.index_available, true);
@@ -32,18 +28,13 @@ mod schema_mismatch_admin_tests {
         let response = SearchStatusResponse {
             schema_mismatch: true,
             index_available: false,
-            message: Some(
-                "Index schema mismatch detected. Please rebuild the index in admin settings.".to_string(),
-            ),
+            message: Some("Index schema mismatch detected. Please rebuild the index in admin settings.".to_string()),
         };
 
         assert_eq!(response.schema_mismatch, true);
         assert_eq!(response.index_available, false);
         assert!(response.message.is_some());
-        assert!(response
-            .message
-            .unwrap()
-            .contains("rebuild the index"));
+        assert!(response.message.unwrap().contains("rebuild the index"));
         println!("✅ Search status response structure (with mismatch) is correct");
     }
 
@@ -55,9 +46,7 @@ mod schema_mismatch_admin_tests {
         let response = SearchStatusResponse {
             schema_mismatch: true,
             index_available: false,
-            message: Some(
-                "Index schema mismatch detected. Please rebuild the index in admin settings.".to_string(),
-            ),
+            message: Some("Index schema mismatch detected. Please rebuild the index in admin settings.".to_string()),
         };
 
         let json = serde_json::to_string(&response).expect("Failed to serialize");
@@ -79,8 +68,7 @@ mod schema_mismatch_admin_tests {
             "message": "Index schema mismatch detected"
         }"#;
 
-        let response: SearchStatusResponse =
-            serde_json::from_str(json).expect("Failed to deserialize");
+        let response: SearchStatusResponse = serde_json::from_str(json).expect("Failed to deserialize");
         assert_eq!(response.schema_mismatch, true);
         assert_eq!(response.index_available, false);
         assert!(response.message.is_some());
@@ -98,8 +86,7 @@ mod schema_mismatch_admin_tests {
             "message": null
         }"#;
 
-        let response: SearchStatusResponse =
-            serde_json::from_str(json).expect("Failed to deserialize");
+        let response: SearchStatusResponse = serde_json::from_str(json).expect("Failed to deserialize");
         assert_eq!(response.schema_mismatch, false);
         assert_eq!(response.index_available, true);
         assert!(response.message.is_none());
@@ -132,11 +119,7 @@ mod schema_mismatch_admin_tests {
     /// Ensures the invariant: index_available=true => schema_mismatch=false
     #[test]
     fn test_healthy_status_both_fields_consistent() {
-        let response = SearchStatusResponse {
-            schema_mismatch: false,
-            index_available: true,
-            message: None,
-        };
+        let response = SearchStatusResponse { schema_mismatch: false, index_available: true, message: None };
 
         if response.index_available {
             assert!(
@@ -158,8 +141,7 @@ mod schema_mismatch_admin_tests {
             "message": "Error message"
         }"#;
 
-        let value: serde_json::Value =
-            serde_json::from_str(json).expect("Should be valid JSON");
+        let value: serde_json::Value = serde_json::from_str(json).expect("Should be valid JSON");
 
         // Verify field names exactly match the contract
         assert!(value.get("schema_mismatch").is_some());
@@ -168,11 +150,7 @@ mod schema_mismatch_admin_tests {
 
         // Ensure there are no extra fields that would break the contract
         let obj = value.as_object().unwrap();
-        assert_eq!(
-            obj.len(),
-            3,
-            "Response should have exactly 3 fields"
-        );
+        assert_eq!(obj.len(), 3, "Response should have exactly 3 fields");
         println!("✅ Status response field names match API contract");
     }
 
@@ -188,8 +166,7 @@ mod schema_mismatch_admin_tests {
             "message": "Index schema mismatch detected. Please rebuild the index in admin settings."
         }"#;
 
-        let response: SearchStatusResponse =
-            serde_json::from_str(json).expect("Failed to deserialize");
+        let response: SearchStatusResponse = serde_json::from_str(json).expect("Failed to deserialize");
 
         // Frontend logic: show warning banner if schema_mismatch is true
         if response.schema_mismatch {
@@ -238,21 +215,9 @@ mod schema_mismatch_admin_tests {
     #[test]
     fn test_status_checks_consistency() {
         let responses = vec![
-            SearchStatusResponse {
-                schema_mismatch: false,
-                index_available: true,
-                message: None,
-            },
-            SearchStatusResponse {
-                schema_mismatch: false,
-                index_available: true,
-                message: None,
-            },
-            SearchStatusResponse {
-                schema_mismatch: false,
-                index_available: true,
-                message: None,
-            },
+            SearchStatusResponse { schema_mismatch: false, index_available: true, message: None },
+            SearchStatusResponse { schema_mismatch: false, index_available: true, message: None },
+            SearchStatusResponse { schema_mismatch: false, index_available: true, message: None },
         ];
 
         // All responses should be identical (in a healthy state)
@@ -280,10 +245,7 @@ mod schema_mismatch_admin_tests {
         let response = SearchStatusResponse {
             schema_mismatch: true,
             index_available: false,
-            message: Some(
-                "Index schema mismatch detected. Please rebuild the index in admin settings."
-                    .to_string(),
-            ),
+            message: Some("Index schema mismatch detected. Please rebuild the index in admin settings.".to_string()),
         };
 
         let message = response.message.unwrap();
