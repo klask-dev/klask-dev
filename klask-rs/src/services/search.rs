@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use tracing::{debug, warn};
 
-use crate::services::tokenizer::{CodeTokenizer, RawCasePreservingTokenizer};
+use crate::services::tokenizer::CodeTokenizer;
 
 // Search timeout: maximum time allowed for a single search query (30 seconds)
 // This prevents heavy regex queries (e.g., .*pattern) from blocking other requests
@@ -232,8 +232,7 @@ impl SearchService {
         {
             let tokenizer_manager = index.tokenizers();
             tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
-            tokenizer_manager.register("raw_case_preserving", RawCasePreservingTokenizer::new());
-            debug!("Registered custom tokenizers: code_tokenizer, raw_case_preserving");
+            debug!("Registered custom tokenizer: code_tokenizer");
         }
 
         // Create reader AFTER tokenizer registration so it has access to the registered tokenizer
@@ -311,20 +310,12 @@ impl SearchService {
         // Size field for filtering by file content size (in bytes)
         schema_builder.add_u64_field("size", FAST | STORED);
 
-        // Raw (non-tokenized, case-preserving) versions of file_name and file_path for regex search
-        // Use custom raw_case_preserving tokenizer to ensure case is preserved (not lowercased)
-        // This is critical for case-sensitive RegexQuery matching
-        let raw_text_options = TextOptions::default()
-            .set_indexing_options(
-                TextFieldIndexing::default()
-                    .set_tokenizer("raw_case_preserving")
-                    .set_index_option(IndexRecordOption::WithFreqs),
-            )
-            .set_stored();
-
-        schema_builder.add_text_field("file_name_raw", raw_text_options.clone());
-        schema_builder.add_text_field("file_path_raw", raw_text_options.clone());
-        schema_builder.add_text_field("content_raw", raw_text_options);
+        // Raw (non-tokenized, case-preserving) versions for case-sensitive regex search
+        // Use STRING fields (not TEXT) so RegexQuery can match against the exact stored values
+        // STRING fields are not tokenized by default and preserve exact case
+        schema_builder.add_text_field("file_name_raw", STRING | STORED | FAST);
+        schema_builder.add_text_field("file_path_raw", STRING | STORED | FAST);
+        schema_builder.add_text_field("content_raw", STRING | STORED | FAST);
 
         schema_builder.build()
     }
@@ -378,10 +369,6 @@ impl SearchService {
             if tokenizer_manager.get("code_tokenizer").is_none() {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
                 debug!("Re-registered custom code_tokenizer for indexing");
-            }
-            if tokenizer_manager.get("raw_case_preserving").is_none() {
-                tokenizer_manager.register("raw_case_preserving", RawCasePreservingTokenizer::new());
-                debug!("Re-registered custom raw_case_preserving tokenizer for indexing");
             }
         }
 
@@ -633,10 +620,6 @@ impl SearchService {
             if tokenizer_manager.get("code_tokenizer").is_none() {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
                 debug!("Re-registered custom code_tokenizer for search");
-            }
-            if tokenizer_manager.get("raw_case_preserving").is_none() {
-                tokenizer_manager.register("raw_case_preserving", RawCasePreservingTokenizer::new());
-                debug!("Re-registered custom raw_case_preserving tokenizer for search");
             }
         }
 
