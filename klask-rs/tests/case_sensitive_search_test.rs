@@ -21,6 +21,35 @@ async fn create_test_search_service() -> (SearchService, TempDir, tokio::sync::M
 // ============================================================================
 
 #[tokio::test]
+async fn test_case_sensitive_search_finds_exact_case() {
+    let (service, _temp_dir, _guard) = create_test_search_service().await;
+
+    let file_data = klask_rs::services::search::FileData {
+        file_id: Uuid::new_v4(),
+        file_name: "readerTemplate.rs",
+        file_path: "src/readerTemplate.rs",
+        content: "let template = readerTemplate.parse();",
+        repository: "test-repo",
+        project: "test-project",
+        version: "1.0.0",
+        extension: "rs",
+        size: 38,
+    };
+
+    service.upsert_file(file_data).await.unwrap();
+    service.commit().await.unwrap();
+
+    // Case-sensitive search with EXACT case should find the file
+    let query = SearchQuery::new("readerTemplate".to_string()).with_case_sensitive(true);
+    let result = service.search(query).await.unwrap();
+
+    assert_eq!(
+        result.total, 1,
+        "Case-sensitive search for 'readerTemplate' should find 'readerTemplate'"
+    );
+}
+
+#[tokio::test]
 async fn test_case_sensitive_search_rejects_wrong_case() {
     let (service, _temp_dir, _guard) = create_test_search_service().await;
 
@@ -108,6 +137,35 @@ async fn test_case_sensitive_uppercase_mismatch() {
 // ============================================================================
 // FILE NAME AND PATH MATCHING TESTS
 // ============================================================================
+
+#[tokio::test]
+async fn test_case_sensitive_file_name_match() {
+    let (service, _temp_dir, _guard) = create_test_search_service().await;
+
+    let file_data = klask_rs::services::search::FileData {
+        file_id: Uuid::new_v4(),
+        file_name: "MyComponent.tsx",
+        file_path: "src/MyComponent.tsx",
+        content: "export function MyComponent() {}",
+        repository: "test-repo",
+        project: "test-project",
+        version: "1.0.0",
+        extension: "tsx",
+        size: 32,
+    };
+
+    service.upsert_file(file_data).await.unwrap();
+    service.commit().await.unwrap();
+
+    // Case-sensitive search with EXACT case should find it
+    let query = SearchQuery::new("MyComponent".to_string()).with_case_sensitive(true);
+    let result = service.search(query).await.unwrap();
+
+    assert_eq!(
+        result.total, 1,
+        "Case-sensitive search for 'MyComponent' should find exact match"
+    );
+}
 
 #[tokio::test]
 async fn test_case_sensitive_file_name_mismatch() {
@@ -383,6 +441,35 @@ async fn test_case_sensitive_empty_query_handling() {
     if let Ok(res) = result {
         assert_eq!(res.total, 0, "Empty query should return no results");
     }
+}
+
+#[tokio::test]
+async fn test_case_sensitive_simple_word_match() {
+    let (service, _temp_dir, _guard) = create_test_search_service().await;
+
+    let file_data = klask_rs::services::search::FileData {
+        file_id: Uuid::new_v4(),
+        file_name: "permissions.rs",
+        file_path: "src/permissions.rs",
+        content: "const ALLOW: &str = \"allow\"; fn Allow() {}",
+        repository: "test-repo",
+        project: "test-project",
+        version: "1.0.0",
+        extension: "rs",
+        size: 44,
+    };
+
+    service.upsert_file(file_data).await.unwrap();
+    service.commit().await.unwrap();
+
+    // Case-sensitive search for "Allow" (with capital A)
+    let query = SearchQuery::new("Allow".to_string()).with_case_sensitive(true);
+    let result = service.search(query).await.unwrap();
+
+    assert_eq!(
+        result.total, 1,
+        "Case-sensitive search for 'Allow' should find 'Allow' in function name"
+    );
 }
 
 #[tokio::test]

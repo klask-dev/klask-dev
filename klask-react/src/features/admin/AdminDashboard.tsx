@@ -131,7 +131,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
-                        <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                        <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-50 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
                           <MagnifyingGlassIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
                       </div>

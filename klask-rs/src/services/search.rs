@@ -318,7 +318,7 @@ impl SearchService {
             .set_indexing_options(
                 TextFieldIndexing::default()
                     .set_tokenizer("raw_case_preserving")
-                    .set_index_option(IndexRecordOption::Basic),
+                    .set_index_option(IndexRecordOption::WithFreqs),
             )
             .set_stored();
 

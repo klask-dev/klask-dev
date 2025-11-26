@@ -343,7 +343,7 @@ const SearchPageV3: React.FC = () => {
               isLoading={isLoading || isFetching}
             />
           </div>
-          
+
           {/* Fuzzy Search Toggle */}
           <button
             onClick={handleFuzzyToggle}
@@ -389,7 +389,6 @@ const SearchPageV3: React.FC = () => {
             }`}
           >
             <span className="text-base">Aa</span>
-            <span className="hidden sm:inline">Case</span>
           </button>
 
           {/* Regex Flags (only shown when regex mode is active) */}
