@@ -1416,7 +1416,7 @@ impl SearchService {
                             // Search in file_name_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_name_raw,
+                                self.fields.file_name,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1425,7 +1425,7 @@ impl SearchService {
                             // Search in file_path_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_path_raw,
+                                self.fields.file_path,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1708,7 +1708,7 @@ impl SearchService {
                             // Search in file_name_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_name_raw,
+                                self.fields.file_name,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1717,7 +1717,7 @@ impl SearchService {
                             // Search in file_path_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_path_raw,
+                                self.fields.file_path,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1879,7 +1879,7 @@ impl SearchService {
                                 // Search in file_name_raw (non-tokenized)
                                 if let Ok(regex_query) = RegexQuery::from_pattern(
                                     &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                    self.fields.file_name_raw,
+                                    self.fields.file_name,
                                 ) {
                                     regex_clauses
                                         .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1888,7 +1888,7 @@ impl SearchService {
                                 // Search in file_path_raw (non-tokenized)
                                 if let Ok(regex_query) = RegexQuery::from_pattern(
                                     &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                    self.fields.file_path_raw,
+                                    self.fields.file_path,
                                 ) {
                                     regex_clauses
                                         .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
