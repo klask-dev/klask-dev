@@ -1126,7 +1126,7 @@ mod search_service_tests {
 
     #[tokio::test]
     async fn test_rebuild_index_preserves_index_directory() {
-        let (service, temp_dir, _guard) = create_test_search_service().await;
+        let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         let index_dir = service.get_index_dir().unwrap();
         assert!(index_dir.exists(), "Index directory should exist before rebuild");
@@ -1173,7 +1173,7 @@ mod search_service_tests {
 
             // Search for the document
             let search_query = SearchQuery {
-                query: &format!("cycle{}", cycle),
+                query: format!("cycle{}", cycle),
                 project_filter: None,
                 version_filter: None,
                 extension_filter: None,

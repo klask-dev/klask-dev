@@ -646,42 +646,46 @@ impl SearchService {
             // Search in file_name_raw (case-preserving field)
             match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_name_raw) {
                 Ok(regex_q) => {
+                    debug!("✅ Case-sensitive RegexQuery created for file_name_raw");
                     case_sensitive_clauses.push((
                         tantivy::query::Occur::Should,
                         Box::new(regex_q) as Box<dyn tantivy::query::Query>,
                     ));
                 }
                 Err(e) => {
-                    debug!("Case-sensitive pattern doesn't match file_name_raw: {}", e);
+                    debug!("❌ Case-sensitive pattern error for file_name_raw: {}", e);
                 }
             }
 
             // Search in file_path_raw (case-preserving field)
             match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_path_raw) {
                 Ok(regex_q) => {
+                    debug!("✅ Case-sensitive RegexQuery created for file_path_raw");
                     case_sensitive_clauses.push((
                         tantivy::query::Occur::Should,
                         Box::new(regex_q) as Box<dyn tantivy::query::Query>,
                     ));
                 }
                 Err(e) => {
-                    debug!("Case-sensitive pattern doesn't match file_path_raw: {}", e);
+                    debug!("❌ Case-sensitive pattern error for file_path_raw: {}", e);
                 }
             }
 
             // Search in content_raw (case-preserving field for content)
             match RegexQuery::from_pattern(&escaped_pattern, self.fields.content_raw) {
                 Ok(regex_q) => {
+                    debug!("✅ Case-sensitive RegexQuery created for content_raw");
                     case_sensitive_clauses.push((
                         tantivy::query::Occur::Should,
                         Box::new(regex_q) as Box<dyn tantivy::query::Query>,
                     ));
                 }
                 Err(e) => {
-                    debug!("Case-sensitive pattern doesn't match content_raw: {}", e);
+                    debug!("❌ Case-sensitive pattern error for content_raw: {}", e);
                 }
             }
 
+            debug!("case_sensitive_clauses count: {}", case_sensitive_clauses.len());
             if case_sensitive_clauses.is_empty() {
                 return Err(anyhow!(
                     "Case-sensitive search for '{}' did not match any searchable fields",
