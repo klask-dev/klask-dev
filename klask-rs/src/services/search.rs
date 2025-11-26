@@ -612,19 +612,18 @@ impl SearchService {
 
         // Build the base query - choose between RegexQuery, case-sensitive search, or QueryParser
         let base_query: Box<dyn tantivy::query::Query> = if search_query.case_sensitive {
-            // Mode CASE-SENSITIVE: Use RegexQuery on tokenized fields
-            // This works because the CodeTokenizer splits tokens and we can match exact case
+            // Mode CASE-SENSITIVE: Use RegexQuery with escaped pattern
+            // RegexQuery on tokenized fields works because CodeTokenizer preserves case
             debug!("Using case-sensitive search mode for query: {}", search_query.query);
 
-            // Create a regex pattern that matches case-sensitively
-            // We use .*? to catch the term as a word boundary
-            let regex_pattern = format!(r"\b{}\b", regex::escape(&search_query.query));
-            debug!("Case-sensitive regex pattern: {}", regex_pattern);
+            // Escape special regex characters but keep the pattern simple
+            let escaped_pattern = regex::escape(&search_query.query);
+            debug!("Case-sensitive regex pattern (escaped): {}", escaped_pattern);
 
             let mut case_sensitive_clauses = Vec::new();
 
             // Try file_name field (tokenized with CodeTokenizer)
-            match RegexQuery::from_pattern(&regex_pattern, self.fields.file_name) {
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_name) {
                 Ok(regex_q) => {
                     debug!("✅ Case-sensitive RegexQuery created for file_name");
                     case_sensitive_clauses.push((
@@ -638,7 +637,7 @@ impl SearchService {
             }
 
             // Try file_path field
-            match RegexQuery::from_pattern(&regex_pattern, self.fields.file_path) {
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_path) {
                 Ok(regex_q) => {
                     debug!("✅ Case-sensitive RegexQuery created for file_path");
                     case_sensitive_clauses.push((
@@ -652,7 +651,7 @@ impl SearchService {
             }
 
             // Try content field
-            match RegexQuery::from_pattern(&regex_pattern, self.fields.content) {
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.content) {
                 Ok(regex_q) => {
                     debug!("✅ Case-sensitive RegexQuery created for content");
                     case_sensitive_clauses.push((
