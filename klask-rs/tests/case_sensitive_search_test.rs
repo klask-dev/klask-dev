@@ -504,3 +504,68 @@ async fn test_case_sensitive_very_long_identifier_mismatch() {
         "Case-sensitive search should not find long identifier with wrong case"
     );
 }
+
+// ============================================================================
+// VLANID SPECIFIC TESTS - Testing camelCase search behavior
+// ============================================================================
+
+#[tokio::test]
+async fn test_case_insensitive_search_vlan_id_mixed_case_query() {
+    let (service, _temp_dir, _guard) = create_test_search_service().await;
+
+    let file_data = klask_rs::services::search::FileData {
+        file_id: Uuid::new_v4(),
+        file_name: "network.rs",
+        file_path: "src/network.rs",
+        content: "let vlanID = 100; // configure vlanID here",
+        repository: "test-repo",
+        project: "test-project",
+        version: "1.0.0",
+        extension: "rs",
+        size: 42,
+    };
+
+    service.upsert_file(file_data).await.unwrap();
+    service.commit().await.unwrap();
+
+    // Case-insensitive search with exact case "vlanID" should find it
+    // (QueryParser will lowercase and split the query)
+    let query = SearchQuery::new("vlanID".to_string());
+    let result = service.search(query).await.unwrap();
+
+    println!("Search 'vlanID' case-insensitive: {} results", result.total);
+    assert_eq!(
+        result.total, 1,
+        "Case-insensitive search for 'vlanID' should find 'vlanID' in content"
+    );
+}
+
+#[tokio::test]
+async fn test_case_insensitive_search_vlanid_lowercase_query() {
+    let (service, _temp_dir, _guard) = create_test_search_service().await;
+
+    let file_data = klask_rs::services::search::FileData {
+        file_id: Uuid::new_v4(),
+        file_name: "network.rs",
+        file_path: "src/network.rs",
+        content: "let vlanID = 100;",
+        repository: "test-repo",
+        project: "test-project",
+        version: "1.0.0",
+        extension: "rs",
+        size: 17,
+    };
+
+    service.upsert_file(file_data).await.unwrap();
+    service.commit().await.unwrap();
+
+    // Case-insensitive search with lowercase "vlanid" should find "vlanID"
+    let query = SearchQuery::new("vlanid".to_string());
+    let result = service.search(query).await.unwrap();
+
+    println!("Search 'vlanid' case-insensitive: {} results", result.total);
+    assert_eq!(
+        result.total, 1,
+        "Case-insensitive search for 'vlanid' should find 'vlanID' in content"
+    );
+}

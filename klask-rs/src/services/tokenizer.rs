@@ -32,60 +32,51 @@ impl Tokenizer for CodeTokenizer {
     }
 }
 
-/// Custom tokenizer that preserves case exactly - treats entire input as a single token
-/// This is used for fields where we need exact case-sensitive matching (via RegexQuery)
+/// Case-preserving code tokenizer for case-sensitive search
+/// This tokenizer uses the same splitting logic as CodeTokenizer (camelCase, whitespace, etc.)
+/// but preserves the original case of tokens instead of lowercasing them.
+/// This enables case-sensitive matching via RegexQuery on the indexed tokens.
 #[derive(Clone)]
-pub struct RawCasePreservingTokenizer;
+pub struct CaseSensitiveCodeTokenizer;
 
-impl RawCasePreservingTokenizer {
-    /// Creates a new RawCasePreservingTokenizer instance
+impl CaseSensitiveCodeTokenizer {
+    /// Creates a new CaseSensitiveCodeTokenizer instance
     pub fn new() -> Self {
-        RawCasePreservingTokenizer
+        CaseSensitiveCodeTokenizer
     }
 }
 
-impl Default for RawCasePreservingTokenizer {
+impl Default for CaseSensitiveCodeTokenizer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Tokenizer for RawCasePreservingTokenizer {
-    type TokenStream<'a> = RawCasePreservingTokenStream;
+impl Tokenizer for CaseSensitiveCodeTokenizer {
+    type TokenStream<'a> = CaseSensitiveCodeTokenStream;
 
     fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
-        RawCasePreservingTokenStream::new(text)
+        CaseSensitiveCodeTokenStream::new(text)
     }
 }
 
-/// Token stream for the raw case-preserving tokenizer
-pub struct RawCasePreservingTokenStream {
-    token: Option<Token>,
-    consumed: bool,
+/// Token stream for the case-sensitive code tokenizer
+pub struct CaseSensitiveCodeTokenStream {
+    tokens: Vec<Token>,
+    index: usize,
 }
 
-impl RawCasePreservingTokenStream {
+impl CaseSensitiveCodeTokenStream {
     fn new(text: &str) -> Self {
-        // Create a single token that spans the entire text, preserving case
-        let token = if text.is_empty() {
-            None
-        } else {
-            Some(Token {
-                offset_from: 0,
-                offset_to: text.len(), // Use byte length, not character count
-                position: 0,
-                text: text.to_string(), // Preserve original case - do NOT lowercase
-                position_length: 1,
-            })
-        };
-        RawCasePreservingTokenStream { token, consumed: false }
+        let tokens = tokenize_code_case_sensitive(text);
+        CaseSensitiveCodeTokenStream { tokens, index: 0 }
     }
 }
 
-impl TokenStream for RawCasePreservingTokenStream {
+impl TokenStream for CaseSensitiveCodeTokenStream {
     fn advance(&mut self) -> bool {
-        if self.token.is_some() && !self.consumed {
-            self.consumed = true;
+        if self.index < self.tokens.len() {
+            self.index += 1;
             true
         } else {
             false
@@ -93,11 +84,12 @@ impl TokenStream for RawCasePreservingTokenStream {
     }
 
     fn token(&self) -> &Token {
-        self.token.as_ref().expect("token should be available")
+        &self.tokens[self.index.saturating_sub(1)]
     }
 
     fn token_mut(&mut self) -> &mut Token {
-        self.token.as_mut().expect("token should be available")
+        let idx = self.index.saturating_sub(1);
+        &mut self.tokens[idx]
     }
 }
 
@@ -291,6 +283,129 @@ fn tokenize_code_word(text: &str, byte_offset_base: usize, position_base: usize)
             offset_to: byte_pos,
             position: position_base + tokens.len(),
             text: text.to_lowercase(),
+            position_length: 1,
+        };
+        tokens.push(complete_token);
+    }
+
+    tokens
+}
+
+/// Tokenizes code text with CASE PRESERVATION (for case-sensitive search)
+/// Uses the same splitting logic as tokenize_code but preserves original case.
+fn tokenize_code_case_sensitive(text: &str) -> Vec<Token> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+
+    let mut tokens = Vec::new();
+
+    // First, split by whitespace and non-alphanumeric characters (except underscores and hyphens)
+    let words: Vec<&str> = text
+        .split(|c: char| c.is_whitespace() || (!c.is_alphanumeric() && c != '_' && c != '-'))
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut token_position = 0;
+    let mut byte_offset = 0;
+
+    for word in words.iter() {
+        let word_byte_pos = if byte_offset < text.len() {
+            text[byte_offset..].find(word).unwrap_or(0)
+        } else {
+            0
+        };
+
+        let word_byte_offset = byte_offset + word_byte_pos;
+        let word_tokens = tokenize_code_word_case_sensitive(word, word_byte_offset, token_position);
+        token_position += word_tokens.len();
+        byte_offset = word_byte_offset + word.len();
+
+        tokens.extend(word_tokens);
+    }
+
+    tokens
+}
+
+/// Tokenizes a single word with CASE PRESERVATION (for case-sensitive search)
+/// Same splitting logic as tokenize_code_word but emits tokens with original case.
+fn tokenize_code_word_case_sensitive(text: &str, byte_offset_base: usize, position_base: usize) -> Vec<Token> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+
+    let mut tokens = Vec::new();
+    let chars: Vec<char> = text.chars().collect();
+    let mut current_token = String::new();
+
+    let mut byte_pos = byte_offset_base;
+    let mut token_byte_start = byte_offset_base;
+
+    let mut i = 0;
+    while i < chars.len() {
+        let ch = chars[i];
+        let ch_len = ch.len_utf8();
+
+        let should_split = if i == 0 {
+            false
+        } else {
+            let prev_ch = chars[i - 1];
+            let is_underscore_or_hyphen = ch == '_' || ch == '-';
+            let prev_is_underscore_or_hyphen = prev_ch == '_' || prev_ch == '-';
+
+            if is_underscore_or_hyphen || prev_is_underscore_or_hyphen {
+                false
+            } else if prev_ch.is_lowercase() && ch.is_uppercase() {
+                true
+            } else if prev_ch.is_uppercase() && ch.is_uppercase() && i + 1 < chars.len() && chars[i + 1].is_lowercase()
+            {
+                true
+            } else {
+                false
+            }
+        };
+
+        if should_split {
+            if !current_token.is_empty() {
+                // CASE-PRESERVING: emit the token with original case (no to_lowercase)
+                let token = Token {
+                    offset_from: token_byte_start,
+                    offset_to: byte_pos,
+                    position: position_base + tokens.len(),
+                    text: current_token.clone(), // Preserve original case!
+                    position_length: 1,
+                };
+                tokens.push(token);
+
+                current_token.clear();
+                token_byte_start = byte_pos;
+            }
+        }
+
+        current_token.push(ch);
+        byte_pos += ch_len;
+        i += 1;
+    }
+
+    // Emit the final token with original case
+    if !current_token.is_empty() {
+        let token = Token {
+            offset_from: token_byte_start,
+            offset_to: byte_pos,
+            position: position_base + tokens.len(),
+            text: current_token, // Preserve original case!
+            position_length: 1,
+        };
+        tokens.push(token);
+    }
+
+    // If word was split, also add the complete identifier with original case
+    if tokens.len() > 1 {
+        let complete_token = Token {
+            offset_from: byte_offset_base,
+            offset_to: byte_pos,
+            position: position_base + tokens.len(),
+            text: text.to_string(), // Preserve original case!
             position_length: 1,
         };
         tokens.push(complete_token);

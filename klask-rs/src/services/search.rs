@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use tracing::{debug, warn};
 
-use crate::services::tokenizer::CodeTokenizer;
+use crate::services::tokenizer::{CaseSensitiveCodeTokenizer, CodeTokenizer};
 
 // Search timeout: maximum time allowed for a single search query (30 seconds)
 // This prevents heavy regex queries (e.g., .*pattern) from blocking other requests
@@ -194,6 +194,9 @@ struct SearchFields {
     version: Field,
     extension: Field,
     size: Field,          // File content size in bytes
+    file_name_raw: Field, // Non-tokenized file_name for regex search
+    file_path_raw: Field, // Non-tokenized file_path for regex search
+    content_raw: Field,   // Non-tokenized content for case-sensitive search
 }
 
 impl SearchService {
@@ -212,7 +215,10 @@ impl SearchService {
             Err(e) => {
                 let error_msg = e.to_string();
                 if error_msg.contains("schema does not match") {
-                    tracing::warn!("Schema mismatch detected in existing index. The index will be available but searches will be blocked until the index is rebuilt. Error: {}", error_msg);
+                    tracing::warn!(
+                        "Schema mismatch detected in existing index. The index will be available but searches will be blocked until the index is rebuilt. Error: {}",
+                        error_msg
+                    );
                     schema_mismatch_detected = true;
                     // Try to open the existing index with its original schema to allow graceful operation
                     // This allows the service to still function and report the mismatch
@@ -229,7 +235,8 @@ impl SearchService {
         {
             let tokenizer_manager = index.tokenizers();
             tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
-            debug!("Registered custom tokenizer: code_tokenizer");
+            tokenizer_manager.register("case_sensitive_code", CaseSensitiveCodeTokenizer::new());
+            debug!("Registered custom tokenizers: code_tokenizer, case_sensitive_code");
         }
 
         // Create reader AFTER tokenizer registration so it has access to the registered tokenizer
@@ -286,11 +293,13 @@ impl SearchService {
         // Configure custom code tokenizer for code-specific text fields
         // This tokenizer handles camelCase splitting, preserves underscores/hyphens,
         // and lowercases tokens for case-insensitive search
+        // IMPORTANT: Must use WithFreqsAndPositions for phrase queries to work
+        // (e.g., when searching for "vlanID" which gets tokenized to ["vlan", "id"])
         let code_text_options = TextOptions::default()
             .set_indexing_options(
                 TextFieldIndexing::default()
                     .set_tokenizer("code_tokenizer")
-                    .set_index_option(IndexRecordOption::WithFreqs),
+                    .set_index_option(IndexRecordOption::WithFreqsAndPositions),
             )
             .set_stored();
 
@@ -307,6 +316,22 @@ impl SearchService {
         // Size field for filtering by file content size (in bytes)
         schema_builder.add_u64_field("size", FAST | STORED);
 
+        // Case-preserving versions of fields for case-sensitive search
+        // Uses the same tokenization logic as CodeTokenizer (camelCase splitting, etc.)
+        // but preserves original case instead of lowercasing
+        // This enables case-sensitive RegexQuery matching on individual tokens
+        let case_sensitive_text_options = TextOptions::default()
+            .set_indexing_options(
+                TextFieldIndexing::default()
+                    .set_tokenizer("case_sensitive_code")
+                    .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+            )
+            .set_stored();
+
+        schema_builder.add_text_field("file_name_raw", case_sensitive_text_options.clone());
+        schema_builder.add_text_field("file_path_raw", case_sensitive_text_options.clone());
+        schema_builder.add_text_field("content_raw", case_sensitive_text_options);
+
         schema_builder.build()
     }
 
@@ -321,6 +346,9 @@ impl SearchService {
             version: schema.get_field("version").expect("version field should exist"),
             extension: schema.get_field("extension").expect("extension field should exist"),
             size: schema.get_field("size").expect("size field should exist"),
+            file_name_raw: schema.get_field("file_name_raw").expect("file_name_raw field should exist"),
+            file_path_raw: schema.get_field("file_path_raw").expect("file_path_raw field should exist"),
+            content_raw: schema.get_field("content_raw").expect("content_raw field should exist"),
         }
     }
 
@@ -338,6 +366,9 @@ impl SearchService {
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
             self.fields.size => file_data.size,
+            self.fields.file_name_raw => file_data.file_name,
+            self.fields.file_path_raw => file_data.file_path,
+            self.fields.content_raw => file_data.content,
         );
 
         writer.add_document(doc)?;
@@ -353,6 +384,10 @@ impl SearchService {
             if tokenizer_manager.get("code_tokenizer").is_none() {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
                 debug!("Re-registered custom code_tokenizer for indexing");
+            }
+            if tokenizer_manager.get("case_sensitive_code").is_none() {
+                tokenizer_manager.register("case_sensitive_code", CaseSensitiveCodeTokenizer::new());
+                debug!("Re-registered custom case_sensitive_code tokenizer for indexing");
             }
         }
 
@@ -382,6 +417,9 @@ impl SearchService {
             self.fields.version => file_data.version,
             self.fields.extension => file_data.extension,
             self.fields.size => file_data.size,
+            self.fields.file_name_raw => file_data.file_name,
+            self.fields.file_path_raw => file_data.file_path,
+            self.fields.content_raw => file_data.content,
         );
 
         writer.add_document(doc)?;
@@ -491,6 +529,8 @@ impl SearchService {
                     self.fields.version => version,
                     self.fields.extension => extension,
                     self.fields.size => size,
+                    self.fields.file_name_raw => file_name,
+                    self.fields.file_path_raw => file_path,
                 );
 
                 writer.add_document(new_doc)?;
@@ -558,7 +598,9 @@ impl SearchService {
     pub async fn search(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
         // Check for schema mismatch before attempting search
         if self.has_schema_mismatch() {
-            return Err(anyhow!("Index schema mismatch detected. Please rebuild the index in admin settings."));
+            return Err(anyhow!(
+                "Index schema mismatch detected. Please rebuild the index in admin settings."
+            ));
         }
 
         // Detect inefficient regex patterns (.*prefix or .*) that cause full index scans
@@ -600,6 +642,10 @@ impl SearchService {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
                 debug!("Re-registered custom code_tokenizer for search");
             }
+            if tokenizer_manager.get("case_sensitive_code").is_none() {
+                tokenizer_manager.register("case_sensitive_code", CaseSensitiveCodeTokenizer::new());
+                debug!("Re-registered custom case_sensitive_code tokenizer for search");
+            }
         }
 
         let searcher = self.reader.searcher();
@@ -612,59 +658,54 @@ impl SearchService {
 
         // Build the base query - choose between RegexQuery, case-sensitive search, or QueryParser
         let base_query: Box<dyn tantivy::query::Query> = if search_query.case_sensitive {
-            // Mode CASE-SENSITIVE: Use RegexQuery with escaped pattern
-            // RegexQuery on tokenized fields works because CodeTokenizer preserves case
+            // Mode CASE-SENSITIVE: Use RegexQuery with escaped pattern for exact matching
+            // This preserves case by using regex without the case-insensitive (?i) flag
             debug!("Using case-sensitive search mode for query: {}", search_query.query);
 
-            // Escape special regex characters but keep the pattern simple
+            // Escape the pattern to avoid regex interpretation of special chars
             let escaped_pattern = regex::escape(&search_query.query);
             debug!("Case-sensitive regex pattern (escaped): {}", escaped_pattern);
 
             let mut case_sensitive_clauses = Vec::new();
 
-            // Try file_name field (tokenized with CodeTokenizer)
-            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_name) {
+            // Search in file_name_raw (case-preserving field)
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_name_raw) {
                 Ok(regex_q) => {
-                    debug!("✅ Case-sensitive RegexQuery created for file_name");
                     case_sensitive_clauses.push((
                         tantivy::query::Occur::Should,
                         Box::new(regex_q) as Box<dyn tantivy::query::Query>,
                     ));
                 }
                 Err(e) => {
-                    debug!("❌ Case-sensitive pattern error for file_name: {}", e);
+                    debug!("Case-sensitive pattern doesn't match file_name_raw: {}", e);
                 }
             }
 
-            // Try file_path field
-            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_path) {
+            // Search in file_path_raw (case-preserving field)
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_path_raw) {
                 Ok(regex_q) => {
-                    debug!("✅ Case-sensitive RegexQuery created for file_path");
                     case_sensitive_clauses.push((
                         tantivy::query::Occur::Should,
                         Box::new(regex_q) as Box<dyn tantivy::query::Query>,
                     ));
                 }
                 Err(e) => {
-                    debug!("❌ Case-sensitive pattern error for file_path: {}", e);
+                    debug!("Case-sensitive pattern doesn't match file_path_raw: {}", e);
                 }
             }
 
-            // Try content field
-            match RegexQuery::from_pattern(&escaped_pattern, self.fields.content) {
+            // Search in content_raw (case-preserving field for content)
+            match RegexQuery::from_pattern(&escaped_pattern, self.fields.content_raw) {
                 Ok(regex_q) => {
-                    debug!("✅ Case-sensitive RegexQuery created for content");
                     case_sensitive_clauses.push((
                         tantivy::query::Occur::Should,
                         Box::new(regex_q) as Box<dyn tantivy::query::Query>,
                     ));
                 }
                 Err(e) => {
-                    debug!("❌ Case-sensitive pattern error for content: {}", e);
+                    debug!("Case-sensitive pattern doesn't match content_raw: {}", e);
                 }
             }
-
-            debug!("case_sensitive_clauses count: {}", case_sensitive_clauses.len());
 
             if case_sensitive_clauses.is_empty() {
                 return Err(anyhow!(
@@ -673,9 +714,7 @@ impl SearchService {
                 ));
             }
 
-            let bool_query = BooleanQuery::new(case_sensitive_clauses);
-            debug!("Created case-sensitive BooleanQuery with {} clauses", bool_query.clauses().len());
-            Box::new(bool_query)
+            Box::new(BooleanQuery::new(case_sensitive_clauses))
         } else if search_query.regex_search {
             // Mode REGEX: Use RegexQuery for pattern matching (mutually exclusive with fuzzy)
             debug!("Using regex search mode with pattern: {}", search_query.query);
@@ -686,8 +725,8 @@ impl SearchService {
 
             let mut regex_clauses = Vec::new();
 
-            // Try to apply regex query to file_name field
-            match RegexQuery::from_pattern(&regex_pattern, self.fields.file_name) {
+            // Try to apply regex query to file_name_raw field (non-tokenized for complete matching)
+            match RegexQuery::from_pattern(&regex_pattern, self.fields.file_name_raw) {
                 Ok(regex_q) => {
                     regex_clauses.push((
                         tantivy::query::Occur::Should,
@@ -695,12 +734,12 @@ impl SearchService {
                     ));
                 }
                 Err(e) => {
-                    debug!("Regex pattern doesn't match file_name: {}", e);
+                    debug!("Regex pattern doesn't match file_name_raw: {}", e);
                 }
             }
 
-            // Try to apply regex query to file_path field
-            match RegexQuery::from_pattern(&regex_pattern, self.fields.file_path) {
+            // Try to apply regex query to file_path_raw field (non-tokenized for complete matching)
+            match RegexQuery::from_pattern(&regex_pattern, self.fields.file_path_raw) {
                 Ok(regex_q) => {
                     regex_clauses.push((
                         tantivy::query::Occur::Should,
@@ -708,7 +747,7 @@ impl SearchService {
                     ));
                 }
                 Err(e) => {
-                    debug!("Regex pattern doesn't match file_path: {}", e);
+                    debug!("Regex pattern doesn't match file_path_raw: {}", e);
                 }
             }
 
@@ -772,11 +811,22 @@ impl SearchService {
         // Create a separate query for snippet highlighting
         // (SnippetGenerator doesn't work well with FuzzyTermQuery or RegexQuery - tantivy issue #867)
         // For regex mode, extract simple terms from the pattern for snippet generation
-        let base_query_for_snippet = if search_query.regex_search {
+        let (base_query_for_snippet, snippet_field) = if search_query.case_sensitive {
+            // For case-sensitive search, use content_raw field for snippets
+            // Parse the query with QueryParser to get highlighting on the raw (case-preserved) tokens
+            let query_parser_for_snippet = QueryParser::for_index(
+                &self.index,
+                vec![self.fields.content_raw, self.fields.file_name_raw, self.fields.file_path_raw],
+            );
+            let query = query_parser_for_snippet
+                .parse_query(&search_query.query)
+                .unwrap_or_else(|_| Box::new(tantivy::query::AllQuery));
+            (query, self.fields.content_raw)
+        } else if search_query.regex_search {
             // For regex, extract alphanumeric terms from pattern for highlighting
             let simple_terms = extract_simple_terms_from_regex(&search_query.query);
 
-            if !simple_terms.is_empty() {
+            let query = if !simple_terms.is_empty() {
                 // Try to parse extracted terms with OR for better highlighting
                 let terms_query = simple_terms.join(" OR ");
                 let query_parser_for_snippet = QueryParser::for_index(
@@ -799,21 +849,23 @@ impl SearchService {
                 // No terms extracted - use AllQuery
                 debug!("No simple terms extracted from regex pattern, using AllQuery");
                 Box::new(tantivy::query::AllQuery)
-            }
+            };
+            (query, self.fields.content)
         } else {
             // For normal/fuzzy search, use the original query as-is
             let query_parser_for_snippet = QueryParser::for_index(
                 &self.index,
                 vec![self.fields.content, self.fields.file_name, self.fields.file_path],
             );
-            query_parser_for_snippet
+            let query = query_parser_for_snippet
                 .parse_query(&search_query.query)
-                .unwrap_or_else(|_| Box::new(tantivy::query::AllQuery))
+                .unwrap_or_else(|_| Box::new(tantivy::query::AllQuery));
+            (query, self.fields.content)
         };
 
         // Create snippet generator once for the entire search (using non-fuzzy query)
         let snippet_generator = if search_query.limit > 0 {
-            Some(self.create_snippet_generator(&searcher, &*base_query_for_snippet)?)
+            Some(self.create_snippet_generator(&searcher, &*base_query_for_snippet, snippet_field)?)
         } else {
             None
         };
@@ -943,10 +995,6 @@ impl SearchService {
 
         // For performance with large indices, use Count collector for total
         let total = searcher.search(&final_query, &Count)? as u64;
-        debug!("Search query returned {} total results", total);
-        if search_query.case_sensitive {
-            debug!("⚠️  Case-sensitive search: query={}, total results={}", search_query.query, total);
-        }
 
         // Ensure limit is at least 1 to avoid Tantivy panic
         let effective_limit = if search_query.limit == 0 { 1 } else { search_query.limit };
@@ -1032,8 +1080,9 @@ impl SearchService {
         &self,
         searcher: &tantivy::Searcher,
         query: &dyn tantivy::query::Query,
+        content_field: Field,
     ) -> Result<SnippetGenerator> {
-        let mut snippet_generator = SnippetGenerator::create(searcher, query, self.fields.content)?;
+        let mut snippet_generator = SnippetGenerator::create(searcher, query, content_field)?;
         snippet_generator.set_max_num_chars(300);
         Ok(snippet_generator)
     }
@@ -1415,7 +1464,7 @@ impl SearchService {
                             // Search in file_name_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_name,
+                                self.fields.file_name_raw,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1424,7 +1473,7 @@ impl SearchService {
                             // Search in file_path_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_path,
+                                self.fields.file_path_raw,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1707,7 +1756,7 @@ impl SearchService {
                             // Search in file_name_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_name,
+                                self.fields.file_name_raw,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1716,7 +1765,7 @@ impl SearchService {
                             // Search in file_path_raw (non-tokenized)
                             if let Ok(regex_query) = RegexQuery::from_pattern(
                                 &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                self.fields.file_path,
+                                self.fields.file_path_raw,
                             ) {
                                 regex_clauses
                                     .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1878,7 +1927,7 @@ impl SearchService {
                                 // Search in file_name_raw (non-tokenized)
                                 if let Ok(regex_query) = RegexQuery::from_pattern(
                                     &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                    self.fields.file_name,
+                                    self.fields.file_name_raw,
                                 ) {
                                     regex_clauses
                                         .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
@@ -1887,7 +1936,7 @@ impl SearchService {
                                 // Search in file_path_raw (non-tokenized)
                                 if let Ok(regex_query) = RegexQuery::from_pattern(
                                     &build_regex_pattern(&search_query.query, search_query.regex_flags.as_deref()),
-                                    self.fields.file_path,
+                                    self.fields.file_path_raw,
                                 ) {
                                     regex_clauses
                                         .push((Occur::Should, Box::new(regex_query) as Box<dyn tantivy::query::Query>));
