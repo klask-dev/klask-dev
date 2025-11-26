@@ -693,7 +693,9 @@ impl SearchService {
                 ));
             }
 
-            Box::new(BooleanQuery::new(case_sensitive_clauses))
+            let bool_query = BooleanQuery::new(case_sensitive_clauses);
+            debug!("Created case-sensitive BooleanQuery with {} clauses", bool_query.clauses().len());
+            Box::new(bool_query)
         } else if search_query.regex_search {
             // Mode REGEX: Use RegexQuery for pattern matching (mutually exclusive with fuzzy)
             debug!("Using regex search mode with pattern: {}", search_query.query);
@@ -961,6 +963,10 @@ impl SearchService {
 
         // For performance with large indices, use Count collector for total
         let total = searcher.search(&final_query, &Count)? as u64;
+        debug!("Search query returned {} total results", total);
+        if search_query.case_sensitive {
+            debug!("⚠️  Case-sensitive search: query={}, total results={}", search_query.query, total);
+        }
 
         // Ensure limit is at least 1 to avoid Tantivy panic
         let effective_limit = if search_query.limit == 0 { 1 } else { search_query.limit };
