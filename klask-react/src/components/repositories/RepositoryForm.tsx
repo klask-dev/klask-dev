@@ -483,6 +483,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
       excludedBranchesPatterns: trimOrEmpty(data.excludedBranchesPatterns),
       includedProjects: trimOrEmpty(data.includedProjects),
       includedProjectsPatterns: trimOrEmpty(data.includedProjectsPatterns),
+      gitlabNamespace: trimOrEmpty(data.gitlabNamespace),
       gitlabExcludedProjects: trimOrEmpty(data.gitlabExcludedProjects),
       gitlabExcludedPatterns: trimOrEmpty(data.gitlabExcludedPatterns),
       githubExcludedRepositories: trimOrEmpty(data.githubExcludedRepositories),
@@ -792,6 +793,24 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
                         )}
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Create a token with 'read_api' and 'read_repository' scopes in GitLab settings
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="gitlabNamespace" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          GitLab Namespace (Optional)
+                        </label>
+                        <input
+                          {...register('gitlabNamespace')}
+                          type="text"
+                          className={`input-field ${errors.gitlabNamespace ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
+                          placeholder="my-group or my-username"
+                        />
+                        {errors.gitlabNamespace && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.gitlabNamespace.message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Filter to include only projects from this namespace. Use a group name or username to reduce the number of projects to scan.
                         </p>
                       </div>
 
