@@ -1575,21 +1575,98 @@ impl SearchService {
                         }
                         Err(_) => Box::new(AllQuery), // Invalid regex pattern - return empty results
                     }
-                } else {
-                    // Use QueryParser for normal and fuzzy search modes
-                    let mut query_parser = QueryParser::for_index(
-                        searcher.index(),
-                        vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                    );
-                    // For fuzzy search, enable fuzzy search on individual fields
-                    if search_query.fuzzy_search {
-                        query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
-                        query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
-                        query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+                } else if search_query.case_sensitive {
+                    // Case-sensitive search: use QueryTokenizerCaseSensitive + TermQuery on _raw fields
+                    let mut query_tokenizer = QueryTokenizerCaseSensitive::new();
+                    let mut token_stream = query_tokenizer.token_stream(&search_query.query);
+                    let mut query_tokens: Vec<String> = Vec::new();
+                    while token_stream.advance() {
+                        query_tokens.push(token_stream.token().text.clone());
                     }
-                    match query_parser.parse_query(&search_query.query) {
-                        Ok(parsed) => parsed,
-                        Err(_) => Box::new(AllQuery),
+
+                    if query_tokens.is_empty() {
+                        Box::new(AllQuery)
+                    } else {
+                        let mut token_clauses: Vec<(Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+                        for token_text in &query_tokens {
+                            let mut field_clauses: Vec<(Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+
+                            let content_term = Term::from_field_text(self.fields.content_raw, token_text);
+                            field_clauses.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
+                            ));
+
+                            let file_name_term = Term::from_field_text(self.fields.file_name_raw, token_text);
+                            field_clauses.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(file_name_term, IndexRecordOption::WithFreqsAndPositions)),
+                            ));
+
+                            let file_path_term = Term::from_field_text(self.fields.file_path_raw, token_text);
+                            field_clauses.push((
+                                Occur::Should,
+                                Box::new(TermQuery::new(file_path_term, IndexRecordOption::WithFreqsAndPositions)),
+                            ));
+
+                            let field_query = BooleanQuery::from(field_clauses);
+                            token_clauses.push((Occur::Must, Box::new(field_query)));
+                        }
+                        Box::new(BooleanQuery::from(token_clauses))
+                    }
+                } else {
+                    // Normal/fuzzy search: use QueryTokenizer + TermQuery
+                    let mut query_tokenizer = QueryTokenizer::new();
+                    let mut token_stream = query_tokenizer.token_stream(&search_query.query);
+                    let mut query_tokens: Vec<String> = Vec::new();
+                    while token_stream.advance() {
+                        query_tokens.push(token_stream.token().text.clone());
+                    }
+
+                    if query_tokens.is_empty() {
+                        Box::new(AllQuery)
+                    } else {
+                        let mut token_clauses: Vec<(Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+                        for token_text in &query_tokens {
+                            let mut field_clauses: Vec<(Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+
+                            let content_term = Term::from_field_text(self.fields.content, token_text);
+                            if search_query.fuzzy_search {
+                                let fuzzy_q = tantivy::query::FuzzyTermQuery::new(content_term, 1, true);
+                                field_clauses.push((Occur::Should, Box::new(fuzzy_q)));
+                            } else {
+                                field_clauses.push((
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
+                                ));
+                            }
+
+                            let file_name_term = Term::from_field_text(self.fields.file_name, token_text);
+                            if search_query.fuzzy_search {
+                                let fuzzy_q = tantivy::query::FuzzyTermQuery::new(file_name_term, 1, true);
+                                field_clauses.push((Occur::Should, Box::new(fuzzy_q)));
+                            } else {
+                                field_clauses.push((
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(file_name_term, IndexRecordOption::WithFreqsAndPositions)),
+                                ));
+                            }
+
+                            let file_path_term = Term::from_field_text(self.fields.file_path, token_text);
+                            if search_query.fuzzy_search {
+                                let fuzzy_q = tantivy::query::FuzzyTermQuery::new(file_path_term, 1, true);
+                                field_clauses.push((Occur::Should, Box::new(fuzzy_q)));
+                            } else {
+                                field_clauses.push((
+                                    Occur::Should,
+                                    Box::new(TermQuery::new(file_path_term, IndexRecordOption::WithFreqsAndPositions)),
+                                ));
+                            }
+
+                            let field_query = BooleanQuery::from(field_clauses);
+                            token_clauses.push((Occur::Must, Box::new(field_query)));
+                        }
+                        Box::new(BooleanQuery::from(token_clauses))
                     }
                 };
             clauses.push((Occur::Must, text_query));
