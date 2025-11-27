@@ -11,13 +11,16 @@ use tantivy::schema::{
     FAST, Field, IndexRecordOption, STORED, STRING, Schema, TEXT, TextFieldIndexing, TextOptions, Value,
 };
 use tantivy::snippet::SnippetGenerator;
+use tantivy::tokenizer::{TokenStream, Tokenizer};
 use tantivy::{Index, IndexReader, IndexWriter, Term, doc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use tracing::{debug, warn};
 
-use crate::services::tokenizer::{CaseSensitiveCodeTokenizer, CodeTokenizer};
+use crate::services::tokenizer::{
+    CaseSensitiveCodeTokenizer, CodeTokenizer, QueryTokenizer, QueryTokenizerCaseSensitive,
+};
 
 // Search timeout: maximum time allowed for a single search query (30 seconds)
 // This prevents heavy regex queries (e.g., .*pattern) from blocking other requests
@@ -232,11 +235,21 @@ impl SearchService {
         // Register custom tokenizers
         // This MUST be done immediately after opening the index and before creating reader/writer
         // The tokenizers must be registered on the index so QueryParser can access them during search
+        //
+        // Tokenizer roles:
+        // - code_tokenizer: For INDEXING - splits camelCase, lowercases
+        // - case_sensitive_code: For INDEXING - splits camelCase, preserves case
+        // - query_tokenizer: For QUERYING - NO split, lowercases (case-insensitive search)
+        // - query_tokenizer_case_sensitive: For QUERYING - NO split, preserves case
         {
             let tokenizer_manager = index.tokenizers();
             tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
             tokenizer_manager.register("case_sensitive_code", CaseSensitiveCodeTokenizer::new());
-            debug!("Registered custom tokenizers: code_tokenizer, case_sensitive_code");
+            tokenizer_manager.register("query_tokenizer", QueryTokenizer::new());
+            tokenizer_manager.register("query_tokenizer_case_sensitive", QueryTokenizerCaseSensitive::new());
+            debug!(
+                "Registered custom tokenizers: code_tokenizer, case_sensitive_code, query_tokenizer, query_tokenizer_case_sensitive"
+            );
         }
 
         // Create reader AFTER tokenizer registration so it has access to the registered tokenizer
@@ -383,11 +396,15 @@ impl SearchService {
             let tokenizer_manager = self.index.tokenizers();
             if tokenizer_manager.get("code_tokenizer").is_none() {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
-                debug!("Re-registered custom code_tokenizer for indexing");
             }
             if tokenizer_manager.get("case_sensitive_code").is_none() {
                 tokenizer_manager.register("case_sensitive_code", CaseSensitiveCodeTokenizer::new());
-                debug!("Re-registered custom case_sensitive_code tokenizer for indexing");
+            }
+            if tokenizer_manager.get("query_tokenizer").is_none() {
+                tokenizer_manager.register("query_tokenizer", QueryTokenizer::new());
+            }
+            if tokenizer_manager.get("query_tokenizer_case_sensitive").is_none() {
+                tokenizer_manager.register("query_tokenizer_case_sensitive", QueryTokenizerCaseSensitive::new());
             }
         }
 
@@ -640,11 +657,15 @@ impl SearchService {
             let tokenizer_manager = self.index.tokenizers();
             if tokenizer_manager.get("code_tokenizer").is_none() {
                 tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
-                debug!("Re-registered custom code_tokenizer for search");
             }
             if tokenizer_manager.get("case_sensitive_code").is_none() {
                 tokenizer_manager.register("case_sensitive_code", CaseSensitiveCodeTokenizer::new());
-                debug!("Re-registered custom case_sensitive_code tokenizer for search");
+            }
+            if tokenizer_manager.get("query_tokenizer").is_none() {
+                tokenizer_manager.register("query_tokenizer", QueryTokenizer::new());
+            }
+            if tokenizer_manager.get("query_tokenizer_case_sensitive").is_none() {
+                tokenizer_manager.register("query_tokenizer_case_sensitive", QueryTokenizerCaseSensitive::new());
             }
         }
 
@@ -656,65 +677,56 @@ impl SearchService {
         // - SnippetGenerator doesn't work well with RegexQuery (uses fallback query)
         // - Regex patterns must be valid Rust regex syntax (e.g., ^pattern$, .*test.*)
 
-        // Build the base query - choose between RegexQuery, case-sensitive search, or QueryParser
+        // Build the base query - choose between TermQuery (case-sensitive or insensitive) or RegexQuery
         let base_query: Box<dyn tantivy::query::Query> = if search_query.case_sensitive {
-            // Mode CASE-SENSITIVE: Use RegexQuery with escaped pattern for exact matching
-            // This preserves case by using regex without the case-insensitive (?i) flag
+            // Mode CASE-SENSITIVE: Use TermQuery with case-preserving tokenizer on _raw fields
+            // The _raw fields are indexed with CaseSensitiveCodeTokenizer (splits camelCase, preserves case)
+            // So we tokenize the query with QueryTokenizerCaseSensitive (NO split, preserves case)
             debug!("Using case-sensitive search mode for query: {}", search_query.query);
 
-            // Escape the pattern to avoid regex interpretation of special chars
-            let escaped_pattern = regex::escape(&search_query.query);
-            debug!("Case-sensitive regex pattern (escaped): {}", escaped_pattern);
+            let mut query_tokenizer = QueryTokenizerCaseSensitive::new();
+            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
+            let mut query_tokens: Vec<String> = Vec::new();
+            while token_stream.advance() {
+                query_tokens.push(token_stream.token().text.clone());
+            }
 
-            let mut case_sensitive_clauses = Vec::new();
+            if query_tokens.is_empty() {
+                Box::new(tantivy::query::EmptyQuery)
+            } else {
+                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
 
-            // Search in file_name_raw (case-preserving field)
-            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_name_raw) {
-                Ok(regex_q) => {
-                    case_sensitive_clauses.push((
+                for token_text in &query_tokens {
+                    let mut field_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+
+                    // Search in content_raw (case-preserving field)
+                    let content_term = Term::from_field_text(self.fields.content_raw, token_text);
+                    field_clauses.push((
                         tantivy::query::Occur::Should,
-                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                        Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
                     ));
-                }
-                Err(e) => {
-                    debug!("Case-sensitive pattern doesn't match file_name_raw: {}", e);
-                }
-            }
 
-            // Search in file_path_raw (case-preserving field)
-            match RegexQuery::from_pattern(&escaped_pattern, self.fields.file_path_raw) {
-                Ok(regex_q) => {
-                    case_sensitive_clauses.push((
+                    // Search in file_name_raw (case-preserving field)
+                    let file_name_term = Term::from_field_text(self.fields.file_name_raw, token_text);
+                    field_clauses.push((
                         tantivy::query::Occur::Should,
-                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                        Box::new(TermQuery::new(file_name_term, IndexRecordOption::WithFreqsAndPositions)),
                     ));
-                }
-                Err(e) => {
-                    debug!("Case-sensitive pattern doesn't match file_path_raw: {}", e);
-                }
-            }
 
-            // Search in content_raw (case-preserving field for content)
-            match RegexQuery::from_pattern(&escaped_pattern, self.fields.content_raw) {
-                Ok(regex_q) => {
-                    case_sensitive_clauses.push((
+                    // Search in file_path_raw (case-preserving field)
+                    let file_path_term = Term::from_field_text(self.fields.file_path_raw, token_text);
+                    field_clauses.push((
                         tantivy::query::Occur::Should,
-                        Box::new(regex_q) as Box<dyn tantivy::query::Query>,
+                        Box::new(TermQuery::new(file_path_term, IndexRecordOption::WithFreqsAndPositions)),
                     ));
-                }
-                Err(e) => {
-                    debug!("Case-sensitive pattern doesn't match content_raw: {}", e);
-                }
-            }
 
-            if case_sensitive_clauses.is_empty() {
-                return Err(anyhow!(
-                    "Case-sensitive search for '{}' did not match any searchable fields",
-                    search_query.query
-                ));
-            }
+                    // This token must match in at least one field
+                    let field_query = BooleanQuery::new(field_clauses);
+                    token_clauses.push((tantivy::query::Occur::Must, Box::new(field_query)));
+                }
 
-            Box::new(BooleanQuery::new(case_sensitive_clauses))
+                Box::new(BooleanQuery::new(token_clauses))
+            }
         } else if search_query.regex_search {
             // Mode REGEX: Use RegexQuery for pattern matching (mutually exclusive with fuzzy)
             debug!("Using regex search mode with pattern: {}", search_query.query);
@@ -774,37 +786,74 @@ impl SearchService {
 
             Box::new(BooleanQuery::new(regex_clauses))
         } else {
-            // Mode NORMAL/FUZZY: Use QueryParser (existing code)
-            let mut query_parser = QueryParser::for_index(
-                &self.index,
-                vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-            );
+            // Mode NORMAL/FUZZY: Use TermQuery with query tokenizer (NO camelCase splitting)
+            // This ensures "vlanID" query matches "vlanid" token in index (complete match)
+            // NOT split into ["vlan", "id"] which would require phrase matching
 
-            // Optionally enable fuzzy search for all fields (only if search_query.fuzzy_search is true)
-            // set_field_fuzzy(field, prefix, distance, transpose_cost_one)
-            // - prefix: whether to enable prefix matching (e.g., "helo" matches "hello")
-            // - distance: max Levenshtein distance (1 or 2, typically 1)
-            // - transpose_cost_one: whether transpositions count as 1 edit (usually true)
-            // We use a bool to enable/disable fuzzy search due to this bug: https://github.com/quickwit-oss/tantivy/issues/867
-            if search_query.fuzzy_search {
-                query_parser.set_field_fuzzy(self.fields.content, true, 1, true);
-                query_parser.set_field_fuzzy(self.fields.file_name, true, 1, true);
-                query_parser.set_field_fuzzy(self.fields.file_path, true, 1, true);
+            // Tokenize the query WITHOUT camelCase splitting, just lowercase
+            let mut query_tokenizer = QueryTokenizer::new();
+            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
+            let mut query_tokens: Vec<String> = Vec::new();
+            while token_stream.advance() {
+                query_tokens.push(token_stream.token().text.clone());
             }
 
-            // Parse the main query
-            // If parsing fails (e.g., invalid syntax like "string[abc]"), use EmptyQuery (no results)
-            // This happens when user types incomplete regex patterns without activating regex mode
-            match query_parser.parse_query(&search_query.query) {
-                Ok(q) => q,
-                Err(e) => {
-                    debug!(
-                        "Failed to parse query '{}', returning no results: {}",
-                        search_query.query, e
-                    );
-                    // Return EmptyQuery to match no documents
-                    Box::new(tantivy::query::EmptyQuery)
+            if query_tokens.is_empty() {
+                // No valid tokens in query
+                Box::new(tantivy::query::EmptyQuery)
+            } else {
+                // Build a BooleanQuery with TermQuery for each token
+                // Each token should match in content, file_name, or file_path (Should)
+                // All tokens must match (implicit AND between tokens)
+                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+
+                for token_text in &query_tokens {
+                    // For each token, create a Should query across all searchable fields
+                    let mut field_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+
+                    // Search in content field
+                    let content_term = Term::from_field_text(self.fields.content, token_text);
+                    if search_query.fuzzy_search {
+                        // Use FuzzyTermQuery for fuzzy search
+                        let fuzzy_q = tantivy::query::FuzzyTermQuery::new(content_term, 1, true);
+                        field_clauses.push((tantivy::query::Occur::Should, Box::new(fuzzy_q)));
+                    } else {
+                        field_clauses.push((
+                            tantivy::query::Occur::Should,
+                            Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
+                        ));
+                    }
+
+                    // Search in file_name field
+                    let file_name_term = Term::from_field_text(self.fields.file_name, token_text);
+                    if search_query.fuzzy_search {
+                        let fuzzy_q = tantivy::query::FuzzyTermQuery::new(file_name_term, 1, true);
+                        field_clauses.push((tantivy::query::Occur::Should, Box::new(fuzzy_q)));
+                    } else {
+                        field_clauses.push((
+                            tantivy::query::Occur::Should,
+                            Box::new(TermQuery::new(file_name_term, IndexRecordOption::WithFreqsAndPositions)),
+                        ));
+                    }
+
+                    // Search in file_path field
+                    let file_path_term = Term::from_field_text(self.fields.file_path, token_text);
+                    if search_query.fuzzy_search {
+                        let fuzzy_q = tantivy::query::FuzzyTermQuery::new(file_path_term, 1, true);
+                        field_clauses.push((tantivy::query::Occur::Should, Box::new(fuzzy_q)));
+                    } else {
+                        field_clauses.push((
+                            tantivy::query::Occur::Should,
+                            Box::new(TermQuery::new(file_path_term, IndexRecordOption::WithFreqsAndPositions)),
+                        ));
+                    }
+
+                    // This token must match in at least one field
+                    let field_query = BooleanQuery::new(field_clauses);
+                    token_clauses.push((tantivy::query::Occur::Must, Box::new(field_query)));
                 }
+
+                Box::new(BooleanQuery::new(token_clauses))
             }
         };
 
@@ -812,16 +861,32 @@ impl SearchService {
         // (SnippetGenerator doesn't work well with FuzzyTermQuery or RegexQuery - tantivy issue #867)
         // For regex mode, extract simple terms from the pattern for snippet generation
         let (base_query_for_snippet, snippet_field) = if search_query.case_sensitive {
-            // For case-sensitive search, use content_raw field for snippets
-            // Parse the query with QueryParser to get highlighting on the raw (case-preserved) tokens
-            let query_parser_for_snippet = QueryParser::for_index(
-                &self.index,
-                vec![self.fields.content_raw, self.fields.file_name_raw, self.fields.file_path_raw],
-            );
-            let query = query_parser_for_snippet
-                .parse_query(&search_query.query)
-                .unwrap_or_else(|_| Box::new(tantivy::query::AllQuery));
-            (query, self.fields.content_raw)
+            // For case-sensitive search, we use content (lowercased) for snippets
+            // because SnippetGenerator doesn't work well with our case-preserving tokenization
+            // The search still works correctly on content_raw, but snippets will be lowercased
+            // TODO: Implement custom highlighting that preserves case
+            let mut query_tokenizer = QueryTokenizer::new(); // Use lowercase tokenizer for snippets
+            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
+            let mut query_tokens: Vec<String> = Vec::new();
+            while token_stream.advance() {
+                query_tokens.push(token_stream.token().text.clone());
+            }
+
+            let query = if query_tokens.is_empty() {
+                Box::new(tantivy::query::AllQuery) as Box<dyn tantivy::query::Query>
+            } else {
+                // Build BooleanQuery with TermQuery for each token (for content field)
+                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+                for token_text in &query_tokens {
+                    let content_term = Term::from_field_text(self.fields.content, token_text);
+                    token_clauses.push((
+                        tantivy::query::Occur::Must,
+                        Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
+                    ));
+                }
+                Box::new(BooleanQuery::new(token_clauses)) as Box<dyn tantivy::query::Query>
+            };
+            (query, self.fields.content) // Use normal content field for snippets
         } else if search_query.regex_search {
             // For regex, extract alphanumeric terms from pattern for highlighting
             let simple_terms = extract_simple_terms_from_regex(&search_query.query);
@@ -852,14 +917,28 @@ impl SearchService {
             };
             (query, self.fields.content)
         } else {
-            // For normal/fuzzy search, use the original query as-is
-            let query_parser_for_snippet = QueryParser::for_index(
-                &self.index,
-                vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-            );
-            let query = query_parser_for_snippet
-                .parse_query(&search_query.query)
-                .unwrap_or_else(|_| Box::new(tantivy::query::AllQuery));
+            // For normal/fuzzy search, build TermQuery manually to avoid QueryParser splitting camelCase
+            let mut query_tokenizer = QueryTokenizer::new();
+            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
+            let mut query_tokens: Vec<String> = Vec::new();
+            while token_stream.advance() {
+                query_tokens.push(token_stream.token().text.clone());
+            }
+
+            let query = if query_tokens.is_empty() {
+                Box::new(tantivy::query::AllQuery) as Box<dyn tantivy::query::Query>
+            } else {
+                // Build BooleanQuery with TermQuery for each token (for content only, since snippets are from content)
+                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+                for token_text in &query_tokens {
+                    let content_term = Term::from_field_text(self.fields.content, token_text);
+                    token_clauses.push((
+                        tantivy::query::Occur::Must,
+                        Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
+                    ));
+                }
+                Box::new(BooleanQuery::new(token_clauses)) as Box<dyn tantivy::query::Query>
+            };
             (query, self.fields.content)
         };
 

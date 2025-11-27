@@ -52,6 +52,18 @@ Added: `pub mod tokenizer;`
 | `base64Encode` | `["base64", "encode"]` | Numbers preserved |
 | `HTTPSConnection` | `["https", "connection"]` | Acronym edges |
 
+
+## Differents Tokenizers
+| Recherche | Aa  | Résultat                                               |
+|-----------|-----|--------------------------------------------------------|
+| vlanid    | Non | ✅ Trouve vlanID (query "vlanid" matche token "vlanid") |
+| vlanID    | Non | ✅ Trouve vlanID (query lowercased → "vlanid")          |
+| VlAnId    | Non | ✅ Trouve vlanID (query lowercased → "vlanid")          |
+| vlanid    | Oui | ✅ Vide (token "vlanid" ≠ token "vlanID")               |
+| vlanID    | Oui | ✅ Trouve vlanID (match exact)                          |
+
+
+
 ## ✨ Search Improvements
 
 Users can now:

@@ -32,6 +32,138 @@ impl Tokenizer for CodeTokenizer {
     }
 }
 
+/// Query tokenizer for case-INSENSITIVE search
+/// This tokenizer does NOT split on camelCase - it only lowercases the input.
+/// Used for query parsing so that "vlanID" search query becomes "vlanid" token
+/// which matches the complete lowercased token in the index.
+#[derive(Clone)]
+pub struct QueryTokenizer;
+
+impl QueryTokenizer {
+    pub fn new() -> Self {
+        QueryTokenizer
+    }
+}
+
+impl Default for QueryTokenizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Tokenizer for QueryTokenizer {
+    type TokenStream<'a> = QueryTokenStream;
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
+        QueryTokenStream::new(text, false) // lowercase = true (case-insensitive)
+    }
+}
+
+/// Query tokenizer for case-SENSITIVE search
+/// This tokenizer does NOT split on camelCase and preserves case exactly.
+/// Used for query parsing so that "vlanID" search query stays "vlanID" token
+/// which matches the case-preserved token in the index.
+#[derive(Clone)]
+pub struct QueryTokenizerCaseSensitive;
+
+impl QueryTokenizerCaseSensitive {
+    pub fn new() -> Self {
+        QueryTokenizerCaseSensitive
+    }
+}
+
+impl Default for QueryTokenizerCaseSensitive {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Tokenizer for QueryTokenizerCaseSensitive {
+    type TokenStream<'a> = QueryTokenStream;
+
+    fn token_stream<'a>(&'a mut self, text: &'a str) -> Self::TokenStream<'a> {
+        QueryTokenStream::new(text, true) // preserve_case = true (case-sensitive)
+    }
+}
+
+/// Token stream for query tokenizers (no camelCase splitting)
+pub struct QueryTokenStream {
+    tokens: Vec<Token>,
+    index: usize,
+}
+
+impl QueryTokenStream {
+    fn new(text: &str, preserve_case: bool) -> Self {
+        let tokens = tokenize_query(text, preserve_case);
+        QueryTokenStream { tokens, index: 0 }
+    }
+}
+
+impl TokenStream for QueryTokenStream {
+    fn advance(&mut self) -> bool {
+        if self.index < self.tokens.len() {
+            self.index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn token(&self) -> &Token {
+        &self.tokens[self.index.saturating_sub(1)]
+    }
+
+    fn token_mut(&mut self) -> &mut Token {
+        let idx = self.index.saturating_sub(1);
+        &mut self.tokens[idx]
+    }
+}
+
+/// Tokenizes query text WITHOUT camelCase splitting
+/// Only splits on whitespace and non-alphanumeric chars (except _ and -)
+/// Optionally lowercases tokens based on preserve_case flag
+fn tokenize_query(text: &str, preserve_case: bool) -> Vec<Token> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+
+    let mut tokens = Vec::new();
+
+    // Split by whitespace and non-alphanumeric characters (except underscores and hyphens)
+    let words: Vec<&str> = text
+        .split(|c: char| c.is_whitespace() || (!c.is_alphanumeric() && c != '_' && c != '-'))
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut byte_offset = 0;
+
+    for (position, word) in words.iter().enumerate() {
+        // Find this word in the original text
+        let word_byte_pos = if byte_offset < text.len() {
+            text[byte_offset..].find(word).unwrap_or(0)
+        } else {
+            0
+        };
+
+        let word_byte_offset = byte_offset + word_byte_pos;
+
+        // Create token - either lowercase or preserve case
+        let token_text = if preserve_case { word.to_string() } else { word.to_lowercase() };
+
+        tokens.push(Token {
+            offset_from: word_byte_offset,
+            offset_to: word_byte_offset + word.len(),
+            position,
+            text: token_text,
+            position_length: 1,
+        });
+
+        byte_offset = word_byte_offset + word.len();
+    }
+
+    tokens
+}
+
 /// Case-preserving code tokenizer for case-sensitive search
 /// This tokenizer uses the same splitting logic as CodeTokenizer (camelCase, whitespace, etc.)
 /// but preserves the original case of tokens instead of lowercasing them.
