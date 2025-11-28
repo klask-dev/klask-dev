@@ -363,6 +363,15 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
         {/* Badges - positioned above metadata, horizontal and right-aligned */}
         <div className="flex justify-end items-center gap-2 mb-3">
+          {repoData.lastCrawlError && (
+            <span
+              className="text-xs bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 px-2 py-0.5 rounded flex items-center space-x-1 cursor-help"
+              title={repoData.lastCrawlError}
+            >
+              <ExclamationTriangleIcon className="h-3 w-3" />
+              <span>Crawl Error</span>
+            </span>
+          )}
           <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded">
             {repoData.repositoryType}
           </span>

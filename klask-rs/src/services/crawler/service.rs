@@ -184,8 +184,9 @@ impl CrawlerService {
                         let error_msg = format!("Failed to clone/update repository: {}", e);
                         error!("Crawl error for repository {}: {}", repository.name, error_msg);
                         self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-                        // Mark crawl as failed in database
+                        // Mark crawl as failed in database and store error message
                         let _ = repo_repo.fail_crawl(repository.id).await;
+                        let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg.clone())).await;
                         self.cleanup_cancellation_token(repository.id).await;
                         return Err(anyhow!(error_msg));
                     }
@@ -204,8 +205,9 @@ impl CrawlerService {
                 if !repo_path_git.exists() {
                     let error_msg = format!("Repository path does not exist: {:?}", repo_path_git);
                     self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-                    // Mark crawl as failed in database
+                    // Mark crawl as failed in database and store error message
                     let _ = repo_repo.fail_crawl(repository.id).await;
+                    let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg.clone())).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Err(anyhow!(error_msg));
                 }
@@ -213,8 +215,9 @@ impl CrawlerService {
                 if !repo_path_git.is_dir() {
                     let error_msg = format!("Repository path is not a directory: {:?}", repo_path_git);
                     self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-                    // Mark crawl as failed in database
+                    // Mark crawl as failed in database and store error message
                     let _ = repo_repo.fail_crawl(repository.id).await;
+                    let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg.clone())).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Err(anyhow!(error_msg));
                 }
@@ -549,7 +552,9 @@ impl CrawlerService {
                 Err(e) => {
                     error!("Failed to resume crawl for repository {}: {}", repository.name, e);
                     // Mark as failed so it doesn't get stuck in "in_progress" state
+                    let error_msg = format!("{}", e);
                     let _ = repo_repo.fail_crawl(repository.id).await;
+                    let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg)).await;
                 }
             }
         }
@@ -671,6 +676,8 @@ impl CrawlerService {
                 repository.name, repository.crawl_started_at
             );
             repo_repo.fail_crawl(repository.id).await?;
+            let error_msg = format!("Crawl abandoned after {} minutes (started at: {:?})", timeout_minutes, repository.crawl_started_at);
+            repo_repo.set_last_crawl_error(repository.id, Some(error_msg)).await?;
         }
 
         Ok(())
@@ -696,6 +703,9 @@ impl CrawlerService {
 
         // Mark crawl as completed in database
         repo_repo.complete_crawl(repository.id).await?;
+
+        // Clear any previous crawl errors on successful completion
+        repo_repo.set_last_crawl_error(repository.id, None).await?;
 
         // Complete the progress tracking
         self.progress_tracker.complete_crawl(repository.id).await;
