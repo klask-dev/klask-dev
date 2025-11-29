@@ -192,10 +192,12 @@ impl RepositoryRepository {
     }
 
     pub async fn fail_crawl(&self, repository_id: Uuid) -> Result<()> {
-        sqlx::query("UPDATE repositories SET crawl_state = 'failed', updated_at = NOW() WHERE id = $1")
-            .bind(repository_id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE repositories SET crawl_state = 'failed', last_crawled = NOW(), updated_at = NOW() WHERE id = $1",
+        )
+        .bind(repository_id)
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }

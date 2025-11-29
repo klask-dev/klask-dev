@@ -1,16 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { useQueryClient } from '@tanstack/react-query';
-import { 
+import {
   PlusIcon,
   FunnelIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { SelectableRepositoryCard } from '../../components/repositories/SelectableRepositoryCard';
-import { Checkbox } from '../../components/ui/Checkbox';
 import { RepositoryForm } from '../../components/repositories/RepositoryForm';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { CrawlErrorDisplay } from '../../components/repositories/CrawlErrorDisplay';
 import { 
   useRepositories, 
   useCreateRepository, 
@@ -27,7 +24,7 @@ import type { Repository, RepositoryWithStats, CreateRepositoryRequest } from '.
 type FilterType = 'all' | 'enabled' | 'disabled' | 'crawled' | 'not-crawled';
 
 const RepositoriesPage: React.FC = () => {
-  const queryClient = useQueryClient();
+  const activeCrawlsRef = useRef<Set<string>>(new Set());
   const [showForm, setShowForm] = useState(false);
   const [editingRepository, setEditingRepository] = useState<RepositoryWithStats | null>(null);
   const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
@@ -105,6 +102,29 @@ const RepositoriesPage: React.FC = () => {
       selectAllCheckboxRef.current.indeterminate = isIndeterminate;
     }
   }, [selectedRepos.length, filteredRepositories.length]);
+
+  // Refetch when crawls finish
+  useEffect(() => {
+    // Current crawling repos
+    const currentCrawling = new Set(
+      activeProgress
+        .filter(p => !['completed', 'failed', 'cancelled'].includes(p.status.toLowerCase()))
+        .map(p => p.repository_id)
+    );
+
+    // Find repos that finished crawling
+    const justFinished = Array.from(activeCrawlsRef.current).filter(
+      id => !currentCrawling.has(id)
+    );
+
+    if (justFinished.length > 0) {
+      console.log('Crawls finished, refetching repositories...');
+      refetch();
+    }
+
+    // Update ref
+    activeCrawlsRef.current = currentCrawling;
+  }, [activeProgress, refetch]);
 
   const handleCreate = useCallback(async (data: any) => {
     try {
@@ -329,23 +349,6 @@ const RepositoriesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Crawl Errors Alert - Show if any repository has crawl errors */}
-      {activeProgress.filter(p => p.error_message).length > 0 && (
-        <div className="space-y-3">
-          {activeProgress
-            .filter(p => p.error_message)
-            .map(progress => (
-              <CrawlErrorDisplay
-                key={progress.repository_id}
-                errorMessage={progress.error_message!}
-                occurredAt={progress.updated_at}
-                repositoryName={progress.repository_name}
-                compact={true}
-              />
-            ))
-          }
-        </div>
-      )}
 
       {/* Stats */}
       {memoizedStats && (

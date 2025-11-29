@@ -113,7 +113,8 @@ export const useCrawlRepository = () => {
     onSuccess: (_, repositoryId) => {
       // Refetch the specific repository to get updated lastCrawled timestamp
       queryClient.invalidateQueries({ queryKey: ['repositories', repositoryId] });
-      queryClient.invalidateQueries({ queryKey: ['repositories'] });
+      // Force immediate refetch of repositories list to show updated lastCrawlError
+      queryClient.refetchQueries({ queryKey: ['repositories'] });
       // Force immediate refetch of active progress to switch polling interval
       queryClient.refetchQueries({ queryKey: ['repositories', 'progress', 'active'] });
     },

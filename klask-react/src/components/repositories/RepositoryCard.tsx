@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   FolderIcon,
@@ -21,7 +21,7 @@ import { CrawlProgressBar, GitLabHierarchicalProgressBar } from '../ui/ProgressB
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useStopCrawl } from '../../hooks/useRepositories';
 import { isRepositoryCrawling, getRepositoryProgressFromActive, type CrawlProgressInfo } from '../../hooks/useProgress';
-import { InlineCrawlError, CrawlErrorDisplay } from './CrawlErrorDisplay';
+import { CrawlErrorDisplay } from './CrawlErrorDisplay';
 
 interface RepositoryCardProps {
   repository: RepositoryWithStats;
@@ -65,6 +65,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   // Override the isCrawling prop with real-time data
   const actuallyIsCrawling = isCurrentlyCrawling || isCrawling;
+
+  // Close error details when error is cleared (crawl succeeded)
+  useEffect(() => {
+    if (!repoData.lastCrawlError) {
+      setShowErrorDetails(false);
+    }
+  }, [repoData.lastCrawlError]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -434,13 +441,6 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
                 currentFile={crawlProgress.current_file}
               />
             )}
-          </div>
-        )}
-
-        {/* Crawl Error Display - Show if there's an error from active crawl */}
-        {crawlProgress?.error_message && (
-          <div className="mt-4">
-            <InlineCrawlError errorMessage={crawlProgress.error_message} />
           </div>
         )}
 
