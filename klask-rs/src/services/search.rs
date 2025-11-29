@@ -1518,7 +1518,7 @@ impl SearchService {
         use tantivy::aggregation::AggregationCollector;
         use tantivy::aggregation::agg_req::Aggregations;
         use tantivy::aggregation::agg_result::AggregationResults;
-        use tantivy::query::{AllQuery, BooleanQuery, Occur, QueryParser, TermQuery};
+        use tantivy::query::{AllQuery, BooleanQuery, Occur, TermQuery};
 
         // Helper to build query with specific filters
         let build_query_with_filters = |include_repository: bool,

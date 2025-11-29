@@ -57,6 +57,7 @@ async fn main() -> Result<()> {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
         last_crawled: None,
+        last_crawl_error: None,
         // Scheduling fields
         auto_crawl_enabled: false,
         cron_schedule: None,

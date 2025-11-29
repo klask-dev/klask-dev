@@ -556,6 +556,7 @@ async fn create_repository(
         gitlab_namespace: clean_optional_string(request.gitlab_namespace),
         is_group: request.is_group.unwrap_or(false),
         last_crawled: None,
+        last_crawl_error: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
         auto_crawl_enabled: request.auto_crawl_enabled.unwrap_or(false),
