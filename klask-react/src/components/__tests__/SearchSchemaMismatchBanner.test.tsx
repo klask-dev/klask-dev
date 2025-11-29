@@ -11,13 +11,17 @@ vi.mock('../../api/indexMetrics', () => ({
   useAllIndexMetrics: vi.fn(),
 }));
 
-vi.mock('react-router-dom', () => ({
-  Link: ({ to, children, className }: any) => (
-    <a href={to} className={className} data-testid="admin-link">
-      {children}
-    </a>
-  ),
-}));
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    Link: ({ to, children, className }: any) => (
+      <a href={to} className={className} data-testid="admin-link">
+        {children}
+      </a>
+    ),
+  };
+});
 
 vi.mock('@heroicons/react/24/outline', () => ({
   ExclamationTriangleIcon: () => <div data-testid="warning-icon" />,

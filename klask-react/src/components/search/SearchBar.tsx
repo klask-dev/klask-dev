@@ -66,8 +66,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    onSearch(localValue);
-  }, [localValue, onSearch]);
+    // Don't submit if search is disabled due to schema mismatch
+    if (!isSearchDisabled) {
+      onSearch(localValue);
+    }
+  }, [localValue, onSearch, isSearchDisabled]);
 
   return (
     <div className={className}>

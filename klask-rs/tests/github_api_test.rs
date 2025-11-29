@@ -149,6 +149,7 @@ async fn test_github_repository_model_fields() {
         included_branches_patterns: None,
         included_projects: None,
         included_projects_patterns: None,
+        last_crawl_error: None,
     };
 
     // Verify GitHub fields are set correctly

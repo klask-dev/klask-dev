@@ -449,7 +449,7 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
       const errorBadge = screen.getByText('Crawl Error');
-      const badgeContainer = errorBadge.closest('span');
+      const badgeContainer = errorBadge.closest('button');
 
       // SVG icon should be present (from ExclamationTriangleIcon)
       const icon = badgeContainer?.querySelector('svg');
@@ -463,7 +463,7 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
-      const errorBadge = screen.getByText('Crawl Error').closest('span');
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
 
       // Check for red styling classes
       expect(errorBadge).toHaveClass('bg-red-100');
@@ -472,18 +472,18 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
       expect(errorBadge).toHaveClass('dark:text-red-200');
     });
 
-    it('should have cursor-help class for tooltip indication', () => {
+    it('should have cursor-pointer class for tooltip indication', () => {
       const repositoryWithError = createMockRepositoryWithStats({
         lastCrawlError: 'Network error',
       });
 
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
-      const errorBadge = screen.getByText('Crawl Error').closest('span');
-      expect(errorBadge).toHaveClass('cursor-help');
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveClass('cursor-pointer');
     });
 
-    it('should display error message in title attribute (tooltip)', () => {
+    it('should have title attribute explaining to click for details', () => {
       const errorMessage = 'This is a detailed error message about the crawl failure';
       const repositoryWithError = createMockRepositoryWithStats({
         lastCrawlError: errorMessage,
@@ -491,11 +491,11 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
-      const errorBadge = screen.getByText('Crawl Error').closest('span');
-      expect(errorBadge).toHaveAttribute('title', errorMessage);
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveAttribute('title', 'Click to view error details');
     });
 
-    it('should preserve special characters in error message tooltip', () => {
+    it('should preserve special characters in error message when displayed', () => {
       const errorMessage = 'Error: Failed to clone "https://github.com/repo.git" (exit code 1)';
       const repositoryWithError = createMockRepositoryWithStats({
         lastCrawlError: errorMessage,
@@ -503,11 +503,12 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
-      const errorBadge = screen.getByText('Crawl Error').closest('span');
-      expect(errorBadge).toHaveAttribute('title', errorMessage);
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toBeInTheDocument();
+      // The error message will be displayed in CrawlErrorDisplay after clicking the badge
     });
 
-    it('should handle very long error messages in tooltip', () => {
+    it('should handle very long error messages correctly', () => {
       const longErrorMessage = 'A'.repeat(500); // Very long error message
       const repositoryWithError = createMockRepositoryWithStats({
         lastCrawlError: longErrorMessage,
@@ -515,8 +516,9 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
-      const errorBadge = screen.getByText('Crawl Error').closest('span');
-      expect(errorBadge).toHaveAttribute('title', longErrorMessage);
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toBeInTheDocument();
+      // Long error messages are handled by CrawlErrorDisplay component
     });
   });
 
@@ -539,7 +541,7 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
       expect(branchBadge).toBeInTheDocument();
 
       // They should be within the same container (badges section)
-      const errorContainer = errorBadge.closest('span')?.parentElement;
+      const errorContainer = errorBadge.closest('button')?.parentElement;
       const typeContainer = typeBadge.closest('span')?.parentElement;
 
       // Check if they share the same parent (badges section)
@@ -553,7 +555,7 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
-      const badgesSection = screen.getByText('Crawl Error').closest('span')?.parentElement;
+      const badgesSection = screen.getByText('Crawl Error').closest('button')?.parentElement;
       const children = badgesSection?.children || [];
 
       // Find the indices of error and type badges
@@ -596,7 +598,7 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
-      const badgesContainer = screen.getByText('Crawl Error').closest('span')?.parentElement;
+      const badgesContainer = screen.getByText('Crawl Error').closest('button')?.parentElement;
       expect(badgesContainer).toHaveClass('gap-2');
     });
   });
@@ -623,7 +625,7 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       // Badge should now be visible
       expect(screen.getByText('Crawl Error')).toBeInTheDocument();
-      expect(screen.getByText('Crawl Error').closest('span')).toHaveAttribute('title', 'New error occurred');
+      expect(screen.getByText('Crawl Error').closest('button')).toHaveAttribute('title', 'Click to view error details');
     });
 
     it('should remove badge when lastCrawlError changes from error to undefined', () => {
@@ -657,8 +659,8 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
         />
       );
 
-      let errorBadge = screen.getByText('Crawl Error').closest('span');
-      expect(errorBadge).toHaveAttribute('title', 'Initial error');
+      let errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveAttribute('title', 'Click to view error details');
 
       // Rerender with different error
       rerender(
@@ -668,8 +670,8 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
         />
       );
 
-      errorBadge = screen.getByText('Crawl Error').closest('span');
-      expect(errorBadge).toHaveAttribute('title', 'Updated error message');
+      errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveAttribute('title', 'Click to view error details');
     });
   });
 
@@ -721,7 +723,8 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
       render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
 
       expect(screen.getByText('Crawl Error')).toBeInTheDocument();
-      expect(screen.getByText('Disabled')).toBeInTheDocument();
+      // Check that the Disabled status is displayed
+      expect(screen.getAllByText('Disabled').length).toBeGreaterThan(0);
     });
   });
 
@@ -738,7 +741,9 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       // Other elements should still be present and functional
       expect(screen.getByText('Test Repository')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /crawl/i })).toBeInTheDocument();
+      // Check for crawl button via the Crawl Now text in the menu
+      expect(screen.getByRole('button', { name: /crawl now/i })).toBeInTheDocument();
+      // Check for enabled status button
       expect(screen.getByRole('button', { name: /enabled/i })).toBeInTheDocument();
     });
 

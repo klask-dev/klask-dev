@@ -134,7 +134,7 @@ mod crawl_error_tracking_tests {
         repo_repo.set_last_crawl_error(created_repo.id, Some(error1.clone())).await?;
 
         let repo_with_error1 = repo_repo.get_repository(created_repo.id).await?.unwrap();
-        assert_eq!(repo_with_error1.last_crawl_error, Some(error1));
+        assert_eq!(repo_with_error1.last_crawl_error, Some(error1.clone()));
 
         // Replace with second error
         let error2 = "Second error: Disk space exhausted".to_string();
@@ -142,8 +142,8 @@ mod crawl_error_tracking_tests {
 
         // Verify new error replaced the old one
         let repo_with_error2 = repo_repo.get_repository(created_repo.id).await?.unwrap();
-        assert_eq!(repo_with_error2.last_crawl_error, Some(error2));
-        assert_ne!(repo_with_error2.last_crawl_error, Some(error1));
+        assert_eq!(repo_with_error2.last_crawl_error, Some(error2.clone()));
+        assert_ne!(repo_with_error2.last_crawl_error, Some(error1.clone()));
 
         // Clean up
         repo_repo.delete_repository(created_repo.id).await?;
@@ -460,7 +460,10 @@ mod crawl_error_tracking_tests {
 
         // Verify lastCrawlError is in the JSON response with correct casing
         assert!(json.get("lastCrawlError").is_some());
-        assert_eq!(json.get("lastCrawlError").unwrap().as_str(), Some(&error_msg));
+        assert_eq!(
+            json.get("lastCrawlError").unwrap().as_str().unwrap(),
+            error_msg.as_str()
+        );
 
         // Clean up
         repo_repo.delete_repository(created_repo.id).await?;

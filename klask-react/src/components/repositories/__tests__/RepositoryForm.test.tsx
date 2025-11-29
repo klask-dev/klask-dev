@@ -668,8 +668,7 @@ describe('RepositoryForm - Filtering Fields', () => {
   // Section 5: Form Submission Tests
   // ============================================================================
   describe('Form Submission', () => {
-    // Note: Skipped - empty string handling needs to be implemented in the form
-    it('should convert empty strings to undefined before submission', async () => {
+    it('should convert empty strings to empty string before submission', async () => {
       const user = userEvent.setup();
 
       render(
@@ -698,11 +697,12 @@ describe('RepositoryForm - Filtering Fields', () => {
         expect(mockOnSubmit).toHaveBeenCalled();
         const submittedData = mockOnSubmit.mock.calls[0][0];
 
-        // Empty strings should be converted to undefined
-        expect(submittedData.includedBranches).toBeUndefined();
-        expect(submittedData.includedBranchesPatterns).toBeUndefined();
-        expect(submittedData.excludedBranches).toBeUndefined();
-        expect(submittedData.excludedBranchesPatterns).toBeUndefined();
+        // Empty fields should be converted to empty strings (not undefined)
+        // This allows the backend to distinguish between "field not touched" vs "field emptied by user"
+        expect(submittedData.includedBranches).toBe('');
+        expect(submittedData.includedBranchesPatterns).toBe('');
+        expect(submittedData.excludedBranches).toBe('');
+        expect(submittedData.excludedBranchesPatterns).toBe('');
       });
     });
 
