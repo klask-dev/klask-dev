@@ -161,10 +161,7 @@ impl CrawlerService {
 
         // Check for cancellation before starting main work
         if cancellation_token.is_cancelled() {
-            warn!(
-                "✋ Cancellation detected BEFORE starting main work for repository: {}",
-                repository.name
-            );
+            info!("Crawl cancelled for repository: {}", repository.name);
             self.progress_tracker.cancel_crawl(repository.id).await;
             let repo_repo = RepositoryRepository::new(self.database.clone());
             let _ = repo_repo.cancel_crawl(repository.id).await;
@@ -534,12 +531,11 @@ impl CrawlerService {
     pub async fn cancel_crawl(&self, repository_id: Uuid) -> Result<bool> {
         let tokens = self.cancellation_tokens.read().await;
         if let Some(token) = tokens.get(&repository_id) {
-            warn!("🛑 CANCELLING CRAWL for repository: {}", repository_id);
+            info!("Cancellation requested for repository: {}", repository_id);
             token.cancel();
-            warn!("🛑 Token cancelled, is_cancelled = {}", token.is_cancelled());
             Ok(true)
         } else {
-            warn!("❌ No active crawl token found for repository: {}", repository_id);
+            warn!("No active crawl found for repository: {}", repository_id);
             Ok(false)
         }
     }
