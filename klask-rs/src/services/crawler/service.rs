@@ -670,7 +670,7 @@ impl CrawlerService {
                 self.gitlab_crawler
                     .resume_gitlab_repository_crawl(
                         repository,
-                        cancellation_token,
+                        cancellation_token.clone(),
                         clone_or_update_fn,
                         process_files_fn,
                         update_crawl_time_fn,
@@ -678,8 +678,17 @@ impl CrawlerService {
                     )
                     .await?;
 
-                // Finalize the crawl: commit Tantivy index and update database
-                self.finalize_crawl(repository, crawl_start_time).await
+                // Check if crawl was cancelled after resuming
+                if cancellation_token.is_cancelled() {
+                    info!("Resumed crawl was cancelled for repository: {}", repository.name);
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    repo_repo.cancel_crawl(repository.id).await?;
+                } else {
+                    // Finalize the crawl: commit Tantivy index and update database
+                    self.finalize_crawl(repository, crawl_start_time).await?;
+                }
+
+                Ok(())
             }
             RepositoryType::Git | RepositoryType::FileSystem | RepositoryType::GitHub => {
                 // For Git, FileSystem, and GitHub, just restart the entire crawl
