@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '../../../test/utils';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -126,6 +126,7 @@ const createMockTuning = (overrides = {}) => ({
 
 describe('IndexManagement', () => {
   let queryClient: QueryClient;
+  const mockUseSearchStatus = vi.mocked(indexMetricsApi.useSearchStatus);
 
   beforeEach(() => {
     queryClient = new QueryClient({
@@ -135,15 +136,25 @@ describe('IndexManagement', () => {
       },
     });
     vi.clearAllMocks();
+    // Default mock for useSearchStatus
+    mockUseSearchStatus.mockReturnValue({
+      data: {
+        schema_mismatch: false,
+        index_available: true,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
   });
 
   const renderComponent = () => {
     return render(
-      <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <IndexManagement />
-        </QueryClientProvider>
-      </BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <IndexManagement />
+      </QueryClientProvider>
     );
   };
 
@@ -738,7 +749,9 @@ describe('IndexManagement', () => {
 
       const { container } = renderComponent();
 
-      expect(screen.getByTestId('warning-icon')).toBeInTheDocument();
+      // Get all warning icons and verify at least one exists (there may be multiple)
+      const warningIcons = screen.getAllByTestId('warning-icon');
+      expect(warningIcons.length).toBeGreaterThan(0);
     });
 
     // Test 11c: Schema mismatch callout has correct styling

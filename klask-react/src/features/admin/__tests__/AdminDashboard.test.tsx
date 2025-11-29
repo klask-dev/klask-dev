@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '../../../test/utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
 import AdminDashboard from '../AdminDashboard';
 import { useAdminDashboard } from '../../../hooks/useAdmin';
 
@@ -45,6 +46,7 @@ vi.mock('@heroicons/react/24/outline', () => ({
   ClockIcon: () => <div data-testid="clock-icon" />,
   CogIcon: () => <div data-testid="cog-icon" />,
   ArrowPathIcon: () => <div data-testid="arrow-path-icon" />,
+  ExclamationTriangleIcon: () => <div data-testid="exclamation-icon" />,
 }));
 
 describe('AdminDashboard', () => {
@@ -655,7 +657,8 @@ describe('AdminDashboard', () => {
 
       renderComponent();
 
-      expect(screen.getByText('(schema mismatch)')).toBeInTheDocument();
+      // Text is broken up by elements, so use a regex matcher
+      expect(screen.getByText(/schema mismatch/i)).toBeInTheDocument();
     });
 
     // Test 13d: Action prompt shown for rebuild

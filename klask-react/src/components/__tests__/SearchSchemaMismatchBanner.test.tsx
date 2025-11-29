@@ -1,5 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import userEvent from '@testing-library/user-event';
 
 // Mocks must be at the top level before imports!
 vi.mock('../../api/indexMetrics', () => ({
@@ -29,6 +30,7 @@ vi.mock('@heroicons/react/24/outline', () => ({
 }));
 
 import { render, screen, waitFor } from '../../test/utils';
+import { within } from '@testing-library/react';
 import { SearchSchemaMismatchBanner } from '../SearchSchemaMismatchBanner';
 import * as indexMetricsApi from '../../api/indexMetrics';
 
@@ -162,7 +164,7 @@ describe('SearchSchemaMismatchBanner Component', () => {
   });
 
   // Test 6: Banner can be dismissed
-  it('should hide banner when dismiss button is clicked', () => {
+  it('should hide banner when dismiss button is clicked', async () => {
     mockUseSearchStatus.mockReturnValue({
       data: {
         schema_mismatch: true,
@@ -179,10 +181,13 @@ describe('SearchSchemaMismatchBanner Component', () => {
 
     expect(screen.getByText('Index schema has changed')).toBeInTheDocument();
 
-    const dismissButton = screen.getByRole('button', { name: /dismiss/i });
-    dismissButton.click();
+    const dismissButton = screen.getByRole('button', { name: /dismiss warning/i });
+    await userEvent.click(dismissButton);
 
-    expect(screen.queryByText('Index schema has changed')).not.toBeInTheDocument();
+    // Wait for DOM to update after state change
+    await waitFor(() => {
+      expect(screen.queryByText('Index schema has changed')).not.toBeInTheDocument();
+    });
   });
 
   // Test 7: Warning icon is displayed

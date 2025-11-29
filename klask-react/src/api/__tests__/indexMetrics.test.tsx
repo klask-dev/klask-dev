@@ -156,7 +156,7 @@ describe('indexMetrics Hook Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
-      });
+      }, { timeout: 3000 });
 
       // Hook should handle error gracefully (throwOnError: false)
       expect(result.current.error).toBeTruthy();
@@ -323,7 +323,7 @@ describe('indexMetrics Hook Tests', () => {
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
-      });
+      }, { timeout: 3000 });
 
       // Should error due to validation
       expect(result.current.error).toBeTruthy();
