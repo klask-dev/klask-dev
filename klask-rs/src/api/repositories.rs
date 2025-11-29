@@ -902,17 +902,25 @@ async fn crawl_repository(
     // Start crawl using the crawler service
     let crawler_service = app_state.crawler_service.clone();
     let progress_tracker = app_state.progress_tracker.clone();
+    let database_pool = app_state.database.pool().clone();
     let repository_clone = repository.clone();
     let repository_id = repository.id;
+    let repository_name = repository.name.clone();
 
     // Spawn crawl task in background
     tokio::spawn(async move {
         if let Err(e) = crawler_service.crawl_repository(&repository_clone).await {
             let error_msg = format!("{}", e);
-            error!("Crawl failed for repository {}: {}", repository_clone.name, error_msg);
+            error!("Crawl failed for repository {}: {}", repository_name, error_msg);
 
             // Record the error in progress tracker so it's visible in the UI
-            progress_tracker.set_error(repository_id, error_msg).await;
+            progress_tracker.set_error(repository_id, error_msg.clone()).await;
+
+            // Also persist the error to the database so it survives after the crawl finishes
+            let repo_repo = RepositoryRepository::new(database_pool);
+            if let Err(db_err) = repo_repo.set_last_crawl_error(repository_id, Some(error_msg)).await {
+                error!("Failed to save crawl error to database: {}", db_err);
+            }
         }
     });
 
