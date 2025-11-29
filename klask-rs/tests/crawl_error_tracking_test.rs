@@ -68,7 +68,7 @@ mod crawl_error_tracking_tests {
         let repo_repo = RepositoryRepository::new(pool.clone());
 
         // Create a repository
-        let mut repo = create_test_repository("test-repo-1");
+        let repo = create_test_repository("test-repo-1");
         let created_repo = repo_repo.create_repository(&repo).await?;
 
         // Set an error message
@@ -291,7 +291,7 @@ mod crawl_error_tracking_tests {
         let repo_repo = RepositoryRepository::new(pool.clone());
 
         // Create a repository
-        let mut repo = create_test_repository("test-repo-8");
+        let repo = create_test_repository("test-repo-8");
         let mut created_repo = repo_repo.create_repository(&repo).await?;
 
         // Set an error
@@ -483,12 +483,12 @@ mod crawl_error_tracking_tests {
 
         // Retrieve and serialize as JSON
         let retrieved_repo = repo_repo.get_repository(created_repo.id).await?.unwrap();
-        let json = serde_json::to_value(&retrieved_repo)?;
+        let _json = serde_json::to_value(&retrieved_repo)?;
 
         // Verify lastCrawlError is null/absent in JSON
         // Since it uses #[serde(skip_serializing_if = "Option::is_none")], it should be absent
         // But the field should still be deserializable
-        let json_with_explicit_null = serde_json::json!({
+        let _json_with_explicit_null = serde_json::json!({
             "lastCrawlError": serde_json::Value::Null
         });
 
