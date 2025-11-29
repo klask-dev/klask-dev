@@ -103,8 +103,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     }
   };
 
+  const isCrawlStopped = () => {
+    return repoData.crawlState === 'idle' && repoData.crawlStartedAt && !repoData.lastCrawled;
+  };
+
   const getStatusColor = () => {
     if (!repoData.enabled) return 'text-gray-400';
+    if (isCrawlStopped()) return 'text-orange-500';
     if (repoData.lastCrawled) return 'text-green-500';
     return 'text-yellow-500';
   };
@@ -112,6 +117,9 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const getStatusIcon = () => {
     if (!repoData.enabled) {
       return <PauseCircleIcon className="h-5 w-5 text-gray-400" />;
+    }
+    if (isCrawlStopped()) {
+      return <StopCircleIcon className="h-5 w-5 text-orange-500" />;
     }
     if (repoData.lastCrawled) {
       return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
@@ -121,6 +129,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const getStatusText = () => {
     if (!repoData.enabled) return 'Disabled';
+    if (isCrawlStopped()) return 'Stopped';
     if (repoData.lastCrawled) return 'Ready';
     return 'Not Crawled';
   };
