@@ -149,6 +149,10 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   };
 
   const formatLastCrawled = (date: string | null | undefined) => {
+    // Check if crawl was stopped (crawlStartedAt is set but crawl didn't finalize)
+    if (repoData.crawlState === 'idle' && repoData.crawlStartedAt && !date) {
+      return 'Stopped (not completed)';
+    }
     if (!date) return 'Never';
     try {
       return formatDistanceToNow(new Date(date), { addSuffix: true });
@@ -400,8 +404,19 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         {/* Metadata */}
         <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center space-x-2">
-            <ClockIcon className="h-4 w-4 flex-shrink-0" />
-            <span>Last crawled: {formatLastCrawled(repoData.lastCrawled)}</span>
+            {repoData.crawlState === 'idle' && repoData.crawlStartedAt && !repoData.lastCrawled ? (
+              <>
+                <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0 text-orange-500" />
+                <span className="text-orange-600 dark:text-orange-400 font-medium">
+                  Last crawled: {formatLastCrawled(repoData.lastCrawled)}
+                </span>
+              </>
+            ) : (
+              <>
+                <ClockIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Last crawled: {formatLastCrawled(repoData.lastCrawled)}</span>
+              </>
+            )}
             {repoData.lastCrawlDurationSeconds && (
               <span className="text-gray-400 dark:text-gray-500">
                 ({formatDuration(repoData.lastCrawlDurationSeconds)})
