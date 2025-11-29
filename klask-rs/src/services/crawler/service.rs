@@ -676,7 +676,10 @@ impl CrawlerService {
                 repository.name, repository.crawl_started_at
             );
             repo_repo.fail_crawl(repository.id).await?;
-            let error_msg = format!("Crawl abandoned after {} minutes (started at: {:?})", timeout_minutes, repository.crawl_started_at);
+            let error_msg = format!(
+                "Crawl abandoned after {} minutes (started at: {:?})",
+                timeout_minutes, repository.crawl_started_at
+            );
             repo_repo.set_last_crawl_error(repository.id, Some(error_msg)).await?;
         }
 

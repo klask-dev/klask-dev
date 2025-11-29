@@ -12,18 +12,13 @@ mod crawl_error_tracking_tests {
 
     /// Get PostgreSQL connection string from environment or use default for testing
     fn get_db_url() -> String {
-        env::var("DATABASE_URL").unwrap_or_else(|_| {
-            "postgresql://klask:klask@localhost:5432/klask".to_string()
-        })
+        env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql://klask:klask@localhost:5432/klask".to_string())
     }
 
     /// Create a test database pool
     async fn create_pool() -> Result<PgPool> {
         let url = get_db_url();
-        let pool = PgPoolOptions::new()
-            .max_connections(1)
-            .connect(&url)
-            .await?;
+        let pool = PgPoolOptions::new().max_connections(1).connect(&url).await?;
         Ok(pool)
     }
 
@@ -212,7 +207,8 @@ mod crawl_error_tracking_tests {
         Error at file: /src/main.rs:123
         Details: Unexpected EOF while parsing token stream
         Stack trace: parsing.rs:456 -> tokenize.rs:789
-        Status: FATAL - Crawl aborted"#.to_string();
+        Status: FATAL - Crawl aborted"#
+            .to_string();
 
         repo_repo.set_last_crawl_error(created_repo.id, Some(long_error.clone())).await?;
 
