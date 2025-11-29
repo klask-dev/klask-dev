@@ -434,11 +434,17 @@ impl BranchProcessor {
         let repo_path_owned2 = repo_path.to_owned();
 
         // First pass: Count total eligible files for accurate progress reporting (in blocking thread)
+        let cancellation_token_clone = cancellation_token.clone();
         let total_files = tokio::task::spawn_blocking(move || -> Result<usize> {
             let mut total_files = 0;
             for entry in
                 WalkDir::new(&repo_path_owned).into_iter().filter_map(|e| e.ok()).filter(|e| e.file_type().is_file())
             {
+                // Check for cancellation during file scanning
+                if cancellation_token_clone.is_cancelled() {
+                    return Ok(total_files);
+                }
+
                 let file_path = entry.path();
                 let relative_path = file_path
                     .strip_prefix(&repo_path_owned)
@@ -475,11 +481,17 @@ impl BranchProcessor {
         );
 
         // Collect all file paths to process (in blocking thread)
+        let cancellation_token_clone2 = cancellation_token.clone();
         let files_to_process = tokio::task::spawn_blocking(move || -> Result<Vec<(std::path::PathBuf, String)>> {
             let mut files = Vec::new();
             for entry in
                 WalkDir::new(&repo_path_owned2).into_iter().filter_map(|e| e.ok()).filter(|e| e.file_type().is_file())
             {
+                // Check for cancellation during file scanning
+                if cancellation_token_clone2.is_cancelled() {
+                    return Ok(files);
+                }
+
                 let file_path = entry.path();
                 let relative_path = file_path
                     .strip_prefix(&repo_path_owned2)
