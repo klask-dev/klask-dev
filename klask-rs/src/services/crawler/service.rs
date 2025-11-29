@@ -180,6 +180,15 @@ impl CrawlerService {
                     .update_status(repository.id, crate::services::progress::CrawlStatus::Cloning)
                     .await;
 
+                // Check for cancellation before starting potentially long clone operation
+                if cancellation_token.is_cancelled() {
+                    self.progress_tracker.cancel_crawl(repository.id).await;
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    let _ = repo_repo.cancel_crawl(repository.id).await;
+                    self.cleanup_cancellation_token(repository.id).await;
+                    return Ok(());
+                }
+
                 // Try to clone the repository, handle errors gracefully
                 match self.git_operations.clone_or_update_repository(repository, &temp_path).await {
                     Ok(_git_repo) => temp_path,
