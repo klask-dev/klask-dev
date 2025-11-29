@@ -605,6 +605,16 @@ impl CrawlerService {
             repository.name, repository.last_processed_project
         );
 
+        // Create and register cancellation token for resumed crawl
+        let cancellation_token = CancellationToken::new();
+        {
+            let mut tokens = self.cancellation_tokens.write().await;
+            tokens.insert(repository.id, cancellation_token.clone());
+        }
+
+        // Start progress tracking
+        self.progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
+
         match repository.repository_type {
             RepositoryType::GitLab => {
                 // Create closures for GitLab crawler callbacks
@@ -664,6 +674,7 @@ impl CrawlerService {
                 self.gitlab_crawler
                     .resume_gitlab_repository_crawl(
                         repository,
+                        cancellation_token,
                         clone_or_update_fn,
                         process_files_fn,
                         update_crawl_time_fn,

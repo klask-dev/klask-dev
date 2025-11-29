@@ -333,6 +333,7 @@ impl GitLabCrawler {
     pub async fn resume_gitlab_repository_crawl(
         &self,
         repository: &Repository,
+        cancellation_token: CancellationToken,
         clone_or_update_fn: impl Fn(
             &Repository,
             &std::path::Path,
@@ -381,9 +382,7 @@ impl GitLabCrawler {
             repository.url.clone()
         };
 
-        // Create cancellation token
-        let cancellation_token = CancellationToken::new();
-
+        // Note: cancellation_token is now passed as a parameter
         // Start progress tracking
         self.progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
 
