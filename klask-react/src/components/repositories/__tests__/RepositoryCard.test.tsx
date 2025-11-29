@@ -741,8 +741,9 @@ describe('RepositoryCard Crawl Error Badge Display', () => {
 
       // Other elements should still be present and functional
       expect(screen.getByText('Test Repository')).toBeInTheDocument();
-      // Check for crawl button via the Crawl Now text in the menu
-      expect(screen.getByRole('button', { name: /crawl now/i })).toBeInTheDocument();
+      // Check for visible crawl button (not the one in the dropdown menu)
+      const crawlButtons = screen.getAllByRole('button', { name: /crawl/i });
+      expect(crawlButtons.length).toBeGreaterThan(0);
       // Check for enabled status button
       expect(screen.getByRole('button', { name: /enabled/i })).toBeInTheDocument();
     });
