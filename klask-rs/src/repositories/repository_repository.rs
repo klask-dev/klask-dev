@@ -204,7 +204,7 @@ impl RepositoryRepository {
 
     pub async fn cancel_crawl(&self, repository_id: Uuid) -> Result<()> {
         sqlx::query(
-            "UPDATE repositories SET crawl_state = 'idle', last_processed_project = NULL, crawl_started_at = NULL, updated_at = NOW() WHERE id = $1",
+            "UPDATE repositories SET crawl_state = 'stopped', last_processed_project = NULL, crawl_started_at = NULL, updated_at = NOW() WHERE id = $1",
         )
         .bind(repository_id)
         .execute(&self.pool)

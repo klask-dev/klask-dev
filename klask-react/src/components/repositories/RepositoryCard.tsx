@@ -103,13 +103,9 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     }
   };
 
-  const isCrawlStopped = () => {
-    return repoData.crawlState === 'idle' && repoData.crawlStartedAt && !repoData.lastCrawled;
-  };
-
   const getStatusColor = () => {
     if (!repoData.enabled) return 'text-gray-400';
-    if (isCrawlStopped()) return 'text-orange-500';
+    if (repoData.crawlState === 'stopped') return 'text-orange-500';
     if (repoData.lastCrawled) return 'text-green-500';
     return 'text-yellow-500';
   };
@@ -118,7 +114,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
     if (!repoData.enabled) {
       return <PauseCircleIcon className="h-5 w-5 text-gray-400" />;
     }
-    if (isCrawlStopped()) {
+    if (repoData.crawlState === 'stopped') {
       return <StopCircleIcon className="h-5 w-5 text-orange-500" />;
     }
     if (repoData.lastCrawled) {
@@ -129,7 +125,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const getStatusText = () => {
     if (!repoData.enabled) return 'Disabled';
-    if (isCrawlStopped()) return 'Stopped';
+    if (repoData.crawlState === 'stopped') return 'Stopped';
     if (repoData.lastCrawled) return 'Ready';
     return 'Not Crawled';
   };
@@ -158,10 +154,6 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   };
 
   const formatLastCrawled = (date: string | null | undefined) => {
-    // Check if crawl was stopped (crawlStartedAt is set but crawl didn't finalize)
-    if (repoData.crawlState === 'idle' && repoData.crawlStartedAt && !date) {
-      return 'Stopped (not completed)';
-    }
     if (!date) return 'Never';
     try {
       return formatDistanceToNow(new Date(date), { addSuffix: true });
@@ -413,19 +405,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         {/* Metadata */}
         <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center space-x-2">
-            {repoData.crawlState === 'idle' && repoData.crawlStartedAt && !repoData.lastCrawled ? (
-              <>
-                <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0 text-orange-500" />
-                <span className="text-orange-600 dark:text-orange-400 font-medium">
-                  Last crawled: {formatLastCrawled(repoData.lastCrawled)}
-                </span>
-              </>
-            ) : (
-              <>
-                <ClockIcon className="h-4 w-4 flex-shrink-0" />
-                <span>Last crawled: {formatLastCrawled(repoData.lastCrawled)}</span>
-              </>
-            )}
+            <ClockIcon className="h-4 w-4 flex-shrink-0" />
+            <span>Last crawled: {formatLastCrawled(repoData.lastCrawled)}</span>
             {repoData.lastCrawlDurationSeconds && (
               <span className="text-gray-400 dark:text-gray-500">
                 ({formatDuration(repoData.lastCrawlDurationSeconds)})
