@@ -67,6 +67,7 @@ mod crawl_error_tracking_tests {
 
     // Test 1: set_last_crawl_error stores error message
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_set_last_crawl_error_stores_error_message() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -94,6 +95,7 @@ mod crawl_error_tracking_tests {
 
     // Test 2: set_last_crawl_error clears error when None is passed
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_set_last_crawl_error_clears_error() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -125,6 +127,7 @@ mod crawl_error_tracking_tests {
 
     // Test 3: set_last_crawl_error replaces old error with new one
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_set_last_crawl_error_replaces_old_error() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -157,6 +160,7 @@ mod crawl_error_tracking_tests {
 
     // Test 4: Multiple repositories have independent error tracking
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_error_tracking_independent_across_repositories() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -198,6 +202,7 @@ mod crawl_error_tracking_tests {
 
     // Test 5: Long error messages are stored correctly
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_set_last_crawl_error_with_long_message() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -228,6 +233,7 @@ mod crawl_error_tracking_tests {
 
     // Test 6: Special characters in error messages are preserved
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_set_last_crawl_error_with_special_characters() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -253,6 +259,7 @@ mod crawl_error_tracking_tests {
 
     // Test 7: Error is included in list_repositories response
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_last_crawl_error_in_list_repositories() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -290,6 +297,7 @@ mod crawl_error_tracking_tests {
 
     // Test 8: Error is preserved when updating other repository fields
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_error_preserved_when_updating_repository() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -320,6 +328,7 @@ mod crawl_error_tracking_tests {
 
     // Test 9: Error is cleared on successful crawl completion
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_error_cleared_on_successful_crawl() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -351,6 +360,7 @@ mod crawl_error_tracking_tests {
 
     // Test 10: Concurrent error updates work correctly
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_concurrent_error_updates() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -392,6 +402,7 @@ mod crawl_error_tracking_tests {
 
     // Test 11: Error message with exact size boundary
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_error_message_with_large_content() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -417,6 +428,7 @@ mod crawl_error_tracking_tests {
 
     // Test 12: Error timestamp (updated_at) is updated when error is set
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_updated_at_timestamp_changes_when_error_set() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -447,6 +459,7 @@ mod crawl_error_tracking_tests {
     // Test 13: GET /api/repositories includes lastCrawlError field
     // This test validates the model serialization
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_last_crawl_error_serialization_in_api_response() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -477,6 +490,7 @@ mod crawl_error_tracking_tests {
 
     // Test 14: lastCrawlError is null in JSON when no error
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_last_crawl_error_null_in_api_response() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
@@ -508,6 +522,7 @@ mod crawl_error_tracking_tests {
 
     // Test 15: find_incomplete_crawls includes error information
     #[tokio::test]
+    #[ignore = "Requires PostgreSQL with migrations applied"]
     async fn test_incomplete_crawls_includes_error_info() -> Result<()> {
         let pool = create_pool().await?;
         let repo_repo = RepositoryRepository::new(pool.clone());
