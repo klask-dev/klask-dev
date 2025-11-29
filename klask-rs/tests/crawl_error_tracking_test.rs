@@ -12,13 +12,17 @@ mod crawl_error_tracking_tests {
 
     /// Get PostgreSQL connection string from environment or use default for testing
     fn get_db_url() -> String {
-        env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql://klask:klask@localhost:5432/klask".to_string())
+        env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql://klask_user@localhost:5432/klask_dev".to_string())
     }
 
     /// Create a test database pool
     async fn create_pool() -> Result<PgPool> {
         let url = get_db_url();
-        let pool = PgPoolOptions::new().max_connections(1).connect(&url).await?;
+        let pool = PgPoolOptions::new().max_connections(5).connect(&url).await?;
+
+        // Run migrations
+        sqlx::migrate!("./migrations").run(&pool).await?;
+
         Ok(pool)
     }
 
