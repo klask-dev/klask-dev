@@ -161,6 +161,8 @@ impl CrawlerService {
         // Check for cancellation before starting main work
         if cancellation_token.is_cancelled() {
             self.progress_tracker.cancel_crawl(repository.id).await;
+            let repo_repo = RepositoryRepository::new(self.database.clone());
+            let _ = repo_repo.cancel_crawl(repository.id).await;
             self.cleanup_cancellation_token(repository.id).await;
             return Ok(());
         }
@@ -230,6 +232,8 @@ impl CrawlerService {
                 // Check for cancellation before processing
                 if cancellation_token.is_cancelled() {
                     self.progress_tracker.cancel_crawl(repository.id).await;
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    let _ = repo_repo.cancel_crawl(repository.id).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Ok(());
                 }
@@ -239,6 +243,8 @@ impl CrawlerService {
                 // Check for cancellation before indexing
                 if cancellation_token.is_cancelled() {
                     self.progress_tracker.cancel_crawl(repository.id).await;
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    let _ = repo_repo.cancel_crawl(repository.id).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Ok(());
                 }
