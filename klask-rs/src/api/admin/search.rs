@@ -56,7 +56,7 @@ async fn get_search_status(State(app_state): State<AppState>) -> Result<Json<Sea
         (true, None)
     };
 
-    info!(
+    debug!(
         "Search status: schema_mismatch={}, index_available={}",
         has_mismatch, index_available
     );

@@ -149,6 +149,7 @@ impl CrawlerService {
 
         // Create cancellation token for this crawl
         let cancellation_token = CancellationToken::new();
+        let cancellation_token_final = cancellation_token.clone(); // Keep a clone for final check
         {
             let mut tokens = self.cancellation_tokens.write().await;
             tokens.insert(repository.id, cancellation_token.clone());
@@ -389,6 +390,19 @@ impl CrawlerService {
                     .await?;
             }
         };
+
+        // Check for cancellation one final time before finalizing
+        if cancellation_token_final.is_cancelled() {
+            info!(
+                "Crawl was cancelled for repository: {}, skipping finalization",
+                repository.name
+            );
+            self.progress_tracker.cancel_crawl(repository.id).await;
+            let repo_repo = RepositoryRepository::new(self.database.clone());
+            let _ = repo_repo.cancel_crawl(repository.id).await;
+            self.cleanup_cancellation_token(repository.id).await;
+            return Ok(());
+        }
 
         // Finalize the crawl: commit Tantivy index and update database
         self.finalize_crawl(repository, crawl_start_time).await?;
