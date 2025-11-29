@@ -656,7 +656,7 @@ async fn update_repository(
         repository.enabled = enabled;
     }
     if let Some(gitlab_namespace) = request.gitlab_namespace {
-        repository.gitlab_namespace = Some(gitlab_namespace);
+        repository.gitlab_namespace = if gitlab_namespace.trim().is_empty() { None } else { Some(gitlab_namespace) };
     }
     if let Some(is_group) = request.is_group {
         repository.is_group = is_group;
@@ -705,11 +705,16 @@ async fn update_repository(
     }
     if let Some(github_namespace) = request.github_namespace {
         // Validate GitHub namespace before updating
-        if let Err(e) = validate_github_namespace(&github_namespace) {
-            error!("Invalid GitHub namespace '{}': {}", github_namespace, e);
-            return Err(StatusCode::BAD_REQUEST);
+        let trimmed = github_namespace.trim();
+        if !trimmed.is_empty() {
+            if let Err(e) = validate_github_namespace(trimmed) {
+                error!("Invalid GitHub namespace '{}': {}", trimmed, e);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            repository.github_namespace = Some(github_namespace);
+        } else {
+            repository.github_namespace = None;
         }
-        repository.github_namespace = Some(github_namespace);
     }
     if let Some(github_excluded_repositories) = request.github_excluded_repositories {
         repository.github_excluded_repositories = if github_excluded_repositories.trim().is_empty() {

@@ -471,7 +471,7 @@ export const RepositoryForm: React.FC<RepositoryFormProps> = ({
     // The backend will then convert empty strings to NULL in the database.
     const trimOrEmpty = (value: string | undefined) => {
       const trimmed = value?.trim();
-      return trimmed === '' ? undefined : trimmed;
+      return trimmed === '' ? '' : trimmed;
     };
 
     const submitData: RepositoryFormSubmitData = {
