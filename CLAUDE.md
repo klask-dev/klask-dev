@@ -536,6 +536,9 @@ cd klask-react
 npm test -- --testPathPattern="integration"
 ```
 
+### Test Database Setup
+All integration tests use **in-memory SQLite** via `klask_rs::testing::TestDatabase` module. Each test gets an isolated database instance with no external dependencies. See `src/testing.rs` for implementation details.
+
 ---
 
 ## 🚀 Kubernetes Testing
