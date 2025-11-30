@@ -1,15 +1,15 @@
 use anyhow::Result;
 use chrono::Utc;
-use klask_rs::database::create_test_database;
 use klask_rs::models::{User, UserRole};
 use klask_rs::repositories::test_user_repository::TestUserRepository;
+use klask_rs::testing::TestDatabase;
 use uuid::Uuid;
 
 #[tokio::test]
 async fn test_sqlite_user_repository() -> Result<()> {
     // Create isolated in-memory database
-    let pool = create_test_database().await?;
-    let user_repo = TestUserRepository::new(pool);
+    let db = TestDatabase::new().await?;
+    let user_repo = TestUserRepository::new(db.pool().clone());
 
     // Create test user
     let user = User {
@@ -54,11 +54,11 @@ async fn test_sqlite_user_repository() -> Result<()> {
 #[tokio::test]
 async fn test_sqlite_isolation() -> Result<()> {
     // Create two separate databases
-    let pool1 = create_test_database().await?;
-    let pool2 = create_test_database().await?;
+    let db1 = TestDatabase::new().await?;
+    let db2 = TestDatabase::new().await?;
 
-    let user_repo1 = TestUserRepository::new(pool1);
-    let user_repo2 = TestUserRepository::new(pool2);
+    let user_repo1 = TestUserRepository::new(db1.pool().clone());
+    let user_repo2 = TestUserRepository::new(db2.pool().clone());
 
     // Create user in first database
     let user1 = User {
@@ -126,8 +126,8 @@ async fn test_sqlite_concurrent_access() -> Result<()> {
     // Test that multiple tests can run concurrently without interfering
     let tasks = (0..5).map(|i| {
         tokio::spawn(async move {
-            let pool = create_test_database().await?;
-            let user_repo = TestUserRepository::new(pool);
+            let db = TestDatabase::new().await?;
+            let user_repo = TestUserRepository::new(db.pool().clone());
 
             let user = User {
                 id: Uuid::new_v4(),

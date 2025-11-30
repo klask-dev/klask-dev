@@ -7,9 +7,9 @@ pub mod repositories;
 pub mod services;
 pub mod utils;
 
-// Always available for integration tests but marked as test-only
+// Testing utilities - centralized test database setup
 #[cfg(any(test, debug_assertions))]
-pub mod test_utils;
+pub mod testing;
 
 pub use config::AppConfig;
 pub use database::Database;
