@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   FolderIcon,
@@ -21,7 +21,7 @@ import { CrawlProgressBar, GitLabHierarchicalProgressBar } from '../ui/ProgressB
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useStopCrawl } from '../../hooks/useRepositories';
 import { isRepositoryCrawling, getRepositoryProgressFromActive, type CrawlProgressInfo } from '../../hooks/useProgress';
-import { InlineCrawlError } from './CrawlErrorDisplay';
+import { CrawlErrorDisplay } from './CrawlErrorDisplay';
 
 interface RepositoryCardProps {
   repository: RepositoryWithStats;
@@ -50,6 +50,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
   // activeProgress is now passed as prop to avoid multiple polling instances
   const stopCrawlMutation = useStopCrawl();
 
@@ -64,6 +65,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   // Override the isCrawling prop with real-time data
   const actuallyIsCrawling = isCurrentlyCrawling || isCrawling;
+
+  // Close error details when error is cleared (crawl succeeded)
+  useEffect(() => {
+    if (!repoData.lastCrawlError) {
+      setShowErrorDetails(false);
+    }
+  }, [repoData.lastCrawlError]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -97,6 +105,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const getStatusColor = () => {
     if (!repoData.enabled) return 'text-gray-400';
+    if (repoData.crawlState === 'stopped') return 'text-orange-500';
     if (repoData.lastCrawled) return 'text-green-500';
     return 'text-yellow-500';
   };
@@ -104,6 +113,9 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const getStatusIcon = () => {
     if (!repoData.enabled) {
       return <PauseCircleIcon className="h-5 w-5 text-gray-400" />;
+    }
+    if (repoData.crawlState === 'stopped') {
+      return <StopCircleIcon className="h-5 w-5 text-orange-500" />;
     }
     if (repoData.lastCrawled) {
       return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
@@ -113,6 +125,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
   const getStatusText = () => {
     if (!repoData.enabled) return 'Disabled';
+    if (repoData.crawlState === 'stopped') return 'Stopped';
     if (repoData.lastCrawled) return 'Ready';
     return 'Not Crawled';
   };
@@ -363,6 +376,16 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
 
         {/* Badges - positioned above metadata, horizontal and right-aligned */}
         <div className="flex justify-end items-center gap-2 mb-3">
+          {repoData.lastCrawlError && (
+            <button
+              onClick={() => setShowErrorDetails(!showErrorDetails)}
+              className="text-xs bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 px-2 py-0.5 rounded flex items-center space-x-1 cursor-pointer hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+              title="Click to view error details"
+            >
+              <ExclamationTriangleIcon className="h-3 w-3" />
+              <span>Crawl Error</span>
+            </button>
+          )}
           <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded">
             {repoData.repositoryType}
           </span>
@@ -426,10 +449,13 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </div>
         )}
 
-        {/* Crawl Error Display - Show if there's an error */}
-        {crawlProgress?.error_message && (
+        {/* Last Crawl Error Display - Show from repository data */}
+        {repoData.lastCrawlError && showErrorDetails && (
           <div className="mt-4">
-            <InlineCrawlError errorMessage={crawlProgress.error_message} />
+            <CrawlErrorDisplay
+              errorMessage={repoData.lastCrawlError}
+              repositoryName={repoData.name}
+            />
           </div>
         )}
 

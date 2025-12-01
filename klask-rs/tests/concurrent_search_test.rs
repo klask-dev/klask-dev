@@ -1,11 +1,26 @@
 use klask_rs::services::{SearchQuery, SearchService};
+use std::sync::LazyLock;
 use std::time::Instant;
+use tempfile::TempDir;
+use tokio::sync::Mutex as AsyncMutex;
 use tokio::time::Duration;
+
+// Global mutex to ensure tests don't interfere with each other
+static TEST_MUTEX: LazyLock<AsyncMutex<()>> = LazyLock::new(|| AsyncMutex::new(()));
+
+async fn create_test_search_service() -> (SearchService, TempDir) {
+    let _guard = TEST_MUTEX.lock().await;
+    let temp_dir = TempDir::new().unwrap();
+    let test_id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+    let index_path = temp_dir.path().join(format!("test_index_{}", test_id));
+    let service = SearchService::new(&index_path).expect("Failed to create search service");
+    (service, temp_dir)
+}
 
 #[tokio::test]
 async fn test_concurrent_queries_run_in_parallel() {
     // Create search service with test data
-    let search_service = SearchService::new("test_index_concurrent_search").unwrap();
+    let (search_service, _temp_dir) = create_test_search_service().await;
 
     // Index some test files
     for i in 0..100 {
@@ -45,6 +60,7 @@ async fn test_concurrent_queries_run_in_parallel() {
         fuzzy_search: false,
         regex_search: false,
         regex_flags: None,
+        case_sensitive: false,
     };
     let simple_result = search_service.search(simple_query).await;
     let simple_duration = start.elapsed();
@@ -74,6 +90,7 @@ async fn test_concurrent_queries_run_in_parallel() {
         fuzzy_search: false,
         regex_search: true,
         regex_flags: None,
+        case_sensitive: false,
     };
 
     let simple_query2 = SearchQuery {
@@ -90,6 +107,7 @@ async fn test_concurrent_queries_run_in_parallel() {
         fuzzy_search: false,
         regex_search: false,
         regex_flags: None,
+        case_sensitive: false,
     };
 
     let start = Instant::now();
@@ -119,7 +137,7 @@ async fn test_concurrent_queries_run_in_parallel() {
 
 #[tokio::test]
 async fn test_inefficient_regex_pattern_warning() {
-    let search_service = SearchService::new("test_index_regex_warning").unwrap();
+    let (search_service, _temp_dir) = create_test_search_service().await;
 
     // Index a test file
     let file_id = uuid::Uuid::new_v4();
@@ -155,6 +173,7 @@ async fn test_inefficient_regex_pattern_warning() {
         fuzzy_search: false,
         regex_search: true,
         regex_flags: None,
+        case_sensitive: false,
     };
 
     let result = search_service.search(query).await;
@@ -167,7 +186,7 @@ async fn test_inefficient_regex_pattern_warning() {
 async fn test_search_timeout() {
     // This test is informational - it demonstrates that the timeout exists
     // We can't easily create a query that times out reliably without a huge index
-    let search_service = SearchService::new("test_index_timeout").unwrap();
+    let (search_service, _temp_dir) = create_test_search_service().await;
 
     // Index a single file
     let file_id = uuid::Uuid::new_v4();
@@ -203,6 +222,7 @@ async fn test_search_timeout() {
         fuzzy_search: false,
         regex_search: false,
         regex_flags: None,
+        case_sensitive: false,
     };
 
     let start = Instant::now();

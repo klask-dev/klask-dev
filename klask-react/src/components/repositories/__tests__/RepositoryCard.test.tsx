@@ -1,9 +1,9 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../../test/utils';
+import { render, screen, waitFor, within } from '../../../test/utils';
 import userEvent from '@testing-library/user-event';
 import { RepositoryCard } from '../RepositoryCard';
-import type { Repository, CrawlProgressInfo } from '../../../types';
+import type { Repository, RepositoryWithStats, CrawlProgressInfo } from '../../../types';
 import { useActiveProgress, useStopCrawl } from '../../../hooks/useRepositories';
 import { isRepositoryCrawling, getRepositoryProgressFromActive } from '../../../hooks/useProgress';
 
@@ -328,5 +328,437 @@ describe('RepositoryCard Stop Crawl Functionality', () => {
     expect(screen.queryByRole('button', { name: /stop/i })).not.toBeInTheDocument();
     // Should show crawl button instead
     expect(screen.getByRole('button', { name: /crawl/i })).toBeInTheDocument();
+  });
+});
+
+describe('RepositoryCard Crawl Error Badge Display', () => {
+  const mockStopCrawl = {
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  };
+
+  const createMockRepository = (overrides: Partial<Repository> = {}): Repository => ({
+    id: 'repo-123',
+    name: 'Test Repository',
+    url: 'https://github.com/test/repo.git',
+    repositoryType: 'Git',
+    branch: 'main',
+    enabled: true,
+    accessToken: null,
+    gitlabNamespace: null,
+    isGroup: false,
+    lastCrawled: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    autoCrawlEnabled: false,
+    ...overrides,
+  });
+
+  const createMockRepositoryWithStats = (overrides: Partial<Repository> = {}): RepositoryWithStats => ({
+    repository: createMockRepository(overrides),
+    diskSizeMb: 100,
+    fileCount: 1000,
+  });
+
+  const defaultProps = {
+    repository: createMockRepositoryWithStats(),
+    onEdit: vi.fn(),
+    onDelete: vi.fn(),
+    onCrawl: vi.fn(),
+    onStopCrawl: vi.fn(),
+    onToggleEnabled: vi.fn(),
+    activeProgress: [],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseStopCrawl.mockReturnValue(mockStopCrawl);
+    mockIsRepositoryCrawling.mockReturnValue(false);
+    mockGetRepositoryProgressFromActive.mockReturnValue(null);
+  });
+
+  describe('Error badge visibility', () => {
+    it('should display error badge when lastCrawlError exists with error message', () => {
+      const errorMessage = 'Connection timeout';
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: errorMessage,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      // Badge should be visible
+      const errorBadge = screen.getByText('Crawl Error');
+      expect(errorBadge).toBeInTheDocument();
+
+      // Badge should be a span element
+      expect(errorBadge.parentElement).toHaveClass('text-xs');
+    });
+
+    it('should NOT display error badge when lastCrawlError is undefined', () => {
+      const repositoryWithoutError = createMockRepositoryWithStats({
+        lastCrawlError: undefined,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithoutError} />);
+
+      // Badge should not be visible
+      expect(screen.queryByText('Crawl Error')).not.toBeInTheDocument();
+    });
+
+    it('should NOT display error badge when lastCrawlError is empty string', () => {
+      const repositoryWithEmptyError = createMockRepositoryWithStats({
+        lastCrawlError: '',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithEmptyError} />);
+
+      // Badge should not be visible
+      expect(screen.queryByText('Crawl Error')).not.toBeInTheDocument();
+    });
+
+    it('should NOT display error badge when lastCrawlError is null', () => {
+      const repositoryWithNullError = createMockRepositoryWithStats({
+        lastCrawlError: null as any,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithNullError} />);
+
+      // Badge should not be visible
+      expect(screen.queryByText('Crawl Error')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Error badge content and styling', () => {
+    it('should contain "Crawl Error" text in the badge', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Repository not found',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+    });
+
+    it('should display ExclamationTriangleIcon in error badge', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Authentication failed',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const errorBadge = screen.getByText('Crawl Error');
+      const badgeContainer = errorBadge.closest('button');
+
+      // SVG icon should be present (from ExclamationTriangleIcon)
+      const icon = badgeContainer?.querySelector('svg');
+      expect(icon).toBeInTheDocument();
+    });
+
+    it('should have correct styling classes for red error appearance', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Crawl failed',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+
+      // Check for red styling classes
+      expect(errorBadge).toHaveClass('bg-red-100');
+      expect(errorBadge).toHaveClass('text-red-800');
+      expect(errorBadge).toHaveClass('dark:bg-red-900');
+      expect(errorBadge).toHaveClass('dark:text-red-200');
+    });
+
+    it('should have cursor-pointer class for tooltip indication', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Network error',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveClass('cursor-pointer');
+    });
+
+    it('should have title attribute explaining to click for details', () => {
+      const errorMessage = 'This is a detailed error message about the crawl failure';
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: errorMessage,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveAttribute('title', 'Click to view error details');
+    });
+
+    it('should preserve special characters in error message when displayed', () => {
+      const errorMessage = 'Error: Failed to clone "https://github.com/repo.git" (exit code 1)';
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: errorMessage,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toBeInTheDocument();
+      // The error message will be displayed in CrawlErrorDisplay after clicking the badge
+    });
+
+    it('should handle very long error messages correctly', () => {
+      const longErrorMessage = 'A'.repeat(500); // Very long error message
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: longErrorMessage,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toBeInTheDocument();
+      // Long error messages are handled by CrawlErrorDisplay component
+    });
+  });
+
+  describe('Error badge positioning', () => {
+    it('should position error badge with other badges in badges section', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Crawl timeout',
+        branch: 'main',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const errorBadge = screen.getByText('Crawl Error');
+      const typeBadge = screen.getByText('Git');
+      const branchBadge = screen.getByText('main');
+
+      // All badges should be in the document
+      expect(errorBadge).toBeInTheDocument();
+      expect(typeBadge).toBeInTheDocument();
+      expect(branchBadge).toBeInTheDocument();
+
+      // They should be within the same container (badges section)
+      const errorContainer = errorBadge.closest('button')?.parentElement;
+      const typeContainer = typeBadge.closest('span')?.parentElement;
+
+      // Check if they share the same parent (badges section)
+      expect(errorContainer).toBe(typeContainer);
+    });
+
+    it('should display error badge before type badge', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Crawl error occurred',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const badgesSection = screen.getByText('Crawl Error').closest('button')?.parentElement;
+      const children = badgesSection?.children || [];
+
+      // Find the indices of error and type badges
+      let errorIndex = -1;
+      let typeIndex = -1;
+
+      for (let i = 0; i < children.length; i++) {
+        if (children[i].textContent?.includes('Crawl Error')) {
+          errorIndex = i;
+        }
+        if (children[i].textContent === 'Git') {
+          typeIndex = i;
+        }
+      }
+
+      // Error badge should come before type badge (lower index)
+      expect(errorIndex).toBeLessThan(typeIndex);
+    });
+
+    it('should display error badge with branch and auto-crawl badges', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Crawl error',
+        branch: 'develop',
+        autoCrawlEnabled: true,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      // All badges should be visible
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+      expect(screen.getByText('Git')).toBeInTheDocument();
+      expect(screen.getByText('develop')).toBeInTheDocument();
+      expect(screen.getByText('Auto-crawl')).toBeInTheDocument();
+    });
+
+    it('should display error badge with flex gap spacing', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Connection refused',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      const badgesContainer = screen.getByText('Crawl Error').closest('button')?.parentElement;
+      expect(badgesContainer).toHaveClass('gap-2');
+    });
+  });
+
+  describe('Error badge updates', () => {
+    it('should update badge when lastCrawlError changes from undefined to error message', () => {
+      const { rerender } = render(
+        <RepositoryCard
+          {...defaultProps}
+          repository={createMockRepositoryWithStats({ lastCrawlError: undefined })}
+        />
+      );
+
+      // Badge should not be visible initially
+      expect(screen.queryByText('Crawl Error')).not.toBeInTheDocument();
+
+      // Rerender with error
+      rerender(
+        <RepositoryCard
+          {...defaultProps}
+          repository={createMockRepositoryWithStats({ lastCrawlError: 'New error occurred' })}
+        />
+      );
+
+      // Badge should now be visible
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+      expect(screen.getByText('Crawl Error').closest('button')).toHaveAttribute('title', 'Click to view error details');
+    });
+
+    it('should remove badge when lastCrawlError changes from error to undefined', () => {
+      const { rerender } = render(
+        <RepositoryCard
+          {...defaultProps}
+          repository={createMockRepositoryWithStats({ lastCrawlError: 'Existing error' })}
+        />
+      );
+
+      // Badge should be visible initially
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+
+      // Rerender without error
+      rerender(
+        <RepositoryCard
+          {...defaultProps}
+          repository={createMockRepositoryWithStats({ lastCrawlError: undefined })}
+        />
+      );
+
+      // Badge should no longer be visible
+      expect(screen.queryByText('Crawl Error')).not.toBeInTheDocument();
+    });
+
+    it('should update error message in tooltip when lastCrawlError changes', () => {
+      const { rerender } = render(
+        <RepositoryCard
+          {...defaultProps}
+          repository={createMockRepositoryWithStats({ lastCrawlError: 'Initial error' })}
+        />
+      );
+
+      let errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveAttribute('title', 'Click to view error details');
+
+      // Rerender with different error
+      rerender(
+        <RepositoryCard
+          {...defaultProps}
+          repository={createMockRepositoryWithStats({ lastCrawlError: 'Updated error message' })}
+        />
+      );
+
+      errorBadge = screen.getByText('Crawl Error').closest('button');
+      expect(errorBadge).toHaveAttribute('title', 'Click to view error details');
+    });
+  });
+
+  describe('Error badge with different repository types', () => {
+    it('should display error badge for GitHub repositories', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'GitHub API rate limit exceeded',
+        repositoryType: 'GitHub',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+      expect(screen.getByText('GitHub')).toBeInTheDocument();
+    });
+
+    it('should display error badge for GitLab repositories', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'GitLab namespace not found',
+        repositoryType: 'GitLab',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+      expect(screen.getByText('GitLab')).toBeInTheDocument();
+    });
+
+    it('should display error badge for FileSystem repositories', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Directory not accessible',
+        repositoryType: 'FileSystem',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+      expect(screen.getByText('FileSystem')).toBeInTheDocument();
+    });
+  });
+
+  describe('Error badge with disabled repositories', () => {
+    it('should display error badge even when repository is disabled', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Last crawl failed before disable',
+        enabled: false,
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+      // Check that the Disabled status is displayed
+      expect(screen.getAllByText('Disabled').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Error badge integration', () => {
+    it('should render error badge without interfering with other functionality', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Integration test error',
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      // Error badge should be present
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+
+      // Other elements should still be present and functional
+      expect(screen.getByText('Test Repository')).toBeInTheDocument();
+      // Check for visible crawl button (not the one in the dropdown menu)
+      const crawlButtons = screen.getAllByRole('button', { name: /crawl/i });
+      expect(crawlButtons.length).toBeGreaterThan(0);
+      // Check for enabled status button
+      expect(screen.getByRole('button', { name: /enabled/i })).toBeInTheDocument();
+    });
+
+    it('should display error badge alongside crawl status', () => {
+      const repositoryWithError = createMockRepositoryWithStats({
+        lastCrawlError: 'Last crawl had errors',
+        lastCrawled: new Date().toISOString(),
+      });
+
+      render(<RepositoryCard {...defaultProps} repository={repositoryWithError} />);
+
+      // Both error badge and status should be present
+      expect(screen.getByText('Crawl Error')).toBeInTheDocument();
+      expect(screen.getByText('Ready')).toBeInTheDocument();
+    });
   });
 });

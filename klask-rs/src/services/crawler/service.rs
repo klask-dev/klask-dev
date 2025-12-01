@@ -149,6 +149,7 @@ impl CrawlerService {
 
         // Create cancellation token for this crawl
         let cancellation_token = CancellationToken::new();
+        let cancellation_token_final = cancellation_token.clone(); // Keep a clone for final check
         {
             let mut tokens = self.cancellation_tokens.write().await;
             tokens.insert(repository.id, cancellation_token.clone());
@@ -160,7 +161,10 @@ impl CrawlerService {
 
         // Check for cancellation before starting main work
         if cancellation_token.is_cancelled() {
+            info!("Crawl cancelled for repository: {}", repository.name);
             self.progress_tracker.cancel_crawl(repository.id).await;
+            let repo_repo = RepositoryRepository::new(self.database.clone());
+            let _ = repo_repo.cancel_crawl(repository.id).await;
             self.cleanup_cancellation_token(repository.id).await;
             return Ok(());
         }
@@ -177,6 +181,15 @@ impl CrawlerService {
                     .update_status(repository.id, crate::services::progress::CrawlStatus::Cloning)
                     .await;
 
+                // Check for cancellation before starting potentially long clone operation
+                if cancellation_token.is_cancelled() {
+                    self.progress_tracker.cancel_crawl(repository.id).await;
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    let _ = repo_repo.cancel_crawl(repository.id).await;
+                    self.cleanup_cancellation_token(repository.id).await;
+                    return Ok(());
+                }
+
                 // Try to clone the repository, handle errors gracefully
                 match self.git_operations.clone_or_update_repository(repository, &temp_path).await {
                     Ok(_git_repo) => temp_path,
@@ -184,8 +197,9 @@ impl CrawlerService {
                         let error_msg = format!("Failed to clone/update repository: {}", e);
                         error!("Crawl error for repository {}: {}", repository.name, error_msg);
                         self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-                        // Mark crawl as failed in database
+                        // Mark crawl as failed in database and store error message
                         let _ = repo_repo.fail_crawl(repository.id).await;
+                        let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg.clone())).await;
                         self.cleanup_cancellation_token(repository.id).await;
                         return Err(anyhow!(error_msg));
                     }
@@ -204,8 +218,9 @@ impl CrawlerService {
                 if !repo_path_git.exists() {
                     let error_msg = format!("Repository path does not exist: {:?}", repo_path_git);
                     self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-                    // Mark crawl as failed in database
+                    // Mark crawl as failed in database and store error message
                     let _ = repo_repo.fail_crawl(repository.id).await;
+                    let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg.clone())).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Err(anyhow!(error_msg));
                 }
@@ -213,8 +228,9 @@ impl CrawlerService {
                 if !repo_path_git.is_dir() {
                     let error_msg = format!("Repository path is not a directory: {:?}", repo_path_git);
                     self.progress_tracker.set_error(repository.id, error_msg.clone()).await;
-                    // Mark crawl as failed in database
+                    // Mark crawl as failed in database and store error message
                     let _ = repo_repo.fail_crawl(repository.id).await;
+                    let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg.clone())).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Err(anyhow!(error_msg));
                 }
@@ -227,6 +243,8 @@ impl CrawlerService {
                 // Check for cancellation before processing
                 if cancellation_token.is_cancelled() {
                     self.progress_tracker.cancel_crawl(repository.id).await;
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    let _ = repo_repo.cancel_crawl(repository.id).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Ok(());
                 }
@@ -236,6 +254,8 @@ impl CrawlerService {
                 // Check for cancellation before indexing
                 if cancellation_token.is_cancelled() {
                     self.progress_tracker.cancel_crawl(repository.id).await;
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    let _ = repo_repo.cancel_crawl(repository.id).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Ok(());
                 }
@@ -381,6 +401,19 @@ impl CrawlerService {
             }
         };
 
+        // Check for cancellation one final time before finalizing
+        if cancellation_token_final.is_cancelled() {
+            info!(
+                "Crawl was cancelled for repository: {}, skipping finalization",
+                repository.name
+            );
+            self.progress_tracker.cancel_crawl(repository.id).await;
+            let repo_repo = RepositoryRepository::new(self.database.clone());
+            let _ = repo_repo.cancel_crawl(repository.id).await;
+            self.cleanup_cancellation_token(repository.id).await;
+            return Ok(());
+        }
+
         // Finalize the crawl: commit Tantivy index and update database
         self.finalize_crawl(repository, crawl_start_time).await?;
 
@@ -498,8 +531,8 @@ impl CrawlerService {
     pub async fn cancel_crawl(&self, repository_id: Uuid) -> Result<bool> {
         let tokens = self.cancellation_tokens.read().await;
         if let Some(token) = tokens.get(&repository_id) {
-            token.cancel();
             info!("Cancellation requested for repository: {}", repository_id);
+            token.cancel();
             Ok(true)
         } else {
             warn!("No active crawl found for repository: {}", repository_id);
@@ -549,7 +582,9 @@ impl CrawlerService {
                 Err(e) => {
                     error!("Failed to resume crawl for repository {}: {}", repository.name, e);
                     // Mark as failed so it doesn't get stuck in "in_progress" state
+                    let error_msg = format!("{}", e);
                     let _ = repo_repo.fail_crawl(repository.id).await;
+                    let _ = repo_repo.set_last_crawl_error(repository.id, Some(error_msg)).await;
                 }
             }
         }
@@ -565,6 +600,16 @@ impl CrawlerService {
             "Resuming crawl for repository: {} from project: {:?}",
             repository.name, repository.last_processed_project
         );
+
+        // Create and register cancellation token for resumed crawl
+        let cancellation_token = CancellationToken::new();
+        {
+            let mut tokens = self.cancellation_tokens.write().await;
+            tokens.insert(repository.id, cancellation_token.clone());
+        }
+
+        // Start progress tracking
+        self.progress_tracker.start_crawl(repository.id, repository.name.clone()).await;
 
         match repository.repository_type {
             RepositoryType::GitLab => {
@@ -625,6 +670,7 @@ impl CrawlerService {
                 self.gitlab_crawler
                     .resume_gitlab_repository_crawl(
                         repository,
+                        cancellation_token.clone(),
                         clone_or_update_fn,
                         process_files_fn,
                         update_crawl_time_fn,
@@ -632,8 +678,17 @@ impl CrawlerService {
                     )
                     .await?;
 
-                // Finalize the crawl: commit Tantivy index and update database
-                self.finalize_crawl(repository, crawl_start_time).await
+                // Check if crawl was cancelled after resuming
+                if cancellation_token.is_cancelled() {
+                    info!("Resumed crawl was cancelled for repository: {}", repository.name);
+                    let repo_repo = RepositoryRepository::new(self.database.clone());
+                    repo_repo.cancel_crawl(repository.id).await?;
+                } else {
+                    // Finalize the crawl: commit Tantivy index and update database
+                    self.finalize_crawl(repository, crawl_start_time).await?;
+                }
+
+                Ok(())
             }
             RepositoryType::Git | RepositoryType::FileSystem | RepositoryType::GitHub => {
                 // For Git, FileSystem, and GitHub, just restart the entire crawl
@@ -671,6 +726,11 @@ impl CrawlerService {
                 repository.name, repository.crawl_started_at
             );
             repo_repo.fail_crawl(repository.id).await?;
+            let error_msg = format!(
+                "Crawl abandoned after {} minutes (started at: {:?})",
+                timeout_minutes, repository.crawl_started_at
+            );
+            repo_repo.set_last_crawl_error(repository.id, Some(error_msg)).await?;
         }
 
         Ok(())
@@ -696,6 +756,9 @@ impl CrawlerService {
 
         // Mark crawl as completed in database
         repo_repo.complete_crawl(repository.id).await?;
+
+        // Clear any previous crawl errors on successful completion
+        repo_repo.set_last_crawl_error(repository.id, None).await?;
 
         // Complete the progress tracking
         self.progress_tracker.complete_crawl(repository.id).await;

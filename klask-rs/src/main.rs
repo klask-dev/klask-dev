@@ -22,7 +22,7 @@ use std::time::Instant;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -112,13 +112,21 @@ async fn main() -> Result<()> {
 
             // Check for incomplete crawls and resume them in background
             // This must not block server startup
-            let service_clone = service.clone();
-            tokio::spawn(async move {
-                info!("Checking for incomplete crawls to resume (in background)...");
-                if let Err(e) = service_clone.check_and_resume_incomplete_crawls().await {
-                    error!("Failed to resume incomplete crawls: {}", e);
-                }
-            });
+            // Can be disabled with KLASK_SKIP_RESUME_CRAWLS=true (useful after index rebuild)
+            let skip_resume =
+                std::env::var("KLASK_SKIP_RESUME_CRAWLS").ok().and_then(|v| v.parse::<bool>().ok()).unwrap_or(false);
+
+            if skip_resume {
+                warn!("KLASK_SKIP_RESUME_CRAWLS is set - incomplete crawls will NOT be resumed on startup");
+            } else {
+                let service_clone = service.clone();
+                tokio::spawn(async move {
+                    info!("Checking for incomplete crawls to resume (in background)...");
+                    if let Err(e) = service_clone.check_and_resume_incomplete_crawls().await {
+                        error!("Failed to resume incomplete crawls: {}", e);
+                    }
+                });
+            }
 
             // Clean up any abandoned crawls (older than 2 hours) in background
             let service_clone = service.clone();

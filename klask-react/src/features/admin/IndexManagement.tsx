@@ -15,7 +15,7 @@ import {
 
 // Import custom hooks and types
 import { useIndexMetrics } from '../../hooks/useIndexMetrics';
-import { useOptimizeIndex } from '../../api/indexMetrics';
+import { useOptimizeIndex, useSearchStatus } from '../../api/indexMetrics';
 import type { OptimizeIndexResponse } from '../../types/tantivy';
 
 // Import components
@@ -54,6 +54,9 @@ export const IndexManagement: React.FC = () => {
     nextRefreshTime,
     manualRefresh,
   } = useIndexMetrics({ enableAutoRefresh: true, defaultInterval: 'off' });
+
+  // Check search status for schema mismatch
+  const statusQuery = useSearchStatus(false);
 
   // Optimize index mutation
   const optimizeIndexMutation = useOptimizeIndex();
@@ -266,6 +269,23 @@ export const IndexManagement: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Schema Mismatch Warning - if present */}
+      {statusQuery.data?.schema_mismatch && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+          <div className="flex items-start gap-4">
+            <ExclamationTriangleIcon className="h-6 w-6 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-900 dark:text-yellow-100">
+                Index schema mismatch detected
+              </h3>
+              <p className="mt-1 text-sm text-yellow-800 dark:text-yellow-200">
+                The search index schema has changed and needs to be rebuilt. Click the Rebuild Index button below to fix this issue and restore search functionality.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Danger Zone - Reset Index */}
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg">

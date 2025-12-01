@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import SearchPageV3 from '../SearchPageV3';
 import * as useSearch from '../../../hooks/useSearch';
@@ -22,9 +22,9 @@ const createWrapper = () => {
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       <SearchFiltersProvider>
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/search']}>
           {children}
-        </BrowserRouter>
+        </MemoryRouter>
       </SearchFiltersProvider>
     </QueryClientProvider>
   );
@@ -289,13 +289,19 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
       await userEvent.click(regexButton);
 
       // State should change to active (purple)
-      expect(regexButton.className).toMatch(/border-purple-200/);
+      await waitFor(() => {
+        const updatedButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
+        expect(updatedButton.className).toMatch(/border-purple-200/);
+      });
 
       // Click again to deactivate
       await userEvent.click(regexButton);
 
       // State should change back to inactive (gray)
-      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      await waitFor(() => {
+        const updatedButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
+        expect(updatedButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      });
     });
 
     it('should maintain regex state across re-renders', async () => {
@@ -322,14 +328,20 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
 
       // Activate regex
       await userEvent.click(regexButton);
-      expect(regexButton.className).toMatch(/border-purple-200/);
+
+      await waitFor(() => {
+        const activeButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
+        expect(activeButton.className).toMatch(/border-purple-200/);
+      });
 
       // Trigger re-render (simulate component update)
       rerender(<SearchPageV3 />);
 
       // State should be preserved
-      const updatedButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
-      expect(updatedButton.className).toMatch(/border-purple-200/);
+      await waitFor(() => {
+        const updatedButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
+        expect(updatedButton.className).toMatch(/border-purple-200/);
+      });
     });
 
     it('should start with regex disabled by default', async () => {
@@ -507,22 +519,34 @@ describe('SearchPageV3 - Regex Search Toggle Feature', () => {
       await userEvent.click(regexButton);
 
       // Regex should be purple, fuzzy should be gray
-      expect(regexButton.className).toMatch(/border-purple-200/);
-      expect(fuzzyButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      await waitFor(() => {
+        const updatedRegexButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
+        const updatedFuzzyButton = screen.getByRole('button', { name: /fuzzy/i });
+        expect(updatedRegexButton.className).toMatch(/border-purple-200/);
+        expect(updatedFuzzyButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      });
 
       // Enable fuzzy - this disables regex due to mutual exclusivity
       await userEvent.click(fuzzyButton);
 
       // Fuzzy should be blue, regex should be gray (mutually exclusive)
-      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
-      expect(fuzzyButton.className).toMatch(/border-blue-200/);
+      await waitFor(() => {
+        const updatedRegexButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
+        const updatedFuzzyButton = screen.getByRole('button', { name: /fuzzy/i });
+        expect(updatedRegexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+        expect(updatedFuzzyButton.className).toMatch(/border-blue-200/);
+      });
 
       // Disable fuzzy by clicking again
       await userEvent.click(fuzzyButton);
 
       // Both should be disabled (back to normal state)
-      expect(regexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
-      expect(fuzzyButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      await waitFor(() => {
+        const updatedRegexButton = screen.getByRole('button', { name: /regex|\/\.\*/i });
+        const updatedFuzzyButton = screen.getByRole('button', { name: /fuzzy/i });
+        expect(updatedRegexButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+        expect(updatedFuzzyButton.className).toMatch(/border-gray-200|dark:border-gray-700/);
+      });
     });
   });
 

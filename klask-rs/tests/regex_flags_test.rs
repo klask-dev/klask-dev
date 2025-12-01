@@ -59,6 +59,7 @@ async fn test_regex_case_sensitivity() {
         query: "MyFile.*".to_string(),
         regex_search: true,
         regex_flags: None, // No flags = case-sensitive
+        case_sensitive: false,
         limit: 100,
         ..Default::default()
     };
@@ -102,6 +103,7 @@ async fn test_regex_case_sensitivity() {
         query: "myfile.*".to_string(),
         regex_search: true,
         regex_flags: None, // No flags = case-sensitive
+        case_sensitive: false,
         limit: 100,
         ..Default::default()
     };

@@ -16,13 +16,15 @@
 
 ```
 klask-dev/
+├── docs/              # All the documentation in markdown format (use this directory to read/produce docs)
+├── charts/            # Helm chart
 ├── klask-rs/          # Rust backend (Axum + Tantivy + PostgreSQL)
 ├── klask-react/       # React frontend (TypeScript + TailwindCSS)
 ├── .claude/           # AI agents, commands, hooks
 │   ├── agents/        # Specialized AI agents
 │   ├── commands/      # Custom slash commands
 │   └── hooks/         # Pre-commit, post-code-change hooks
-└── CLAUDE.md         # This file
+└── CLAUDE.md          # This file
 ```
 
 ---
@@ -533,6 +535,9 @@ cargo test --test '*'
 cd klask-react
 npm test -- --testPathPattern="integration"
 ```
+
+### Test Database Setup
+All integration tests use **in-memory SQLite** via `klask_rs::testing::TestDatabase` module. Each test gets an isolated database instance with no external dependencies. See `src/testing.rs` for implementation details.
 
 ---
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import {
   ServerIcon,
   UsersIcon,
@@ -7,15 +8,18 @@ import {
   DocumentDuplicateIcon,
   ClockIcon,
   CogIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { MetricCard } from '../../components/admin/MetricCard';
 import { RepositoryBadge } from '../../components/ui/RepositoryBadge';
 import { useAdminDashboard } from '../../hooks/useAdmin';
+import { useSearchStatus } from '../../api/indexMetrics';
 import { formatDateTime } from '../../lib/utils';
 
 const AdminDashboard: React.FC = () => {
   const { data: dashboardData, isLoading, error, refetch } = useAdminDashboard();
+  const statusQuery = useSearchStatus(false);
 
   if (error) {
     return (
@@ -121,13 +125,45 @@ const AdminDashboard: React.FC = () => {
           <div>
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Search & Crawling</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <MetricCard
-                title="Search Index"
-                value={dashboardData?.search?.total_documents || 0}
-                description={`${dashboardData?.search?.index_size_mb?.toFixed(1) || '0.0'} MB index`}
-                icon={MagnifyingGlassIcon}
-                color="blue"
-              />
+              {/* Search Index Status Card with Schema Mismatch Indicator */}
+              <Link to="/admin/index" className="group">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg transition-shadow h-full">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-50 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                          <MagnifyingGlassIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      </div>
+                    </div>
+                    {statusQuery.data?.schema_mismatch ? (
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                          Needs Rebuild
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          Healthy
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    {dashboardData?.search?.total_documents || 0}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Documents {statusQuery.data?.schema_mismatch ? '(schema mismatch)' : ''} • {dashboardData?.search?.index_size_mb?.toFixed(1) || '0.0'} MB
+                  </p>
+                  {statusQuery.data?.schema_mismatch && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+                      <ExclamationTriangleIcon className="h-4 w-4" />
+                      <span>Click to rebuild index</span>
+                    </div>
+                  )}
+                </div>
+              </Link>
 
               <MetricCard
                 title="Recently Crawled"

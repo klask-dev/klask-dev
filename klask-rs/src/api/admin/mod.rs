@@ -128,6 +128,7 @@ pub struct IndexResetResponse {
     pub message: String,
     pub documents_before: u64,
     pub documents_after: u64,
+    pub schema_was_mismatch: bool,
 }
 
 pub async fn create_router() -> Result<Router<AppState>> {
@@ -507,6 +508,9 @@ async fn reset_search_index(
 ) -> Result<Json<IndexResetResponse>, StatusCode> {
     info!("Admin user requested search index reset");
 
+    // Track if there was a schema mismatch before reset
+    let schema_was_mismatch = app_state.search_service.has_schema_mismatch();
+
     // Get document count before reset
     let documents_before = app_state.search_service.get_document_count().unwrap_or(0);
 
@@ -523,6 +527,7 @@ async fn reset_search_index(
                 message: "Search index has been reset successfully".to_string(),
                 documents_before,
                 documents_after,
+                schema_was_mismatch,
             }))
         }
         Err(e) => {
@@ -532,6 +537,7 @@ async fn reset_search_index(
                 message: format!("Failed to reset index: {}", e),
                 documents_before,
                 documents_after: documents_before,
+                schema_was_mismatch,
             }))
         }
     }

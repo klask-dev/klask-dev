@@ -21,6 +21,8 @@ pub struct Repository {
     pub is_group: bool,
     #[serde(rename = "lastCrawled")]
     pub last_crawled: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(rename = "lastCrawlError")]
+    pub last_crawl_error: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]

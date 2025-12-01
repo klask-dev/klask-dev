@@ -79,6 +79,7 @@ export interface Repository {
   branch?: string;
   enabled: boolean;
   lastCrawled?: string;
+  lastCrawlError?: string;
   createdAt: string;
   updatedAt: string;
   // Scheduling fields

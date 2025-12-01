@@ -11,6 +11,7 @@ import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { AdminRoute } from './components/common/AdminRoute';
 import { SearchFiltersProvider } from './contexts/SearchFiltersContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { SearchSchemaMismatchBanner } from './components/SearchSchemaMismatchBanner';
 
 // Lazy load pages for better performance
 import { Suspense } from 'react';
@@ -41,6 +42,7 @@ function App() {
       <BrowserRouter>
         <ThemeProvider>
           <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+            <SearchSchemaMismatchBanner />
             <Toaster
             position="top-right"
             toastOptions={{

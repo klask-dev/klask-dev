@@ -234,6 +234,7 @@ impl GitHubCrawler {
                 created_at: repository.created_at,
                 updated_at: repository.updated_at,
                 last_crawled: repository.last_crawled,
+                last_crawl_error: repository.last_crawl_error.clone(),
                 auto_crawl_enabled: repository.auto_crawl_enabled,
                 cron_schedule: repository.cron_schedule.clone(),
                 next_crawl_at: repository.next_crawl_at,

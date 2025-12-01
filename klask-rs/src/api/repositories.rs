@@ -556,6 +556,7 @@ async fn create_repository(
         gitlab_namespace: clean_optional_string(request.gitlab_namespace),
         is_group: request.is_group.unwrap_or(false),
         last_crawled: None,
+        last_crawl_error: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
         auto_crawl_enabled: request.auto_crawl_enabled.unwrap_or(false),
@@ -655,7 +656,7 @@ async fn update_repository(
         repository.enabled = enabled;
     }
     if let Some(gitlab_namespace) = request.gitlab_namespace {
-        repository.gitlab_namespace = Some(gitlab_namespace);
+        repository.gitlab_namespace = if gitlab_namespace.trim().is_empty() { None } else { Some(gitlab_namespace) };
     }
     if let Some(is_group) = request.is_group {
         repository.is_group = is_group;
@@ -704,11 +705,16 @@ async fn update_repository(
     }
     if let Some(github_namespace) = request.github_namespace {
         // Validate GitHub namespace before updating
-        if let Err(e) = validate_github_namespace(&github_namespace) {
-            error!("Invalid GitHub namespace '{}': {}", github_namespace, e);
-            return Err(StatusCode::BAD_REQUEST);
+        let trimmed = github_namespace.trim();
+        if !trimmed.is_empty() {
+            if let Err(e) = validate_github_namespace(trimmed) {
+                error!("Invalid GitHub namespace '{}': {}", trimmed, e);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            repository.github_namespace = Some(github_namespace);
+        } else {
+            repository.github_namespace = None;
         }
-        repository.github_namespace = Some(github_namespace);
     }
     if let Some(github_excluded_repositories) = request.github_excluded_repositories {
         repository.github_excluded_repositories = if github_excluded_repositories.trim().is_empty() {
@@ -901,17 +907,25 @@ async fn crawl_repository(
     // Start crawl using the crawler service
     let crawler_service = app_state.crawler_service.clone();
     let progress_tracker = app_state.progress_tracker.clone();
+    let database_pool = app_state.database.pool().clone();
     let repository_clone = repository.clone();
     let repository_id = repository.id;
+    let repository_name = repository.name.clone();
 
     // Spawn crawl task in background
     tokio::spawn(async move {
         if let Err(e) = crawler_service.crawl_repository(&repository_clone).await {
             let error_msg = format!("{}", e);
-            error!("Crawl failed for repository {}: {}", repository_clone.name, error_msg);
+            error!("Crawl failed for repository {}: {}", repository_name, error_msg);
 
             // Record the error in progress tracker so it's visible in the UI
-            progress_tracker.set_error(repository_id, error_msg).await;
+            progress_tracker.set_error(repository_id, error_msg.clone()).await;
+
+            // Also persist the error to the database so it survives after the crawl finishes
+            let repo_repo = RepositoryRepository::new(database_pool);
+            if let Err(db_err) = repo_repo.set_last_crawl_error(repository_id, Some(error_msg)).await {
+                error!("Failed to save crawl error to database: {}", db_err);
+            }
         }
     });
 
