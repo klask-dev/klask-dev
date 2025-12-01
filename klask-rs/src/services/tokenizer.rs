@@ -489,29 +489,24 @@ fn tokenize_code_word_case_sensitive(text: &str, byte_offset_base: usize, positi
                 false
             } else if prev_ch.is_lowercase() && ch.is_uppercase() {
                 true
-            } else if prev_ch.is_uppercase() && ch.is_uppercase() && i + 1 < chars.len() && chars[i + 1].is_lowercase()
-            {
-                true
             } else {
-                false
+                prev_ch.is_uppercase() && ch.is_uppercase() && i + 1 < chars.len() && chars[i + 1].is_lowercase()
             }
         };
 
-        if should_split {
-            if !current_token.is_empty() {
-                // CASE-PRESERVING: emit the token with original case (no to_lowercase)
-                let token = Token {
-                    offset_from: token_byte_start,
-                    offset_to: byte_pos,
-                    position: position_base + tokens.len(),
-                    text: current_token.clone(), // Preserve original case!
-                    position_length: 1,
-                };
-                tokens.push(token);
+        if should_split && !current_token.is_empty() {
+            // CASE-PRESERVING: emit the token with original case (no to_lowercase)
+            let token = Token {
+                offset_from: token_byte_start,
+                offset_to: byte_pos,
+                position: position_base + tokens.len(),
+                text: current_token.clone(), // Preserve original case!
+                position_length: 1,
+            };
+            tokens.push(token);
 
-                current_token.clear();
-                token_byte_start = byte_pos;
-            }
+            current_token.clear();
+            token_byte_start = byte_pos;
         }
 
         current_token.push(ch);

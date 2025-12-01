@@ -603,11 +603,13 @@ impl SearchService {
     }
 
     /// Get the index directory path
+    #[allow(dead_code)]
     pub fn get_index_dir(&self) -> Result<std::path::PathBuf> {
         Ok(self.index_dir.clone())
     }
 
     /// Rebuild the index to resolve schema mismatch
+    #[allow(dead_code)]
     pub async fn rebuild_index(&self) -> Result<()> {
         self.rebuild_index_internal().await
     }
