@@ -21,6 +21,11 @@ services:
         networks:
             - klask-network
         restart: unless-stopped
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U klask_user -d klask_dev"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
 
     # Klask Backend (Rust)
     klask-backend:
