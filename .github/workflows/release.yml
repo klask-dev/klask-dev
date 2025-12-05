@@ -19,7 +19,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     
     steps:
@@ -44,7 +44,17 @@ jobs:
         else
           echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
         fi
-    
+
+    - name: Get build metadata
+      id: build-meta
+      run: |
+        TAG="${{ steps.version.outputs.tag }}"
+        # Remove 'v' prefix if present (e.g., v2.0.0 -> 2.0.0)
+        VERSION="${TAG#v}"
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
     - name: Build and push frontend (release)
       uses: docker/build-push-action@v5
       with:
@@ -54,9 +64,13 @@ jobs:
         tags: |
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.version.outputs.tag }}
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:stable
+        build-args: |
+          VITE_APP_VERSION=${{ steps.build-meta.outputs.version }}
+          VITE_APP_COMMIT=${{ steps.build-meta.outputs.commit }}
+          VITE_APP_BUILD_TIME=${{ steps.build-meta.outputs.build_time }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-    
+
     - name: Build and push backend (release)
       uses: docker/build-push-action@v5
       with:
@@ -66,6 +80,10 @@ jobs:
         tags: |
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.version.outputs.tag }}
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:stable
+        build-args: |
+          KLASK_VERSION=${{ steps.build-meta.outputs.version }}
+          GIT_COMMIT_HASH=${{ steps.build-meta.outputs.commit }}
+          BUILD_TIMESTAMP=${{ steps.build-meta.outputs.build_time }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
     
