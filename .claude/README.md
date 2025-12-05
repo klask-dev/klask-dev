@@ -104,6 +104,25 @@ Runs automatically before each git commit to ensure code quality.
 ./.claude/hooks/pre-commit.sh
 ```
 
+### pre-push.sh
+Runs automatically before git push to prevent pushing code that fails CI.
+
+**What it does:**
+- 🦀 Runs `cargo clippy -- -D warnings` (same as GitHub Actions)
+- 🛑 Blocks push if clippy finds warnings
+- 💡 Provides helpful error messages and solutions
+- ⚡ Only checks if Rust code was changed
+
+**Manual execution:**
+```bash
+./.claude/hooks/pre-push.sh
+```
+
+**Bypass (if necessary):**
+```bash
+git push --no-verify
+```
+
 ### post-code-change.sh
 Runs automatically after code modifications to verify changes.
 
