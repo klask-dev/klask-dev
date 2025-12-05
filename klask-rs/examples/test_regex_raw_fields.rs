@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
             repository: "test-repo",
             project: "test-project",
             version: "main",
-            extension: file_name.split('.').last().unwrap_or(""),
+            extension: file_name.split('.').next_back().unwrap_or(""),
             size: content.len() as u64,
         };
         search_service.upsert_file(file_data).await?;
