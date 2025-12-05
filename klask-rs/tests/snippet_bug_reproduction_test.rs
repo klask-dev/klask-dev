@@ -128,6 +128,7 @@ fn find_pattern(regex: &str) {
 
     /// Test Case 5: What happens with actual backend snippet generation
     #[test]
+    #[allow(clippy::implicit_saturating_sub, clippy::string_from_utf8_as_bytes)]
     fn test_backend_snippet_generation_safety() {
         let file_content = include_str!("./snippet_utf8_test.rs");
 

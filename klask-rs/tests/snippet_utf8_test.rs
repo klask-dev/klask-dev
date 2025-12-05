@@ -123,6 +123,7 @@ fn hello() {
 
     /// Test: Potential panic from invalid UTF-8
     #[test]
+    #[allow(clippy::implicit_saturating_sub, clippy::string_from_utf8_as_bytes)]
     fn test_invalid_utf8_causes_panic() {
         let text = "Hello🔍World";
 
@@ -133,7 +134,7 @@ fn hello() {
 
             // Instead, try the safe way
             let safe = safe_truncate_at_char(text, 6);
-            assert!(safe == "Hello🔍" || safe == "Hello🔍");
+            assert_eq!(safe, "Hello🔍");
         });
 
         assert!(result.is_ok(), "Safe truncation should not panic");
@@ -156,11 +157,7 @@ fn hello() {
             let result = safe_truncate_at_char(text, char_limit);
 
             // Verify result is valid UTF-8
-            assert!(
-                result.is_empty() || !result.is_empty(),
-                "Result for '{}' should be valid UTF-8",
-                text
-            );
+            let _ = result.chars().count(); // This would panic if invalid UTF-8
 
             // Verify we didn't exceed char limit
             let actual_chars = result.chars().count();
@@ -227,6 +224,7 @@ fn hello() {
     /// Test: Simulating the actual bug scenario
     /// What might happen if snippet generation used byte slicing instead of char iteration
     #[test]
+    #[allow(clippy::implicit_saturating_sub, clippy::string_from_utf8_as_bytes)]
     fn test_simulated_bug_scenario() {
         let file_content = r#"
 // Function with emoji
