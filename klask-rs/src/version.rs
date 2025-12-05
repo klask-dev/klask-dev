@@ -1,6 +1,6 @@
-/// Version information for Klask
-/// The version is determined at compile time from environment variables
-/// or falls back to the Cargo.toml version
+//! Version information for Klask
+//! The version is determined at compile time from environment variables
+//! or falls back to the Cargo.toml version
 
 /// Get the current Klask version
 /// Tries to read from KLASK_VERSION env var first, then falls back to CARGO_PKG_VERSION
@@ -18,6 +18,7 @@ pub fn get_build_timestamp() -> Option<&'static str> {
     option_env!("BUILD_TIMESTAMP")
 }
 
+#[allow(dead_code)]
 /// Get full version information
 pub fn get_full_version_string() -> String {
     let mut version = format!("v{}", get_version());
