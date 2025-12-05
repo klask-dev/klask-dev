@@ -86,9 +86,20 @@ Expert code reviewer focused on security, performance, and best practices.
 Use the code-reviewer agent to review the new authentication module for security issues.
 ```
 
-## 🪝 Available Hooks
+## 🪝 Git Hooks Configuration
 
-### pre-commit.sh
+All git hooks are located in the `git-hooks/` directory and are automatically configured by the Makefile.
+
+### Setup (One-time only)
+```bash
+make install-hooks
+```
+
+This configures git to use the hooks in `git-hooks/` directory.
+
+### Available Hooks
+
+#### pre-commit
 Runs automatically before each git commit to ensure code quality.
 
 **What it does:**
@@ -101,10 +112,10 @@ Runs automatically before each git commit to ensure code quality.
 
 **Manual execution:**
 ```bash
-./.claude/hooks/pre-commit.sh
+git-hooks/pre-commit
 ```
 
-### pre-push.sh
+#### pre-push
 Runs automatically before git push to prevent pushing code that fails CI.
 
 **What it does:**
@@ -115,7 +126,7 @@ Runs automatically before git push to prevent pushing code that fails CI.
 
 **Manual execution:**
 ```bash
-./.claude/hooks/pre-push.sh
+git-hooks/pre-push
 ```
 
 **Bypass (if necessary):**
@@ -123,8 +134,8 @@ Runs automatically before git push to prevent pushing code that fails CI.
 git push --no-verify
 ```
 
-### post-code-change.sh
-Runs automatically after code modifications to verify changes.
+#### post-code-change.sh (Legacy)
+Located in `.claude/hooks/` for special use cases.
 
 **What it does:**
 - 🔄 Detects which part of the codebase changed

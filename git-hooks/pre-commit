@@ -1,61 +1,92 @@
 #!/bin/bash
+# Pre-commit hook for Klask
+# Automatically format, lint, and test code before commits
 
-# Git pre-commit hook to format Rust code with cargo fmt
-# This hook will automatically format Rust code before each commit
+set -e
 
-echo "🔧 Running pre-commit checks..."
+echo "🔍 Running pre-commit checks for Klask..."
 
-# Check if we're in the right directory
-if [ ! -f "klask-rs/Cargo.toml" ]; then
-    echo "⚠️  Warning: klask-rs/Cargo.toml not found, skipping cargo fmt"
-    exit 0
+# Detect which part of the project changed
+CHANGED_RUST=false
+CHANGED_REACT=false
+
+if git diff --cached --name-only | grep -q "^klask-rs/"; then
+    CHANGED_RUST=true
 fi
 
-# Store the current directory
-ORIGINAL_DIR=$(pwd)
-
-# Change to the Rust directory
-cd klask-rs
-
-echo "📝 Checking Rust code formatting..."
-
-# Check if there are any staged Rust files
-if ! git diff --cached --name-only | grep -E '\.(rs)$' >/dev/null; then
-    echo "ℹ️  No Rust files staged for commit, skipping formatting"
-    cd "$ORIGINAL_DIR"
-    exit 0
+if git diff --cached --name-only | grep -q "^klask-react/"; then
+    CHANGED_REACT=true
 fi
 
-# Run cargo fmt check
-if ! cargo fmt --all -- --check >/dev/null 2>&1; then
-    echo "🔨 Code formatting issues detected. Running cargo fmt..."
+# Rust backend checks
+if [ "$CHANGED_RUST" = true ]; then
+    echo ""
+    echo "🦀 Checking Rust backend..."
 
-    # Format the code
-    if cargo fmt --all; then
-        echo "✅ Code formatted successfully with cargo fmt"
+    cd klask-rs
 
-        # Add only the modified staged files back to the commit
-        echo "📤 Adding formatted files to staging area..."
+    # Format code
+    echo "  ├─ Formatting code..."
+    cargo fmt --check || {
+        echo "  │  ⚠️  Code not formatted. Running cargo fmt..."
+        cargo fmt
+        echo "  │  ✅ Code formatted"
+    }
 
-        # Get the list of staged Rust files and re-add them
-        cd "$ORIGINAL_DIR"
-        git diff --cached --name-only | grep -E '\.(rs)$' | while read file; do
-            if [ -f "$file" ]; then
-                git add "$file"
-                echo "   ✓ Added $file"
-            fi
-        done
-
-        echo "✅ Formatted files added to commit"
-    else
-        echo "❌ cargo fmt failed"
-        cd "$ORIGINAL_DIR"
+    # Run clippy
+    echo "  ├─ Running clippy..."
+    cargo clippy --all-targets --all-features -- -D warnings || {
+        echo "  │  ❌ Clippy found issues. Please fix them before committing."
+        cd ..
         exit 1
-    fi
-else
-    echo "✅ Code is already properly formatted"
+    }
+
+    # Run tests
+    echo "  ├─ Running tests..."
+    cargo test --quiet || {
+        echo "  │  ❌ Tests failed. Please fix them before committing."
+        cd ..
+        exit 1
+    }
+
+    echo "  └─ ✅ Rust checks passed"
+    cd ..
 fi
 
-cd "$ORIGINAL_DIR"
-echo "🎉 Pre-commit hook completed successfully"
-exit 0
+# React frontend checks
+if [ "$CHANGED_REACT" = true ]; then
+    echo ""
+    echo "⚛️  Checking React frontend..."
+
+    cd klask-react
+
+    # Lint and fix
+    echo "  ├─ Running ESLint..."
+    npm run lint:fix || {
+        echo "  │  ❌ ESLint found issues that couldn't be auto-fixed."
+        cd ..
+        exit 1
+    }
+
+    # Run tests
+    echo "  ├─ Running tests..."
+    npm test -- --run --reporter=basic || {
+        echo "  │  ❌ Tests failed. Please fix them before committing."
+        cd ..
+        exit 1
+    }
+
+    # Type check
+    echo "  ├─ Type checking..."
+    npm run type-check 2>/dev/null || npx tsc --noEmit || {
+        echo "  │  ❌ TypeScript errors found."
+        cd ..
+        exit 1
+    }
+
+    echo "  └─ ✅ React checks passed"
+    cd ..
+fi
+
+echo ""
+echo "✅ All pre-commit checks passed! Ready to commit."

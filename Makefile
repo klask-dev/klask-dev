@@ -24,9 +24,19 @@ help:
 	@echo ""
 
 # Git hooks
+# Automatically run pre-commit and pre-push checks to catch issues early
 install-hooks:
+	@echo "📦 Installing Git hooks from git-hooks/..."
 	git config core.hooksPath git-hooks
 	chmod +x git-hooks/*
+	@echo ""
+	@echo "✅ Git hooks installed!"
+	@echo "   • pre-commit: Runs cargo fmt, clippy, tests before each commit"
+	@echo "   • pre-push: Runs cargo clippy -- -D warnings before each push"
+	@echo ""
+	@echo "💡 To bypass hooks if needed:"
+	@echo "   git commit --no-verify"
+	@echo "   git push --no-verify"
 
 # Rust development commands
 rust-dev:
