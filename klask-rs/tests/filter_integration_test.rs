@@ -4,7 +4,6 @@
 /// Note: These tests focus on the filtering logic integration without requiring
 /// actual database or network connections. They validate the behavior of filters
 /// when applied to discovered projects/repositories during crawling.
-
 // Test utilities for creating mock data structures
 /// Mock GitLab project structure
 #[derive(Clone, Debug)]

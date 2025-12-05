@@ -472,7 +472,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files across all size ranges
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             2048,     // 1-10 KB
             50000,    // 10-100 KB
@@ -605,7 +605,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files only in < 1KB and > 10MB buckets
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             50000000, // > 10MB
         ];
@@ -727,7 +727,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files across all size ranges
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             2048,     // 1-10 KB
             50000,    // 10-100 KB
@@ -803,7 +803,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files across all size ranges
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             2048,     // 1-10 KB
             50000,    // 10-100 KB
@@ -938,7 +938,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index very large files
-        let sizes = vec![
+        let sizes = [
             100000000,   // 100 MB (> 1 MB)
             1000000000,  // 1 GB (> 1 MB)
             10000000000, // 10 GB (> 1 MB)
