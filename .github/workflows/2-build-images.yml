@@ -91,6 +91,10 @@ jobs:
         push: true
         tags: ${{ steps.meta-frontend.outputs.tags }}
         labels: ${{ steps.meta-frontend.outputs.labels }}
+        build-args: |
+          VITE_APP_VERSION=${{ github.ref_name }}
+          VITE_APP_COMMIT=${{ github.sha }}
+          VITE_APP_BUILD_TIME=${{ github.event.repository.updated_at }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
@@ -150,6 +154,10 @@ jobs:
         push: true
         tags: ${{ steps.meta-backend.outputs.tags }}
         labels: ${{ steps.meta-backend.outputs.labels }}
+        build-args: |
+          KLASK_VERSION=${{ github.ref_name }}
+          GIT_COMMIT_HASH=${{ github.sha }}
+          BUILD_TIMESTAMP=${{ github.event.repository.updated_at }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 

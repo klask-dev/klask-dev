@@ -6,12 +6,14 @@ mod models;
 mod repositories;
 mod services;
 mod utils;
+mod version;
 
 use anyhow::Result;
 use auth::{extractors::AppState, jwt::JwtService};
-use axum::{Router, routing::get};
+use axum::{Json, Router, routing::get};
 use config::AppConfig;
 use database::Database;
+use serde::Serialize;
 use services::{
     SearchService, crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
     scheduler::SchedulerService,
@@ -24,6 +26,13 @@ use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[derive(Serialize)]
+struct VersionInfo {
+    version: String,
+    commit: Option<String>,
+    timestamp: Option<String>,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -226,6 +235,7 @@ async fn shutdown_signal() {
 async fn create_app(app_state: AppState) -> Result<Router> {
     let app = Router::new()
         .route("/", get(root_handler))
+        .route("/version", get(version_handler))
         .route(
             "/health",
             get({
@@ -241,8 +251,19 @@ async fn create_app(app_state: AppState) -> Result<Router> {
     Ok(app)
 }
 
-async fn root_handler() -> &'static str {
-    "Klask-RS: Modern Code Search Engine"
+async fn root_handler() -> String {
+    format!(
+        "Klask-RS: Modern Code Search Engine\n\nVersion: {}\n\nAPI: http://localhost:3000/api\nHealth: http://localhost:3000/health\nVersion Info: http://localhost:3000/version",
+        version::get_version()
+    )
+}
+
+async fn version_handler() -> Json<VersionInfo> {
+    Json(VersionInfo {
+        version: version::get_version().to_string(),
+        commit: version::get_commit_hash().map(|s| s.to_string()),
+        timestamp: version::get_build_timestamp().map(|s| s.to_string()),
+    })
 }
 
 async fn health_handler(database: Database) -> &'static str {
