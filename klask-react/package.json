@@ -9,6 +9,7 @@
     "build:fast": "vite build",
     "typecheck": "tsc --project tsconfig.app.json --noEmit",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix --max-warnings 500",
     "lint:ci": "eslint . --max-warnings 500",
     "preview": "vite preview",
     "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest",
