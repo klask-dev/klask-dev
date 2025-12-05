@@ -820,6 +820,6 @@ mod edge_case_tests {
             true
         };
 
-        items.into_iter().filter(|item| pattern.map_or(true, |p| matches_pattern(item, p))).collect()
+        items.into_iter().filter(|item| pattern.is_none_or(|p| matches_pattern(item, p))).collect()
     }
 }

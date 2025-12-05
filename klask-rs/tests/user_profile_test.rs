@@ -333,7 +333,7 @@ fn test_timezone_validation() {
 
     impl TimezoneValidator {
         fn is_valid(tz: &str) -> bool {
-            let valid_zones = vec![
+            let valid_zones = [
                 "UTC",
                 "GMT",
                 "Europe/London",

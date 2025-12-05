@@ -323,7 +323,7 @@ async fn test_allow_registration_true_via_config() {
         allow_registration: true,
     };
 
-    assert_eq!(config.allow_registration, true);
+    assert!(config.allow_registration);
 }
 
 #[tokio::test]
@@ -335,7 +335,7 @@ async fn test_allow_registration_false_via_config() {
         allow_registration: false,
     };
 
-    assert_eq!(config.allow_registration, false);
+    assert!(!config.allow_registration);
 }
 
 // ============================================================================
