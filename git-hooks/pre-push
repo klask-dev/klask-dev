@@ -1,44 +1,91 @@
 #!/bin/bash
 # Pre-push hook for Klask
-# Runs cargo clippy with -D warnings to prevent pushing code that fails in CI
+# Comprehensive checks before pushing: clippy, tests, type-checking
 
 set -e
 
-echo "🔍 Running pre-push checks..."
+echo "🔍 Running comprehensive pre-push checks..."
 
-# Check if we're pushing changes to Rust code
+# Detect which part of the project changed
+CHANGED_RUST=false
+CHANGED_REACT=false
+
 if git diff --name-only remotes/origin/master HEAD 2>/dev/null | grep -q "^klask-rs/" || \
    git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q "^klask-rs/"; then
+    CHANGED_RUST=true
+fi
 
+if git diff --name-only remotes/origin/master HEAD 2>/dev/null | grep -q "^klask-react/" || \
+   git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q "^klask-react/"; then
+    CHANGED_REACT=true
+fi
+
+# Rust backend comprehensive checks
+if [ "$CHANGED_RUST" = true ]; then
     echo ""
-    echo "🦀 Running cargo clippy with strict warnings..."
-    echo "   (This ensures we don't push code that breaks CI)"
-    echo ""
+    echo "🦀 Running Rust comprehensive checks..."
 
     cd klask-rs
 
     # Run clippy with -D warnings - this is what GitHub Actions does
-    if cargo clippy --all-targets --all-features -- -D warnings; then
+    echo "  ├─ Running cargo clippy with strict warnings..."
+    if ! cargo clippy --all-targets --all-features -- -D warnings; then
+        echo "  │  ❌ Clippy found warnings that would break CI!"
         echo ""
-        echo "✅ Clippy check passed! Safe to push."
-        cd ..
-    else
+        echo "  📋 Common solutions:"
+        echo "     1. Run: cargo clippy --fix --allow-dirty"
+        echo "     2. Run: cargo fmt"
+        echo "     3. Check the output above for specific issues"
         echo ""
-        echo "❌ Clippy found warnings that would break CI!"
-        echo ""
-        echo "📋 Common solutions:"
-        echo "   1. Run: cargo clippy --fix --allow-dirty"
-        echo "   2. Run: cargo fmt"
-        echo "   3. Check the output above for specific issues"
-        echo ""
-        echo "💡 To bypass this hook (not recommended):"
-        echo "   git push --no-verify"
+        echo "  💡 To bypass this hook (not recommended):"
+        echo "     git push --no-verify"
         echo ""
         cd ..
         exit 1
     fi
+
+    # Run tests
+    echo "  ├─ Running tests..."
+    if ! cargo test --quiet; then
+        echo "  │  ❌ Tests failed. Please fix them before pushing."
+        cd ..
+        exit 1
+    fi
+
+    echo "  └─ ✅ Rust checks passed"
+    cd ..
 else
-    echo "✅ No Rust changes detected, skipping clippy check."
+    echo "✅ No Rust changes detected, skipping Rust checks."
 fi
 
-echo "✅ Pre-push checks completed!"
+# React frontend comprehensive checks
+if [ "$CHANGED_REACT" = true ]; then
+    echo ""
+    echo "⚛️  Running React comprehensive checks..."
+
+    cd klask-react
+
+    # Type check
+    echo "  ├─ Type checking..."
+    if ! npm run typecheck 2>/dev/null; then
+        echo "  │  ❌ TypeScript errors found."
+        cd ..
+        exit 1
+    fi
+
+    # Run tests
+    echo "  ├─ Running tests..."
+    if ! npm test -- --run 2>/dev/null; then
+        echo "  │  ❌ Tests failed. Please fix them before pushing."
+        cd ..
+        exit 1
+    fi
+
+    echo "  └─ ✅ React checks passed"
+    cd ..
+else
+    echo "✅ No React changes detected, skipping React checks."
+fi
+
+echo ""
+echo "✅ All pre-push checks passed! Safe to push."

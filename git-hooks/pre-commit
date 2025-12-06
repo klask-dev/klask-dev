@@ -1,10 +1,11 @@
 #!/bin/bash
 # Pre-commit hook for Klask
-# Automatically format, lint, and test code before commits
+# Fast formatting and linting checks before commits
+# Heavy tests are deferred to pre-push for faster workflow
 
 set -e
 
-echo "🔍 Running pre-commit checks for Klask..."
+echo "⚡ Running fast pre-commit checks for Klask..."
 
 # Detect which part of the project changed
 CHANGED_RUST=false
@@ -18,10 +19,10 @@ if git diff --cached --name-only | grep -q "^klask-react/"; then
     CHANGED_REACT=true
 fi
 
-# Rust backend checks
+# Rust backend checks - fast only
 if [ "$CHANGED_RUST" = true ]; then
     echo ""
-    echo "🦀 Checking Rust backend..."
+    echo "🦀 Checking Rust backend (fast checks only)..."
 
     cd klask-rs
 
@@ -33,30 +34,15 @@ if [ "$CHANGED_RUST" = true ]; then
         echo "  │  ✅ Code formatted"
     }
 
-    # Run clippy
-    echo "  ├─ Running clippy..."
-    cargo clippy --all-targets --all-features -- -D warnings || {
-        echo "  │  ❌ Clippy found issues. Please fix them before committing."
-        cd ..
-        exit 1
-    }
-
-    # Run tests
-    echo "  ├─ Running tests..."
-    cargo test --quiet || {
-        echo "  │  ❌ Tests failed. Please fix them before committing."
-        cd ..
-        exit 1
-    }
-
-    echo "  └─ ✅ Rust checks passed"
+    echo "  └─ ✅ Rust formatting passed"
+    echo "  💡 Clippy and tests will run on git push (pre-push hook)"
     cd ..
 fi
 
-# React frontend checks
+# React frontend checks - fast only
 if [ "$CHANGED_REACT" = true ]; then
     echo ""
-    echo "⚛️  Checking React frontend..."
+    echo "⚛️  Checking React frontend (fast checks only)..."
 
     cd klask-react
 
@@ -64,9 +50,9 @@ if [ "$CHANGED_REACT" = true ]; then
     echo "  ├─ Running ESLint on changed files..."
     CHANGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E "^klask-react/.*\.(ts|tsx)$" | sed 's|^klask-react/||')
     if [ -n "$CHANGED_FILES" ]; then
-        # First, run eslint with --fix to auto-fix what can be fixed
+        # Auto-fix what can be fixed
         npx eslint --fix --max-warnings 500 $CHANGED_FILES 2>/dev/null
-        # Then run without --fix to get final error count
+        # Verify final state
         npx eslint --max-warnings 500 $CHANGED_FILES || {
             echo "  │  ❌ ESLint found issues that couldn't be auto-fixed."
             cd ..
@@ -74,25 +60,11 @@ if [ "$CHANGED_REACT" = true ]; then
         }
     fi
 
-    # Run tests
-    echo "  ├─ Running tests..."
-    npm test -- --run || {
-        echo "  │  ❌ Tests failed. Please fix them before committing."
-        cd ..
-        exit 1
-    }
-
-    # Type check
-    echo "  ├─ Type checking..."
-    npm run type-check 2>/dev/null || npx tsc --noEmit || {
-        echo "  │  ❌ TypeScript errors found."
-        cd ..
-        exit 1
-    }
-
-    echo "  └─ ✅ React checks passed"
+    echo "  └─ ✅ ESLint checks passed"
+    echo "  💡 Type checking and tests will run on git push (pre-push hook)"
     cd ..
 fi
 
 echo ""
-echo "✅ All pre-commit checks passed! Ready to commit."
+echo "✅ Fast pre-commit checks passed! You can commit."
+echo "📋 Note: Type checking and tests will run when you push."
