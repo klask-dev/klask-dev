@@ -242,7 +242,7 @@ const SearchPageV3: React.FC = () => {
         extensions: facets.extensions,
         repositories: facets.repositories,
         // Backend returns size_ranges in snake_case, not camelCase
-        size_ranges: (facets as Record<string, unknown>).size_ranges as unknown[] || facets.sizeRanges || [],
+        size_ranges: ((facets as Record<string, unknown>).size_ranges as typeof facets.sizeRanges) || facets.sizeRanges || [],
       });
     }
     // If query exists but facets is still loading/undefined, keep existing filters

@@ -1,22 +1,34 @@
 #!/bin/bash
 # Pre-push hook for Klask
 # Comprehensive checks before pushing: clippy, tests, type-checking
+# Detects changes in unpushed commits only
 
 set -e
 
 echo "🔍 Running comprehensive pre-push checks..."
 
-# Detect which part of the project changed
+# Get the remote tracking branch (e.g., origin/upgrade-2-2-1)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+REMOTE_BRANCH="origin/$CURRENT_BRANCH"
+
+# Check if the remote branch exists
+if ! git rev-parse --verify "$REMOTE_BRANCH" > /dev/null 2>&1; then
+    # Remote branch doesn't exist yet - compare with master
+    MERGE_BASE="remotes/origin/master"
+else
+    # Remote branch exists - compare with it (only unpushed commits)
+    MERGE_BASE="$REMOTE_BRANCH"
+fi
+
+# Detect which part of the project changed in unpushed commits
 CHANGED_RUST=false
 CHANGED_REACT=false
 
-if git diff --name-only remotes/origin/master HEAD 2>/dev/null | grep -q "^klask-rs/" || \
-   git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q "^klask-rs/"; then
+if git diff --name-only "$MERGE_BASE"...HEAD 2>/dev/null | grep -q "^klask-rs/"; then
     CHANGED_RUST=true
 fi
 
-if git diff --name-only remotes/origin/master HEAD 2>/dev/null | grep -q "^klask-react/" || \
-   git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q "^klask-react/"; then
+if git diff --name-only "$MERGE_BASE"...HEAD 2>/dev/null | grep -q "^klask-react/"; then
     CHANGED_REACT=true
 fi
 
