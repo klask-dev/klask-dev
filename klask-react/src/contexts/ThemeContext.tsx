@@ -55,34 +55,42 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   // Function to apply theme to DOM
   const applyTheme = useCallback((theme: Theme) => {
     const resolvedTheme = resolveTheme(theme);
+
+    // Apply to html, body, and main div for Tailwind dark mode support
     const root = document.documentElement;
+    const body = document.body;
+    const mainDiv = document.querySelector('[data-theme-root]') as HTMLElement;
 
     if (resolvedTheme === 'dark') {
       root.classList.add('dark');
+      body.classList.add('dark');
+      if (mainDiv) mainDiv.classList.add('dark');
     } else {
       root.classList.remove('dark');
+      body.classList.remove('dark');
+      if (mainDiv) mainDiv.classList.remove('dark');
     }
   }, [resolveTheme]);
 
-  // Initialize theme from user preferences or localStorage
+  // Initialize theme from localStorage only on mount and user change
+  // Don't depend on user.preferences.theme to avoid re-initializing on every preference change
   useEffect(() => {
     let themeToUse: Theme = 'auto';
 
-    // Priority 1: User preferences from auth store
-    if (user?.preferences?.theme) {
+    // Priority 1: LocalStorage (user's most recent choice)
+    const savedTheme = localStorage.getItem('klask-theme') as Theme | null;
+    if (savedTheme && ['light', 'dark', 'auto'].includes(savedTheme)) {
+      themeToUse = savedTheme;
+    } else if (user?.preferences?.theme) {
+      // Priority 2: User preferences from auth store (only if no localStorage)
       themeToUse = user.preferences.theme;
-    } else {
-      // Priority 2: LocalStorage (fallback if auth store empty)
-      const savedTheme = localStorage.getItem('klask-theme') as Theme | null;
-      if (savedTheme && ['light', 'dark', 'auto'].includes(savedTheme)) {
-        themeToUse = savedTheme;
-      }
     }
 
     setCurrentTheme(themeToUse);
     applyTheme(themeToUse);
     setIsMounted(true);
-  }, [user?.preferences?.theme, applyTheme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, applyTheme]);
 
   // Handle theme changes from user (via the useTheme hook)
   const handleSetTheme = useCallback((newTheme: Theme) => {

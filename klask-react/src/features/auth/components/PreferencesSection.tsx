@@ -20,9 +20,11 @@ const PreferencesSection: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'auto') => {
-    setPreferences({ ...preferences, theme });
-    // Apply theme immediately for visual feedback
-    updateTheme(theme);
+    const newPreferences = { ...preferences, theme };
+    setPreferences(newPreferences);
+    // Pass new preferences to updateTheme to avoid stale state issues
+    // updateTheme handles both DOM update and backend save
+    updateTheme(theme, newPreferences);
   };
 
   const handleLanguageChange = (language: 'en' | 'fr' | 'es' | 'de') => {
