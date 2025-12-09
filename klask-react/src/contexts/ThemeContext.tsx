@@ -77,13 +77,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   useEffect(() => {
     let themeToUse: Theme = 'auto';
 
-    // Priority 1: LocalStorage (user's most recent choice)
-    const savedTheme = localStorage.getItem('klask-theme') as Theme | null;
-    if (savedTheme && ['light', 'dark', 'auto'].includes(savedTheme)) {
-      themeToUse = savedTheme;
-    } else if (user?.preferences?.theme) {
-      // Priority 2: User preferences from auth store (only if no localStorage)
+    // Priority 1: User preferences from auth store
+    if (user?.preferences?.theme) {
       themeToUse = user.preferences.theme;
+    } else {
+      // Priority 2: LocalStorage (user's most recent choice)
+      const savedTheme = localStorage.getItem('klask-theme') as Theme | null;
+      if (savedTheme && ['light', 'dark', 'auto'].includes(savedTheme)) {
+        themeToUse = savedTheme;
+      }
     }
 
     setCurrentTheme(themeToUse);
