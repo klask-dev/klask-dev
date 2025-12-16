@@ -105,7 +105,6 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: showLineNumbers ? '3rem 1fr' : '1fr',
-                  columnGap: showLineNumbers ? '0.5rem' : '0',
                   whiteSpace: wrapLongLines ? 'pre-wrap' : 'pre',
                   wordBreak: wrapLongLines ? 'break-word' : 'normal',
                 }}
@@ -114,6 +113,7 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
                   <span
                     style={{
                       textAlign: 'right',
+                      paddingRight: '0.5rem',
                       userSelect: 'none',
                       opacity: 0.5,
                       whiteSpace: 'nowrap',
