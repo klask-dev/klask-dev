@@ -105,7 +105,7 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: showLineNumbers ? '3rem 1fr' : '1fr',
-                  columnGap: showLineNumbers ? '1rem' : '0',
+                  columnGap: showLineNumbers ? '0.5rem' : '0',
                   whiteSpace: wrapLongLines ? 'pre-wrap' : 'pre',
                   wordBreak: wrapLongLines ? 'break-word' : 'normal',
                 }}
