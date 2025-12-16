@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Highlight, themes } from "prism-react-renderer";
+import { Highlight, themes, type PrismTheme } from "prism-react-renderer";
 
 interface OptimizedSyntaxHighlighterProps {
     children: string;
@@ -18,8 +18,8 @@ interface OptimizedSyntaxHighlighterProps {
 }
 
 // Theme mapping
-const getTheme = (styleName: string, isDarkMode: boolean) => {
-    const themeMap: Record<string, Record<string, unknown>> = {
+const getTheme = (styleName: string, isDarkMode: boolean): PrismTheme => {
+    const themeMap: Record<string, PrismTheme> = {
         oneLight: themes.oneLight,
         oneDark: themes.oneDark,
         vscDarkPlus: themes.vsDark,
