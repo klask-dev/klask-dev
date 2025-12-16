@@ -26,7 +26,7 @@ interface OptimizedSyntaxHighlighterProps {
 
 // Theme mapping
 const getTheme = (styleName: string, isDarkMode: boolean) => {
-  const themeMap: Record<string, any> = {
+  const themeMap: Record<string, Record<string, unknown>> = {
     oneLight: themes.oneLight,
     oneDark: themes.oneDark,
     vscDarkPlus: themes.vsDark,
@@ -96,13 +96,15 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
             lineHeight: '1.5',
           }}
         >
-          <code>
+          <code style={{ display: 'block' }}>
             {tokens.map((line, lineIndex) => (
               <div
                 key={lineIndex}
                 {...getLineProps({ line })}
                 style={{
-                  display: 'flex',
+                  display: 'grid',
+                  gridTemplateColumns: showLineNumbers ? '3rem 1fr' : '1fr',
+                  columnGap: showLineNumbers ? '1rem' : '0',
                   whiteSpace: wrapLongLines ? 'pre-wrap' : 'pre',
                   wordBreak: wrapLongLines ? 'break-word' : 'normal',
                 }}
@@ -110,9 +112,6 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
                 {showLineNumbers && (
                   <span
                     style={{
-                      display: 'inline-block',
-                      width: '3rem',
-                      marginRight: '1rem',
                       textAlign: 'right',
                       userSelect: 'none',
                       opacity: 0.5,
@@ -122,7 +121,7 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
                     {lineIndex + 1}
                   </span>
                 )}
-                <span style={{ flex: 1 }}>
+                <span>
                   {line.map((token, tokenIndex) => (
                     <span key={tokenIndex} {...getTokenProps({ token })} />
                   ))}
