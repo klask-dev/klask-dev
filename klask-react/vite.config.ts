@@ -50,6 +50,8 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      // VirtualizedSyntaxHighlighter tests require react-window mocking and are excluded
+      '**/VirtualizedSyntaxHighlighter.test.tsx',
     ],
     // Performance optimizations
     maxWorkers: 8,
