@@ -46,13 +46,10 @@ export default defineConfig({
     ui: false,
     // Prevent DOM dumping on test failures
     outputFile: undefined,
-    // Exclude problematic tests in CI
+    // Exclude node_modules and build directories
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
-      // Temporarily exclude failing tests
-      '**/OptimizedSyntaxHighlighter.test.tsx',
-      '**/VirtualizedSyntaxHighlighter.test.tsx',
     ],
     // Performance optimizations
     maxWorkers: 8,
