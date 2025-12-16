@@ -37,6 +37,7 @@ const SearchPageV3: React.FC = () => {
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
   const sizeFilter = filters.size;
+  const previousFiltersRef = React.useRef<typeof filters | undefined>(undefined);
 
   // Function to update URL with current search state
   const updateURL = useCallback((searchQuery: string, allFilters: typeof filters, page: number = 1) => {
@@ -178,21 +179,22 @@ const SearchPageV3: React.FC = () => {
   }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch, caseSensitive]);
 
   // Reset to page 1 when filters change (prevents showing empty results on non-existent pages)
-   
   useEffect(() => {
-    if (isInitializing || currentPage === 1) return;
-    // Check if filters actually changed by comparing stringified versions
-    // This helps avoid resetting page during initial URL parse
-    setCurrentPage(1);
-  }, [
-    filters.project,
-    filters.version,
-    filters.extension,
-    filters.language,
-    filters.size,
-    isInitializing,
-    currentPage,
-  ]);
+    if (isInitializing) return;
+
+    // Compare current filters with previous filters
+    const previousFilters = previousFiltersRef.current;
+    const filtersChanged = JSON.stringify(previousFilters) !== JSON.stringify(filters);
+
+    // Only reset page if filters actually changed
+    if (filtersChanged && currentPage !== 1) {
+      setCurrentPage(1);
+    }
+
+    // Update ref for next comparison
+    previousFiltersRef.current = filters;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, isInitializing]);
 
   // Sync query to context for facet fetching
   useEffect(() => {
