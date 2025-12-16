@@ -76,5 +76,4 @@ _ parfois j'ai INFO tantivy::indexer::index_writer: Buffer limit reached, flushi
 - snippets qui génère des erreurs (utf-8 truncate)
 - arrêter l'analyse en fonction des extensions, et se baser sur le type MIME
 - recherche sur le nom de fichier
-- redimensionner le panel à gauche
 - faire des tests sur les regex, elles ne fonctionnent pas
