@@ -86,11 +86,12 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
     <Highlight theme={theme} code={children} language={language.toLowerCase()}>
       {({ className: highlightClassName, style: highlightStyle, tokens, getLineProps, getTokenProps }) => (
         <pre
-          className={`${highlightClassName} ${className} p-4 rounded overflow-x-auto`}
+          className={`${highlightClassName} ${className} rounded overflow-x-auto`}
           style={{
             ...highlightStyle,
             ...customStyle,
             margin: 0,
+            padding: '1rem 1rem 1rem 0.5rem',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
             fontSize: '0.875rem',
             lineHeight: '1.5',
