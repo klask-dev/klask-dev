@@ -115,6 +115,7 @@ const OptimizedSyntaxHighlighter: React.FC<OptimizedSyntaxHighlighterProps> = ({
                       textAlign: 'right',
                       userSelect: 'none',
                       opacity: 0.5,
+                      whiteSpace: 'nowrap',
                       ...lineNumberStyle,
                     }}
                   >
