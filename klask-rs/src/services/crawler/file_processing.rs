@@ -2,6 +2,7 @@ use crate::models::{Repository, RepositoryType};
 use crate::services::parser::{PARSER_DISPATCHER, ParsedContent};
 use crate::services::search::{FileData, SearchService};
 use anyhow::Result;
+use mimetype_detector::kind::MimeKind;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -165,22 +166,25 @@ impl FileProcessor {
         Ok(())
     }
 
-    /// Check if a file is supported for indexing based on extension
-    /// Note: This does a lightweight check based on extension only.
-    /// Actual MIME detection happens during parsing.
+    /// Check if a file is supported for indexing based on extension or MIME detection
+    /// This performs a quick check: extension first, then MIME detection as fallback.
+    /// Returns false only for files we're confident are binary or should be skipped.
     pub fn is_supported_file(file_path: &Path) -> bool {
         let extension = file_path.extension().and_then(|ext| ext.to_str());
 
         // Check if any parser supports this extension
         if let Some(ext) = extension {
             let ext_lower = ext.to_lowercase();
-            return PARSER_DISPATCHER.all_supported_extensions().iter().any(|e| e.to_lowercase() == ext_lower);
+            if PARSER_DISPATCHER.all_supported_extensions().iter().any(|e| e.to_lowercase() == ext_lower) {
+                return true;
+            }
         }
 
         // Support well-known extensionless files
         if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-            matches!(
-                file_name.to_lowercase().as_str(),
+            let file_name_lower = file_name.to_lowercase();
+            if matches!(
+                file_name_lower.as_str(),
                 "dockerfile"
                     | "makefile"
                     | "rakefile"
@@ -196,10 +200,35 @@ impl FileProcessor {
                     | "install"
                     | "news"
                     | "todo"
-            )
-        } else {
-            false
+            ) {
+                return true;
+            }
         }
+
+        // For files with unknown extensions, try MIME detection as fallback
+        // This allows text files like "_helpers.tpl" to be processed
+        if extension.is_some() {
+            // Only check MIME for files with extensions, not extensionless files
+            if let Ok(bytes) = std::fs::read(file_path) {
+                // Read first 8KB for MIME detection (fast, doesn't read entire file)
+                let sample_size = std::cmp::min(bytes.len(), 8192);
+                let sample = &bytes[..sample_size];
+
+                let mime_type = mimetype_detector::detect(sample);
+                let kind = mime_type.kind();
+
+                // Accept if detected as text
+                if kind.contains(MimeKind::TEXT) {
+                    debug!(
+                        "File {} has unknown extension but detected as TEXT MIME kind, accepting for parsing",
+                        file_path.display()
+                    );
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Collect all supported files from a directory recursively
