@@ -2,7 +2,6 @@ use crate::models::{Repository, RepositoryType};
 use crate::services::parser::{PARSER_DISPATCHER, ParsedContent};
 use crate::services::search::{FileData, SearchService};
 use anyhow::Result;
-use mimetype_detector::kind::MimeKind;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -177,7 +176,10 @@ impl FileProcessor {
         if let Some(ext) = extension {
             let ext_lower = ext.to_lowercase();
             if PARSER_DISPATCHER.all_supported_extensions().iter().any(|e| e.to_lowercase() == ext_lower) {
-                debug!("[is_supported_file] {} - ACCEPTED (known extension: {})", file_name, ext);
+                debug!(
+                    "[is_supported_file] {} - ACCEPTED (known extension: {})",
+                    file_name, ext
+                );
                 return true;
             }
         }
@@ -208,40 +210,22 @@ impl FileProcessor {
             }
         }
 
-        // For files with unknown extensions, try MIME detection as fallback
-        // This allows text files like "_helpers.tpl" to be processed
+        // For files with unknown extensions, tentatively accept them.
+        // MIME detection will happen during parsing to determine if they're actually parseable.
+        // This allows text files like "_helpers.tpl" to be processed without requiring I/O
+        // on potentially non-existent filesystem paths (e.g., during Git crawl).
         if extension.is_some() {
-            // Only check MIME for files with extensions, not extensionless files
-            if let Ok(bytes) = std::fs::read(file_path) {
-                // Read first 8KB for MIME detection (fast, doesn't read entire file)
-                let sample_size = std::cmp::min(bytes.len(), 8192);
-                let sample = &bytes[..sample_size];
-
-                let mime_type = mimetype_detector::detect(sample);
-                let kind = mime_type.kind();
-
-                debug!(
-                    "[is_supported_file] {} - unknown extension {:?}, detected MIME: {}, kind: {:?}",
-                    file_name,
-                    extension,
-                    mime_type.mime(),
-                    kind
-                );
-
-                // Accept if detected as text
-                if kind.contains(MimeKind::TEXT) {
-                    debug!("[is_supported_file] {} - ACCEPTED (TEXT MIME kind detected)", file_name);
-                    return true;
-                }
-
-                debug!("[is_supported_file] {} - REJECTED (not TEXT kind)", file_name);
-            } else {
-                debug!("[is_supported_file] {} - REJECTED (could not read file)", file_name);
-            }
-        } else {
-            debug!("[is_supported_file] {} - REJECTED (no extension, not well-known name)", file_name);
+            debug!(
+                "[is_supported_file] {} - TENTATIVELY ACCEPTED (unknown extension {:?}, will check MIME during parsing)",
+                file_name, extension
+            );
+            return true;
         }
 
+        debug!(
+            "[is_supported_file] {} - REJECTED (no extension, not well-known name)",
+            file_name
+        );
         false
     }
 
@@ -282,6 +266,7 @@ impl FileProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mimetype_detector::kind::MimeKind;
     use std::fs;
 
     #[test]
