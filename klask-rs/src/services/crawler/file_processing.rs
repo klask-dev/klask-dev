@@ -1,5 +1,5 @@
 use crate::models::{Repository, RepositoryType};
-use crate::services::parser::{ParsedContent, PARSER_DISPATCHER};
+use crate::services::parser::{PARSER_DISPATCHER, ParsedContent};
 use crate::services::search::{FileData, SearchService};
 use anyhow::Result;
 use sha2::{Digest, Sha256};
@@ -99,19 +99,13 @@ impl FileProcessor {
                             Some(parsed)
                         }
                         Err(e) => {
-                            debug!(
-                                "[DISK READ] Skipping file {}: {}",
-                                relative_path, e
-                            );
+                            debug!("[DISK READ] Skipping file {}: {}", relative_path, e);
                             None
                         }
                     }
                 }
                 Err(e) => {
-                    debug!(
-                        "[DISK READ] Could not read file: {} - Error: {}",
-                        relative_path, e
-                    );
+                    debug!("[DISK READ] Could not read file: {} - Error: {}", relative_path, e);
                     None
                 }
             }
@@ -180,10 +174,7 @@ impl FileProcessor {
         // Check if any parser supports this extension
         if let Some(ext) = extension {
             let ext_lower = ext.to_lowercase();
-            return PARSER_DISPATCHER
-                .all_supported_extensions()
-                .iter()
-                .any(|e| e.to_lowercase() == ext_lower);
+            return PARSER_DISPATCHER.all_supported_extensions().iter().any(|e| e.to_lowercase() == ext_lower);
         }
 
         // Support well-known extensionless files

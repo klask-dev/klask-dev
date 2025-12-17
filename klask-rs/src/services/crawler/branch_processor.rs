@@ -316,35 +316,36 @@ impl BranchProcessor {
             let oid = file_entry.oid;
             let path = file_entry.path.clone();
 
-            let content_result = tokio::task::spawn_blocking(move || -> Result<Option<crate::services::parser::ParsedContent>> {
-                let git_repo = gix::open(&repo_path_for_task)?;
+            let content_result =
+                tokio::task::spawn_blocking(move || -> Result<Option<crate::services::parser::ParsedContent>> {
+                    let git_repo = gix::open(&repo_path_for_task)?;
 
-                // Check file size first
-                if !GitTreeWalker::check_blob_size(&git_repo, &oid)? {
-                    debug!("[GIT] Skipping large file: {} (> {} bytes)", path, MAX_FILE_SIZE);
-                    return Ok(None);
-                }
+                    // Check file size first
+                    if !GitTreeWalker::check_blob_size(&git_repo, &oid)? {
+                        debug!("[GIT] Skipping large file: {} (> {} bytes)", path, MAX_FILE_SIZE);
+                        return Ok(None);
+                    }
 
-                // Read and parse the content
-                let result = GitTreeWalker::read_and_parse_blob(&git_repo, &oid, &path);
-                match &result {
-                    Ok(Some(content)) => {
-                        debug!(
-                            "[GIT] Successfully parsed blob for file {} ({} bytes of text)",
-                            path,
-                            content.text.len()
-                        );
+                    // Read and parse the content
+                    let result = GitTreeWalker::read_and_parse_blob(&git_repo, &oid, &path);
+                    match &result {
+                        Ok(Some(content)) => {
+                            debug!(
+                                "[GIT] Successfully parsed blob for file {} ({} bytes of text)",
+                                path,
+                                content.text.len()
+                            );
+                        }
+                        Ok(None) => {
+                            debug!("[GIT] Blob returned None (unsupported or binary) for file {}", path);
+                        }
+                        Err(e) => {
+                            debug!("[GIT] Failed to read blob for file {}: {}", path, e);
+                        }
                     }
-                    Ok(None) => {
-                        debug!("[GIT] Blob returned None (unsupported or binary) for file {}", path);
-                    }
-                    Err(e) => {
-                        debug!("[GIT] Failed to read blob for file {}: {}", path, e);
-                    }
-                }
-                result
-            })
-            .await;
+                    result
+                })
+                .await;
 
             match content_result {
                 Ok(Ok(Some(content))) => {

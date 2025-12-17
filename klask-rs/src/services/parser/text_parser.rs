@@ -12,19 +12,72 @@ impl TextParser {
             // Consolidate the extension list from file_processing.rs
             supported_extensions: vec![
                 // Programming languages
-                "rs", "py", "js", "ts", "java", "c", "cpp", "h", "hpp", "go", "rb", "php", "cs",
-                "swift", "kt", "scala", "clj", "hs", "ml", "fs", "elm", "dart", "vue", "jsx",
+                "rs",
+                "py",
+                "js",
+                "ts",
+                "java",
+                "c",
+                "cpp",
+                "h",
+                "hpp",
+                "go",
+                "rb",
+                "php",
+                "cs",
+                "swift",
+                "kt",
+                "scala",
+                "clj",
+                "hs",
+                "ml",
+                "fs",
+                "elm",
+                "dart",
+                "vue",
+                "jsx",
                 "tsx",
                 // Web
-                "html", "css", "scss", "less", "sql",
+                "html",
+                "css",
+                "scss",
+                "less",
+                "sql",
                 // Shell
-                "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd",
+                "sh",
+                "bash",
+                "zsh",
+                "fish",
+                "ps1",
+                "bat",
+                "cmd",
                 // Config
-                "yaml", "yml", "json", "toml", "xml", "cfg", "conf", "ini", "properties", "env",
+                "yaml",
+                "yml",
+                "json",
+                "toml",
+                "xml",
+                "cfg",
+                "conf",
+                "ini",
+                "properties",
+                "env",
                 // Build
-                "gradle", "maven", "pom", "sbt", "cmake", "makefile",
+                "gradle",
+                "maven",
+                "pom",
+                "sbt",
+                "cmake",
+                "makefile",
                 // Other
-                "md", "txt", "r", "m", "perl", "pl", "lua", "dockerfile",
+                "md",
+                "txt",
+                "r",
+                "m",
+                "perl",
+                "pl",
+                "lua",
+                "dockerfile",
             ],
         }
     }
@@ -51,19 +104,14 @@ impl Parser for TextParser {
 
     fn parse(&self, content: &[u8], file_path: &str) -> Result<ParsedContent, ParseError> {
         // Convert bytes to UTF-8 string
-        let text =
-            String::from_utf8(content.to_vec()).map_err(|_| ParseError::InvalidUtf8)?;
+        let text = String::from_utf8(content.to_vec()).map_err(|_| ParseError::InvalidUtf8)?;
 
         // Additional binary check (null bytes in text)
         if text.contains('\0') {
             return Err(ParseError::BinaryFile(file_path.to_string()));
         }
 
-        Ok(ParsedContent {
-            text,
-            metadata: None,
-            mime_type: "text/plain".to_string(),
-        })
+        Ok(ParsedContent { text, metadata: None, mime_type: "text/plain".to_string() })
     }
 
     fn priority(&self) -> i32 {

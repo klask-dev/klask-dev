@@ -41,21 +41,15 @@ impl ParserDispatcher {
     /// # Returns
     /// * `Some(Arc<dyn Parser>)` - Parser that can handle this content
     /// * `None` - No parser found
-    pub fn find_parser(
-        &self,
-        content: &[u8],
-        extension: Option<&str>,
-    ) -> Option<Arc<dyn Parser>> {
+    pub fn find_parser(&self, content: &[u8], extension: Option<&str>) -> Option<Arc<dyn Parser>> {
         // 1. Try MIME detection first
         let mime_type = detect(content);
         let kind = mime_type.kind();
+        let detected_mime_str = mime_type.mime();
 
         // Check if we detected a meaningful kind (not UNKNOWN)
         if kind != MimeKind::UNKNOWN {
-            debug!(
-                "Detected MIME kind: {:?} for extension: {:?}",
-                kind, extension
-            );
+            debug!("Detected MIME kind: {:?} for extension: {:?}", kind, extension);
 
             for parser in &self.parsers {
                 if parser.supported_kinds().iter().any(|k| kind.contains(*k)) {
@@ -63,32 +57,35 @@ impl ParserDispatcher {
                     return Some(parser.clone());
                 }
             }
+
+            // MIME type detected but no parser available - log this important info
+            warn!(
+                "MIME type detected but no parser available - extension: {:?}, MIME: {}, kind: {:?}",
+                extension, detected_mime_str, kind
+            );
         }
 
         // 2. Fallback to extension-based matching
         if let Some(ext) = extension {
             let ext_lower = ext.to_lowercase();
             for parser in &self.parsers {
-                if parser
-                    .supported_extensions()
-                    .iter()
-                    .any(|e| e.to_lowercase() == ext_lower)
-                {
-                    debug!(
-                        "Selected parser '{}' based on extension '{}'",
-                        parser.name(),
-                        ext
-                    );
+                if parser.supported_extensions().iter().any(|e| e.to_lowercase() == ext_lower) {
+                    debug!("Selected parser '{}' based on extension '{}'", parser.name(), ext);
                     return Some(parser.clone());
                 }
             }
         }
 
-        warn!(
-            "No parser found for extension: {:?}, content length: {}",
-            extension,
-            content.len()
-        );
+        // No parser found at all
+        if kind != MimeKind::UNKNOWN {
+            // Already logged above
+        } else {
+            debug!(
+                "No parser found and no MIME type detected for extension: {:?}, content length: {}",
+                extension,
+                content.len()
+            );
+        }
         None
     }
 
@@ -102,17 +99,10 @@ impl ParserDispatcher {
     /// # Returns
     /// * `Ok(ParsedContent)` - Successfully parsed content
     /// * `Err(ParseError)` - Failed to parse or no parser found
-    pub fn parse(
-        &self,
-        content: &[u8],
-        file_path: &str,
-        extension: Option<&str>,
-    ) -> Result<ParsedContent, ParseError> {
+    pub fn parse(&self, content: &[u8], file_path: &str, extension: Option<&str>) -> Result<ParsedContent, ParseError> {
         match self.find_parser(content, extension) {
             Some(parser) => parser.parse(content, file_path),
-            None => Err(ParseError::UnsupportedType(
-                extension.unwrap_or("unknown").to_string(),
-            )),
+            None => Err(ParseError::UnsupportedType(extension.unwrap_or("unknown").to_string())),
         }
     }
 
@@ -133,18 +123,12 @@ impl ParserDispatcher {
     /// Get all supported MIME kinds across all parsers
     #[allow(dead_code)] // Will be used in the future
     pub fn all_supported_kinds(&self) -> Vec<MimeKind> {
-        self.parsers
-            .iter()
-            .flat_map(|p| p.supported_kinds().iter().copied())
-            .collect()
+        self.parsers.iter().flat_map(|p| p.supported_kinds().iter().copied()).collect()
     }
 
     /// Get all supported extensions across all parsers
     pub fn all_supported_extensions(&self) -> Vec<&'static str> {
-        self.parsers
-            .iter()
-            .flat_map(|p| p.supported_extensions().iter().copied())
-            .collect()
+        self.parsers.iter().flat_map(|p| p.supported_extensions().iter().copied()).collect()
     }
 }
 
