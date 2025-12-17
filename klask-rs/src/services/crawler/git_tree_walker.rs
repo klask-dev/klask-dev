@@ -1,6 +1,7 @@
-use anyhow::{Result, anyhow};
-use gix::ObjectId;
+use crate::services::parser::{ParsedContent, PARSER_DISPATCHER};
+use anyhow::{anyhow, Result};
 use gix::bstr::ByteSlice;
+use gix::ObjectId;
 use tracing::{debug, info};
 
 /// Maximum file size to process (10MB)
@@ -52,13 +53,61 @@ impl GitTreeWalker {
         Ok(obj.data.len() as u64 <= MAX_FILE_SIZE)
     }
 
-    /// Read the content of a blob as a UTF-8 string
+    /// Read blob content as raw bytes
+    pub fn read_blob_bytes(repo: &gix::Repository, oid: &ObjectId) -> Result<Vec<u8>> {
+        let obj = repo.find_object(*oid)?;
+        let blob = obj
+            .try_into_blob()
+            .map_err(|_| anyhow!("Object is not a blob"))?;
+        Ok(blob.data.to_vec())
+    }
+
+    /// Read and parse blob content, returning searchable text
+    pub fn read_and_parse_blob(
+        repo: &gix::Repository,
+        oid: &ObjectId,
+        file_path: &str,
+    ) -> Result<Option<ParsedContent>> {
+        let bytes = Self::read_blob_bytes(repo, oid)?;
+
+        let extension = std::path::Path::new(file_path)
+            .extension()
+            .and_then(|e| e.to_str());
+
+        match PARSER_DISPATCHER.parse(&bytes, file_path, extension) {
+            Ok(content) => {
+                debug!(
+                    "[BLOB] Successfully parsed blob {} ({} bytes) -> {} chars of text",
+                    oid,
+                    bytes.len(),
+                    content.text.len()
+                );
+                Ok(Some(content))
+            }
+            Err(e) => {
+                debug!("Failed to parse {}: {}", file_path, e);
+                Ok(None)
+            }
+        }
+    }
+
+    /// Read the content of a blob as a UTF-8 string (DEPRECATED - use read_and_parse_blob)
+    #[deprecated(
+        since = "2.0.0",
+        note = "Use read_and_parse_blob instead for better parser support"
+    )]
+    #[allow(dead_code)] // Kept for backward compatibility
     pub fn read_blob_content(repo: &gix::Repository, oid: &ObjectId) -> Result<Option<String>> {
         let obj = repo.find_object(*oid)?;
-        let blob = obj.try_into_blob().map_err(|_| anyhow!("Object is not a blob"))?;
+        let blob = obj
+            .try_into_blob()
+            .map_err(|_| anyhow!("Object is not a blob"))?;
 
         let blob_size = blob.data.len();
-        debug!("[BLOB] Attempting to read blob {} ({} bytes)", oid, blob_size);
+        debug!(
+            "[BLOB] Attempting to read blob {} ({} bytes)",
+            oid, blob_size
+        );
 
         // Try to convert to UTF-8 string
         match String::from_utf8(blob.data.to_vec()) {

@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
             db
         }
         Err(e) => {
-            error!("Failed to connect to database: {}", e);
+            error!("Failed to connect to database {}: {}", config.database.url, e);
             info!("Continuing without database connection for development");
             // For development, we'll create a dummy database
             return Err(e);

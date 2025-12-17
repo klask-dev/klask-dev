@@ -2584,6 +2584,7 @@ dependencies = [
  "gix",
  "httpmock",
  "jsonwebtoken",
+ "mimetype-detector",
  "once_cell",
  "rand 0.9.2",
  "regex",
@@ -2797,6 +2798,12 @@ dependencies = [
  "mime",
  "unicase",
 ]
+
+[[package]]
+name = "mimetype-detector"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b83f5a6e7ff630835b32ab51746126908b2ad30aa8cad2836df2803c418aabb0"
 
 [[package]]
 name = "minimal-lexical"

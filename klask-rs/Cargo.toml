@@ -70,8 +70,13 @@ sha2 = "0.10"
 # Lazy initialization
 once_cell = "1.20"
 
+# MIME type detection
+mimetype-detector = "0.3"
+
 [features]
 test-utils = []
+pdf-parser = []
+docx-parser = []
 
 [dev-dependencies]
 # Testing

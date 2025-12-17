@@ -311,12 +311,12 @@ impl BranchProcessor {
                 continue;
             }
 
-            // Read file content from Git database
+            // Read and parse file content from Git database
             let repo_path_for_task = repo_path_owned.clone();
             let oid = file_entry.oid;
             let path = file_entry.path.clone();
 
-            let content_result = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
+            let content_result = tokio::task::spawn_blocking(move || -> Result<Option<crate::services::parser::ParsedContent>> {
                 let git_repo = gix::open(&repo_path_for_task)?;
 
                 // Check file size first
@@ -325,18 +325,18 @@ impl BranchProcessor {
                     return Ok(None);
                 }
 
-                // Read the content
-                let result = GitTreeWalker::read_blob_content(&git_repo, &oid);
+                // Read and parse the content
+                let result = GitTreeWalker::read_and_parse_blob(&git_repo, &oid, &path);
                 match &result {
                     Ok(Some(content)) => {
                         debug!(
-                            "[GIT] Successfully read blob for file {} ({} bytes)",
+                            "[GIT] Successfully parsed blob for file {} ({} bytes of text)",
                             path,
-                            content.len()
+                            content.text.len()
                         );
                     }
                     Ok(None) => {
-                        debug!("[GIT] Blob returned None (likely binary) for file {}", path);
+                        debug!("[GIT] Blob returned None (unsupported or binary) for file {}", path);
                     }
                     Err(e) => {
                         debug!("[GIT] Failed to read blob for file {}: {}", path, e);
@@ -624,34 +624,7 @@ impl BranchProcessor {
 
     /// Check if a file is supported for indexing based on its extension or name
     fn is_supported_file_static(file_path: &Path) -> bool {
-        use super::file_processing::SUPPORTED_EXTENSIONS;
-
-        if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
-            SUPPORTED_EXTENSIONS.contains(&extension.to_lowercase().as_str())
-        } else {
-            // Support files without extensions that might be scripts or config files
-            if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-                matches!(
-                    file_name.to_lowercase().as_str(),
-                    "dockerfile"
-                        | "makefile"
-                        | "rakefile"
-                        | "gemfile"
-                        | "vagrantfile"
-                        | "procfile"
-                        | "readme"
-                        | "license"
-                        | "changelog"
-                        | "authors"
-                        | "contributors"
-                        | "copying"
-                        | "install"
-                        | "news"
-                        | "todo"
-                )
-            } else {
-                false
-            }
-        }
+        // Use the FileProcessor's is_supported_file which now uses PARSER_DISPATCHER
+        super::file_processing::FileProcessor::is_supported_file(file_path)
     }
 }

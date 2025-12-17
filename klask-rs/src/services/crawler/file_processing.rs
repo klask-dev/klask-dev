@@ -1,4 +1,5 @@
 use crate::models::{Repository, RepositoryType};
+use crate::services::parser::{ParsedContent, PARSER_DISPATCHER};
 use crate::services::search::{FileData, SearchService};
 use anyhow::Result;
 use sha2::{Digest, Sha256};
@@ -6,70 +7,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{debug, error};
 use uuid::Uuid;
-
-/// Supported file extensions for indexing
-pub const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "rs",
-    "py",
-    "js",
-    "ts",
-    "java",
-    "c",
-    "cpp",
-    "h",
-    "hpp",
-    "go",
-    "rb",
-    "php",
-    "cs",
-    "swift",
-    "kt",
-    "scala",
-    "clj",
-    "hs",
-    "ml",
-    "fs",
-    "elm",
-    "dart",
-    "vue",
-    "jsx",
-    "tsx",
-    "html",
-    "css",
-    "scss",
-    "less",
-    "sql",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "ps1",
-    "bat",
-    "cmd",
-    "dockerfile",
-    "yaml",
-    "yml",
-    "json",
-    "toml",
-    "xml",
-    "md",
-    "txt",
-    "cfg",
-    "conf",
-    "ini",
-    "properties",
-    "gradle",
-    "maven",
-    "pom",
-    "sbt",
-    "cmake",
-    "makefile",
-    "r",
-    "m",
-    "perl",
-    "pl",
-    "lua",
-];
 
 /// File processing utilities for the crawler
 #[derive(Clone)]
@@ -120,7 +57,7 @@ impl FileProcessor {
 
     /// Process a single file and index it in the search service
     ///
-    /// If `provided_content` is Some, it will be used directly instead of reading from disk.
+    /// If `provided_content` is Some, it will be used directly instead of reading and parsing from disk.
     /// This is useful when reading from Git trees without checking out files.
     pub async fn process_single_file(
         &self,
@@ -129,26 +66,16 @@ impl FileProcessor {
         relative_path: &str,
         branch_name: &str,
         parent_project_name: Option<&str>,
-        provided_content: Option<String>,
+        provided_content: Option<ParsedContent>,
     ) -> Result<()> {
-        // Read file content - use provided content if available, otherwise read from disk
-        let content = if let Some(content) = provided_content {
+        // Get parsed content - use provided content if available, otherwise read and parse from disk
+        let parsed_content = if let Some(content) = provided_content {
             debug!(
                 "[GIT READ] Processing file {} in branch '{}' from Git (provided content: {} bytes)",
                 relative_path,
                 branch_name,
-                content.len()
+                content.text.len()
             );
-
-            // Skip binary files or files with invalid UTF-8
-            if content.chars().any(|c| c == '\0') {
-                debug!(
-                    "[GIT READ] Skipping binary file (contains null bytes): {}",
-                    relative_path
-                );
-                return Ok(());
-            }
-
             Some(content)
         } else {
             debug!(
@@ -156,28 +83,33 @@ impl FileProcessor {
                 relative_path, branch_name
             );
 
-            // Read from disk
-            match tokio::fs::read_to_string(file_path).await {
-                Ok(content) => {
-                    // Skip binary files or files with invalid UTF-8
-                    if content.chars().any(|c| c == '\0') {
-                        debug!(
-                            "[DISK READ] Skipping binary file (contains null bytes): {}",
-                            relative_path
-                        );
-                        return Ok(());
-                    }
+            // Read and parse from disk
+            match tokio::fs::read(file_path).await {
+                Ok(bytes) => {
+                    let extension = file_path.extension().and_then(|e| e.to_str());
 
-                    debug!(
-                        "[DISK READ] Successfully read file {} ({} bytes)",
-                        relative_path,
-                        content.len()
-                    );
-                    Some(content)
+                    match PARSER_DISPATCHER.parse(&bytes, relative_path, extension) {
+                        Ok(parsed) => {
+                            debug!(
+                                "[DISK READ] Successfully parsed file {} ({} bytes -> {} chars)",
+                                relative_path,
+                                bytes.len(),
+                                parsed.text.len()
+                            );
+                            Some(parsed)
+                        }
+                        Err(e) => {
+                            debug!(
+                                "[DISK READ] Skipping file {}: {}",
+                                relative_path, e
+                            );
+                            None
+                        }
+                    }
                 }
                 Err(e) => {
                     debug!(
-                        "[DISK READ] Could not read file as UTF-8: {} - Error: {}",
+                        "[DISK READ] Could not read file: {} - Error: {}",
                         relative_path, e
                     );
                     None
@@ -189,8 +121,8 @@ impl FileProcessor {
 
         let file_name = file_path.file_name().and_then(|name| name.to_str()).unwrap_or("").to_string();
 
-        // Index in Tantivy search engine if content is available
-        if let Some(content) = content {
+        // Index in Tantivy search engine if parsed content is available
+        if let Some(parsed) = parsed_content {
             // Generate a deterministic ID for Tantivy indexing to prevent duplicates
             let file_id = Self::generate_deterministic_file_id(repository, relative_path, branch_name);
             let version = branch_name.to_string();
@@ -211,12 +143,12 @@ impl FileProcessor {
                     file_id,
                     file_name: &file_name,
                     file_path: relative_path,
-                    content: &content,
+                    content: &parsed.text,
                     repository: repository_field, // Parent repository for mass deletion
                     project: &repository.name,    // Individual project name for facets
                     version: &version,
                     extension: &extension,
-                    size: content.len() as u64, // Calculate size from content length
+                    size: parsed.text.len() as u64, // Calculate size from content length
                 })
                 .await
             {
@@ -239,35 +171,43 @@ impl FileProcessor {
         Ok(())
     }
 
-    /// Check if a file is supported for indexing based on its extension or name
-    #[allow(dead_code)]
+    /// Check if a file is supported for indexing based on extension
+    /// Note: This does a lightweight check based on extension only.
+    /// Actual MIME detection happens during parsing.
     pub fn is_supported_file(file_path: &Path) -> bool {
-        if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
-            SUPPORTED_EXTENSIONS.contains(&extension.to_lowercase().as_str())
+        let extension = file_path.extension().and_then(|ext| ext.to_str());
+
+        // Check if any parser supports this extension
+        if let Some(ext) = extension {
+            let ext_lower = ext.to_lowercase();
+            return PARSER_DISPATCHER
+                .all_supported_extensions()
+                .iter()
+                .any(|e| e.to_lowercase() == ext_lower);
+        }
+
+        // Support well-known extensionless files
+        if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
+            matches!(
+                file_name.to_lowercase().as_str(),
+                "dockerfile"
+                    | "makefile"
+                    | "rakefile"
+                    | "gemfile"
+                    | "vagrantfile"
+                    | "procfile"
+                    | "readme"
+                    | "license"
+                    | "changelog"
+                    | "authors"
+                    | "contributors"
+                    | "copying"
+                    | "install"
+                    | "news"
+                    | "todo"
+            )
         } else {
-            // Support files without extensions that might be scripts or config files
-            if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-                matches!(
-                    file_name.to_lowercase().as_str(),
-                    "dockerfile"
-                        | "makefile"
-                        | "rakefile"
-                        | "gemfile"
-                        | "vagrantfile"
-                        | "procfile"
-                        | "readme"
-                        | "license"
-                        | "changelog"
-                        | "authors"
-                        | "contributors"
-                        | "copying"
-                        | "install"
-                        | "news"
-                        | "todo"
-                )
-            } else {
-                false
-            }
+            false
         }
     }
 
