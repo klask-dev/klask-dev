@@ -171,18 +171,20 @@ impl FileProcessor {
     /// Returns false only for files we're confident are binary or should be skipped.
     pub fn is_supported_file(file_path: &Path) -> bool {
         let extension = file_path.extension().and_then(|ext| ext.to_str());
+        let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
 
         // Check if any parser supports this extension
         if let Some(ext) = extension {
             let ext_lower = ext.to_lowercase();
             if PARSER_DISPATCHER.all_supported_extensions().iter().any(|e| e.to_lowercase() == ext_lower) {
+                debug!("[is_supported_file] {} - ACCEPTED (known extension: {})", file_name, ext);
                 return true;
             }
         }
 
         // Support well-known extensionless files
-        if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-            let file_name_lower = file_name.to_lowercase();
+        if let Some(file_name_str) = file_path.file_name().and_then(|name| name.to_str()) {
+            let file_name_lower = file_name_str.to_lowercase();
             if matches!(
                 file_name_lower.as_str(),
                 "dockerfile"
@@ -201,6 +203,7 @@ impl FileProcessor {
                     | "news"
                     | "todo"
             ) {
+                debug!("[is_supported_file] {} - ACCEPTED (well-known name)", file_name);
                 return true;
             }
         }
@@ -217,15 +220,26 @@ impl FileProcessor {
                 let mime_type = mimetype_detector::detect(sample);
                 let kind = mime_type.kind();
 
+                debug!(
+                    "[is_supported_file] {} - unknown extension {:?}, detected MIME: {}, kind: {:?}",
+                    file_name,
+                    extension,
+                    mime_type.mime(),
+                    kind
+                );
+
                 // Accept if detected as text
                 if kind.contains(MimeKind::TEXT) {
-                    debug!(
-                        "File {} has unknown extension but detected as TEXT MIME kind, accepting for parsing",
-                        file_path.display()
-                    );
+                    debug!("[is_supported_file] {} - ACCEPTED (TEXT MIME kind detected)", file_name);
                     return true;
                 }
+
+                debug!("[is_supported_file] {} - REJECTED (not TEXT kind)", file_name);
+            } else {
+                debug!("[is_supported_file] {} - REJECTED (could not read file)", file_name);
             }
+        } else {
+            debug!("[is_supported_file] {} - REJECTED (no extension, not well-known name)", file_name);
         }
 
         false
@@ -262,5 +276,107 @@ impl FileProcessor {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_mime_detection_for_tpl_template() {
+        let tpl_content = b"{{ .Title }}\n{{ range .Items }}\n  <li>{{ . }}</li>\n{{ end }}";
+        let mime_type = mimetype_detector::detect(tpl_content);
+        let kind = mime_type.kind();
+
+        println!("\n[DEBUG] TPL Template MIME Detection:");
+        println!("  MIME: {}", mime_type.mime());
+        println!("  Kind: {:?}", kind);
+        println!("  Contains TEXT: {}", kind.contains(MimeKind::TEXT));
+        println!("  Contains DOCUMENT: {}", kind.contains(MimeKind::DOCUMENT));
+        println!("  TEXT contains kind: {}", MimeKind::TEXT.contains(kind));
+        println!("  DOCUMENT contains kind: {}", MimeKind::DOCUMENT.contains(kind));
+    }
+
+    #[test]
+    fn test_is_supported_file_with_tpl_extension() {
+        // Create a temporary .tpl file
+        let test_file = "/tmp/test_helpers.tpl";
+        let tpl_content = "{{ .Title }}\n{{ range .Items }}\n  <li>{{ . }}</li>\n{{ end }}";
+        fs::write(test_file, tpl_content).unwrap();
+
+        let path = Path::new(test_file);
+
+        // Also test the MIME detection directly
+        let bytes = fs::read(test_file).unwrap();
+        let mime_type = mimetype_detector::detect(&bytes);
+        println!("\n[TEST] _helpers.tpl file:");
+        println!("  MIME: {}", mime_type.mime());
+        println!("  Kind: {:?}", mime_type.kind());
+
+        let result = FileProcessor::is_supported_file(path);
+
+        println!("  is_supported_file result: {}", result);
+
+        // Clean up
+        let _ = fs::remove_file(test_file);
+
+        assert!(result, "File with .tpl extension should be supported as TEXT");
+    }
+
+    #[test]
+    fn test_is_supported_file_with_real_helpers_tpl() {
+        // Use the actual content from klask's _helpers.tpl
+        let real_tpl_content = r#"{{/*
+Expand the name of the chart.
+*/}}
+{{- define "klask.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create chart name and version
+*/}}
+{{- define "klask.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}"#;
+
+        let test_file = "/tmp/test_real_helpers.tpl";
+        fs::write(test_file, real_tpl_content).unwrap();
+
+        let path = Path::new(test_file);
+
+        // Check MIME detection
+        let bytes = fs::read(test_file).unwrap();
+        let mime_type = mimetype_detector::detect(&bytes);
+        println!("\n[TEST] Real _helpers.tpl file:");
+        println!("  MIME: {}", mime_type.mime());
+        println!("  Kind: {:?}", mime_type.kind());
+        println!("  Contains TEXT: {}", mime_type.kind().contains(MimeKind::TEXT));
+
+        let result = FileProcessor::is_supported_file(path);
+        println!("  is_supported_file result: {}", result);
+
+        // Clean up
+        let _ = fs::remove_file(test_file);
+
+        assert!(result, "Real _helpers.tpl should be supported");
+    }
+
+    #[test]
+    fn test_is_supported_file_with_known_extension() {
+        let test_file = "/tmp/test_file.rs";
+        fs::write(test_file, "fn main() {}").unwrap();
+
+        let path = Path::new(test_file);
+        let result = FileProcessor::is_supported_file(path);
+
+        println!("[TEST] is_supported_file for .rs file: {}", result);
+
+        // Clean up
+        let _ = fs::remove_file(test_file);
+
+        assert!(result, "File with .rs extension should be supported");
     }
 }
