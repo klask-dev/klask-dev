@@ -1,3 +1,4 @@
+use super::binary_parser::BinaryParser;
 use super::text_parser::TextParser;
 use super::{ParseError, ParsedContent, Parser};
 use mimetype_detector::{detect, kind::MimeKind};
@@ -7,6 +8,43 @@ use tracing::{debug, warn};
 
 /// Global parser dispatcher
 pub static PARSER_DISPATCHER: Lazy<ParserDispatcher> = Lazy::new(ParserDispatcher::new);
+
+/// Format MimeKind flags for readable logging
+fn format_mime_kind(kind: MimeKind) -> String {
+    let mut kinds = Vec::new();
+    if kind.contains(MimeKind::TEXT) {
+        kinds.push("TEXT");
+    }
+    if kind.contains(MimeKind::APPLICATION) {
+        kinds.push("APPLICATION");
+    }
+    if kind.contains(MimeKind::IMAGE) {
+        kinds.push("IMAGE");
+    }
+    if kind.contains(MimeKind::AUDIO) {
+        kinds.push("AUDIO");
+    }
+    if kind.contains(MimeKind::VIDEO) {
+        kinds.push("VIDEO");
+    }
+    if kind.contains(MimeKind::DOCUMENT) {
+        kinds.push("DOCUMENT");
+    }
+    if kind.contains(MimeKind::ARCHIVE) {
+        kinds.push("ARCHIVE");
+    }
+    if kind.contains(MimeKind::FONT) {
+        kinds.push("FONT");
+    }
+    if kind.contains(MimeKind::EXECUTABLE) {
+        kinds.push("EXECUTABLE");
+    }
+    if kind.contains(MimeKind::UNKNOWN) {
+        kinds.push("UNKNOWN");
+    }
+
+    if kinds.is_empty() { "UNKNOWN".to_string() } else { kinds.join("|") }
+}
 
 /// Dispatcher for managing file parsers
 pub struct ParserDispatcher {
@@ -18,6 +56,9 @@ impl ParserDispatcher {
     pub fn new() -> Self {
         let mut parsers: Vec<Arc<dyn Parser>> = vec![
             // Register built-in parsers
+            // Binary parser first - rejects known binary extensions
+            Arc::new(BinaryParser::new()),
+            // Text parser handles text/code files
             Arc::new(TextParser::new()),
             // Future: Feature-gated parsers
             // #[cfg(feature = "pdf-parser")]
@@ -45,7 +86,6 @@ impl ParserDispatcher {
         // 1. Try MIME detection first
         let mime_type = detect(content);
         let kind = mime_type.kind();
-        let detected_mime_str = mime_type.mime();
 
         // Check if we detected a meaningful kind (not UNKNOWN)
         if kind != MimeKind::UNKNOWN {
@@ -57,12 +97,6 @@ impl ParserDispatcher {
                     return Some(parser.clone());
                 }
             }
-
-            // MIME type detected but no parser available - log this important info
-            warn!(
-                "MIME type detected but no parser available - extension: {:?}, MIME: {}, kind: {:?}",
-                extension, detected_mime_str, kind
-            );
         }
 
         // 2. Fallback to extension-based matching
@@ -76,16 +110,22 @@ impl ParserDispatcher {
             }
         }
 
-        // No parser found at all
-        if kind != MimeKind::UNKNOWN {
-            // Already logged above
-        } else {
-            debug!(
-                "No parser found and no MIME type detected for extension: {:?}, content length: {}",
-                extension,
-                content.len()
-            );
+        // 3. Ultimate fallback: for files without extension (like LICENSE, README),
+        // try TextParser to see if it can parse as text
+        if extension.is_none() {
+            // Find TextParser by name
+            if let Some(text_parser) = self.parsers.iter().find(|p| p.name() == "text") {
+                debug!("No extension found, attempting TextParser as fallback for potential text file");
+                return Some(text_parser.clone());
+            }
         }
+
+        // No parser found
+        debug!(
+            "No parser found for extension: {:?}, content length: {}",
+            extension,
+            content.len()
+        );
         None
     }
 
@@ -102,7 +142,19 @@ impl ParserDispatcher {
     pub fn parse(&self, content: &[u8], file_path: &str, extension: Option<&str>) -> Result<ParsedContent, ParseError> {
         match self.find_parser(content, extension) {
             Some(parser) => parser.parse(content, file_path),
-            None => Err(ParseError::UnsupportedType(extension.unwrap_or("unknown").to_string())),
+            None => {
+                // Log with file_path for debugging
+                let mime_type = detect(content);
+                warn!(
+                    "No parser found for file '{}' - extension: {:?}, MIME: {}, kind: {}, size: {} bytes",
+                    file_path,
+                    extension,
+                    mime_type.mime(),
+                    format_mime_kind(mime_type.kind()),
+                    content.len()
+                );
+                Err(ParseError::UnsupportedType(extension.unwrap_or("unknown").to_string()))
+            }
         }
     }
 
@@ -113,11 +165,18 @@ impl ParserDispatcher {
     /// * `extension` - Optional file extension
     ///
     /// # Returns
-    /// * `true` - At least one parser can handle this content
-    /// * `false` - No parser found
+    /// * `true` - At least one parser can PARSE this content (extract text)
+    /// * `false` - No text parser found (binary files return false)
     #[allow(dead_code)] // Used in tests, may be used in future
     pub fn is_supported(&self, content: &[u8], extension: Option<&str>) -> bool {
-        self.find_parser(content, extension).is_some()
+        // Only consider parseable (non-binary) parsers
+        // BinaryParser (priority 100) rejects; TextParser (priority -10) accepts text
+        if let Some(parser) = self.find_parser(content, extension) {
+            // Check if it's the binary parser (returns BinaryFile errors)
+            parser.name() != "binary"
+        } else {
+            false
+        }
     }
 
     /// Get all supported MIME kinds across all parsers
@@ -126,9 +185,24 @@ impl ParserDispatcher {
         self.parsers.iter().flat_map(|p| p.supported_kinds().iter().copied()).collect()
     }
 
-    /// Get all supported extensions across all parsers
-    pub fn all_supported_extensions(&self) -> Vec<&'static str> {
-        self.parsers.iter().flat_map(|p| p.supported_extensions().iter().copied()).collect()
+    /// Get all text/parseable extensions (excluding binary parser extensions)
+    /// Use this for file filtering to accept known text files
+    pub fn all_text_extensions(&self) -> Vec<&'static str> {
+        self.parsers
+            .iter()
+            .filter(|p| p.name() != "binary")
+            .flat_map(|p| p.supported_extensions().iter().copied())
+            .collect()
+    }
+
+    /// Get all binary extensions (from binary parser only)
+    /// Use this for file filtering to reject known binary files
+    pub fn all_binary_extensions(&self) -> Vec<&'static str> {
+        self.parsers
+            .iter()
+            .filter(|p| p.name() == "binary")
+            .flat_map(|p| p.supported_extensions().iter().copied())
+            .collect()
     }
 }
 
@@ -162,12 +236,14 @@ mod tests {
     }
 
     #[test]
-    fn test_dispatcher_rejects_unsupported() {
+    fn test_dispatcher_rejects_binary_files() {
         let dispatcher = ParserDispatcher::new();
-        let content = b"%PDF-1.4";
-        let result = dispatcher.parse(content, "doc.pdf", Some("pdf"));
+        // JPG is recognized as binary and rejected by BinaryParser
+        let content = b"\xFF\xD8\xFF\xE0"; // JPG header
+        let result = dispatcher.parse(content, "image.jpg", Some("jpg"));
         assert!(result.is_err());
-        assert!(matches!(result, Err(ParseError::UnsupportedType(_))));
+        // BinaryParser rejects with BinaryFile error
+        assert!(matches!(result, Err(ParseError::BinaryFile(_))));
     }
 
     #[test]
@@ -182,11 +258,26 @@ mod tests {
     }
 
     #[test]
-    fn test_dispatcher_all_supported_extensions() {
+    fn test_dispatcher_all_text_extensions() {
         let dispatcher = ParserDispatcher::new();
-        let extensions = dispatcher.all_supported_extensions();
+        let extensions = dispatcher.all_text_extensions();
         assert!(extensions.contains(&"rs"));
         assert!(extensions.contains(&"py"));
         assert!(extensions.contains(&"js"));
+        // Binary extensions should NOT be in text extensions
+        assert!(!extensions.contains(&"png"));
+        assert!(!extensions.contains(&"jpg"));
+    }
+
+    #[test]
+    fn test_dispatcher_all_binary_extensions() {
+        let dispatcher = ParserDispatcher::new();
+        let extensions = dispatcher.all_binary_extensions();
+        assert!(extensions.contains(&"png"));
+        assert!(extensions.contains(&"jpg"));
+        assert!(extensions.contains(&"exe"));
+        // Text extensions should NOT be in binary extensions
+        assert!(!extensions.contains(&"rs"));
+        assert!(!extensions.contains(&"py"));
     }
 }

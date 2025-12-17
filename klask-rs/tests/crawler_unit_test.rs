@@ -32,6 +32,7 @@ async fn test_supported_file_extensions() -> Result<()> {
         "README.md",
         "Dockerfile",
         "Makefile",
+        "LICENCE",
         "package.json",
     ];
 

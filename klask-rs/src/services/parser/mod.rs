@@ -1,3 +1,4 @@
+mod binary_parser;
 mod dispatcher;
 mod error;
 mod text_parser;

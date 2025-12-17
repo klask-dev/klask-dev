@@ -165,23 +165,46 @@ impl FileProcessor {
         Ok(())
     }
 
-    /// Check if a file is supported for indexing based on extension or MIME detection
-    /// This performs a quick check: extension first, then MIME detection as fallback.
-    /// Returns false only for files we're confident are binary or should be skipped.
+    /// Check if a file is supported for indexing based on extension or name
+    /// This performs a lightweight check using extension-based filtering:
+    /// 1. Accepts known text/code extensions
+    /// 2. Rejects known binary extensions (jpg, png, exe, zip, etc.)
+    /// 3. Tentatively accepts unknown extensions (MIME check happens during parsing)
     pub fn is_supported_file(file_path: &Path) -> bool {
         let extension = file_path.extension().and_then(|ext| ext.to_str());
         let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
 
-        // Check if any parser supports this extension
+        // Check extension
         if let Some(ext) = extension {
             let ext_lower = ext.to_lowercase();
-            if PARSER_DISPATCHER.all_supported_extensions().iter().any(|e| e.to_lowercase() == ext_lower) {
+
+            // 1. Check if it's a known parseable extension (text, code, config, etc.)
+            // Note: Use all_text_extensions() to exclude binary parser extensions
+            if PARSER_DISPATCHER.all_text_extensions().iter().any(|e| e.to_lowercase() == ext_lower) {
                 debug!(
-                    "[is_supported_file] {} - ACCEPTED (known extension: {})",
+                    "[is_supported_file] {} - ACCEPTED (known text extension: {})",
                     file_name, ext
                 );
                 return true;
             }
+
+            // 2. Check if it's a known binary extension - reject immediately
+            // This avoids wasting time trying to parse images, executables, etc.
+            if PARSER_DISPATCHER.all_binary_extensions().iter().any(|be| be.to_lowercase() == ext_lower) {
+                debug!(
+                    "[is_supported_file] {} - REJECTED (known binary extension: {})",
+                    file_name, ext
+                );
+                return false;
+            }
+
+            // 3. Unknown extension - tentatively accept
+            // MIME detection during parsing will determine if parseable
+            debug!(
+                "[is_supported_file] {} - TENTATIVELY ACCEPTED (unknown extension: {}, will check during parsing)",
+                file_name, ext
+            );
+            return true;
         }
 
         // Support well-known extensionless files
@@ -208,18 +231,6 @@ impl FileProcessor {
                 debug!("[is_supported_file] {} - ACCEPTED (well-known name)", file_name);
                 return true;
             }
-        }
-
-        // For files with unknown extensions, tentatively accept them.
-        // MIME detection will happen during parsing to determine if they're actually parseable.
-        // This allows text files like "_helpers.tpl" to be processed without requiring I/O
-        // on potentially non-existent filesystem paths (e.g., during Git crawl).
-        if extension.is_some() {
-            debug!(
-                "[is_supported_file] {} - TENTATIVELY ACCEPTED (unknown extension {:?}, will check MIME during parsing)",
-                file_name, extension
-            );
-            return true;
         }
 
         debug!(

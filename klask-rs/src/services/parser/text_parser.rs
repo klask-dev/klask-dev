@@ -69,6 +69,11 @@ impl TextParser {
                 "sbt",
                 "cmake",
                 "makefile",
+                // Infrastructure as Code
+                "tf",
+                "hcl",
+                // localization
+                "po",
                 // Other
                 "md",
                 "txt",
@@ -78,6 +83,8 @@ impl TextParser {
                 "pl",
                 "lua",
                 "dockerfile",
+                "xsl",
+                "license",
             ],
         }
     }

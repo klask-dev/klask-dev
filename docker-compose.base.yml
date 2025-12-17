@@ -1,13 +1,30 @@
+#
+# Multi-Instance Usage:
+# Launch multiple instances with different ports and data isolation:
+#
+#   # Default instance (for main worktree)
+#   docker compose -f docker-compose.base.yml up -d
+#
+#   # Secondary instance (for additional worktree with -p flag for project isolation)
+#   docker compose -f docker-compose.base.yml -p instance2 --env-file .env.instance2 up -d
+#
+#   # Stop secondary instance
+#   docker compose -f docker-compose.base.yml -p instance2 --env-file .env.instance2 down
+#
+#   # List all postgres containers
+#   docker ps | grep klask-postgres
+#
+
 services:
     db:
         image: postgres:18-alpine
-        container_name: klask-postgres-dev
+        container_name: ${INSTANCE_NAME:-klask-postgres-dev}
         environment:
             POSTGRES_DB: klask_dev
             POSTGRES_USER: klask_user
             POSTGRES_PASSWORD: klask_password
         ports:
-            - "5432:5432"
+            - ${PORT:-5432}:5432
         volumes:
             - postgres_data:/var/lib/postgresql/data
             #- ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
