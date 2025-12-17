@@ -207,7 +207,7 @@ export const SidebarFilters: React.FC<SidebarFiltersProps> = ({
         )}
 
         {/* Options list */}
-        <div className="space-y-1 max-h-48 overflow-y-auto">
+        <div className="space-y-1 max-h-40 overflow-y-auto">
           {sortedOptions.length === 0 ? (
             <div className="text-xs text-gray-400 dark:text-gray-500 px-2 py-1">No matches</div>
           ) : (
