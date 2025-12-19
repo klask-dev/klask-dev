@@ -3,7 +3,6 @@
 /// This module contains all constants used by the parser system for content detection
 /// and file analysis. Centralizing these constants makes it easier to adjust behavior
 /// and understand the thresholds used throughout the parsing system.
-
 /// Maximum number of bytes to analyze when detecting if content is text or binary
 ///
 /// The content detector analyzes the first N bytes of a file to determine if it's
@@ -22,24 +21,18 @@ pub const ANALYSIS_SIZE: usize = 256;
 /// - 90%+: Very confident text (clean UTF-8 or ASCII)
 pub const TEXT_CONFIDENCE_THRESHOLD: u8 = 70;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_constants_are_reasonable() {
-        // ANALYSIS_SIZE should be a reasonable sample size for binary detection
-        assert!(ANALYSIS_SIZE > 0, "ANALYSIS_SIZE must be positive");
-        assert!(ANALYSIS_SIZE < 10000, "ANALYSIS_SIZE should not be too large");
-
-        // TEXT_CONFIDENCE_THRESHOLD should be a valid percentage
-        assert!(
-            TEXT_CONFIDENCE_THRESHOLD <= 100,
-            "TEXT_CONFIDENCE_THRESHOLD must be 0-100"
-        );
-        assert!(
-            TEXT_CONFIDENCE_THRESHOLD >= 50,
-            "TEXT_CONFIDENCE_THRESHOLD should be at least 50"
-        );
-    }
+// Helper macro for compile-time assertions
+#[allow(unused_macros)]
+macro_rules! const_assert {
+    ($cond:expr, $msg:expr) => {
+        const _: () = assert!($cond, $msg);
+    };
 }
+
+// Compile-time validation of constants
+const _: () = {
+    const_assert!(ANALYSIS_SIZE > 0, "ANALYSIS_SIZE must be positive");
+    const_assert!(ANALYSIS_SIZE < 10000, "ANALYSIS_SIZE should not be too large");
+    const_assert!(TEXT_CONFIDENCE_THRESHOLD <= 100, "TEXT_CONFIDENCE_THRESHOLD must be 0-100");
+    const_assert!(TEXT_CONFIDENCE_THRESHOLD >= 50, "TEXT_CONFIDENCE_THRESHOLD should be at least 50");
+};

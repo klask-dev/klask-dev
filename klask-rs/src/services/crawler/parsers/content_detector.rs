@@ -10,6 +10,7 @@ pub enum ContentType {
     /// File is likely binary data
     Binary,
     /// Unable to determine (too few bytes analyzed)
+    #[allow(dead_code)]
     Unknown,
 }
 
@@ -19,6 +20,7 @@ pub struct ContentAnalysis {
     /// Percentage of characters that appear to be text (0-100)
     pub text_confidence: u8,
     /// Number of bytes analyzed
+    #[allow(dead_code)]
     pub bytes_analyzed: usize,
     /// Detailed statistics
     pub stats: CharacterStats,
@@ -37,10 +39,12 @@ pub struct CharacterStats {
 }
 
 impl ContentAnalysis {
+    #[allow(dead_code)]
     pub fn confidence_percentage(&self) -> u8 {
         self.text_confidence
     }
 
+    #[allow(dead_code)]
     pub fn is_likely_text(&self) -> bool {
         self.content_type == ContentType::Text
     }
@@ -102,17 +106,16 @@ pub fn detect_content_type(content: &[u8]) -> ContentAnalysis {
                 stats.text_chars += 1;
 
                 // Skip continuation bytes (10xxxxxx)
-                let mut utf8_bytes = 1;
-                if byte < 224 {
-                    utf8_bytes = 2;
+                let continuation_count = if byte < 224 {
+                    2 // 2-byte sequence
                 } else if byte < 240 {
-                    utf8_bytes = 3;
+                    3 // 3-byte sequence
                 } else {
-                    utf8_bytes = 4;
-                }
+                    4 // 4-byte sequence
+                };
 
                 // Consume continuation bytes
-                for _ in 1..utf8_bytes {
+                for _ in 1..continuation_count {
                     if i + 1 < sample.len() && (sample[i + 1] & 0xC0) == 0x80 {
                         stats.non_ascii_bytes += 1;
                         i += 1;

@@ -89,7 +89,7 @@ impl PlainTextParser {
     pub async fn parse(&self, content: &[u8], _filename: Option<&str>) -> Result<String> {
         // Convert bytes to string
         // If the file contains null bytes (binary data), return error
-        if content.iter().any(|&b| b == 0) {
+        if content.contains(&0) {
             return Err(anyhow::anyhow!("Binary content detected in file (contains null bytes)"));
         }
 

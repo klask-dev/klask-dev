@@ -180,6 +180,7 @@ pub struct SearchService {
     index: Index,
     reader: IndexReader,
     writer: Arc<RwLock<IndexWriter>>,
+    #[allow(dead_code)]
     schema: Schema,
     fields: SearchFields,
     index_dir: std::path::PathBuf,
