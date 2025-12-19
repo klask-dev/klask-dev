@@ -25,7 +25,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files with specific sizes distributed across buckets
-        let test_files = vec![
+        let test_files = [
             ("file1.txt", 512, "small file"),         // < 1 KB (0-1023)
             ("file2.txt", 2048, "medium file"),       // 1 KB - 10 KB
             ("file3.txt", 50000, "large file"),       // 10 KB - 100 KB
@@ -97,7 +97,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Test exact boundary values - all with searchable content
-        let boundary_files = vec![
+        let boundary_files = [
             ("boundary_0.txt", 0, "boundary searchable"),           // 0 bytes - in < 1KB
             ("boundary_1023.txt", 1023, "boundary searchable"),     // Exactly 1023 - in < 1KB
             ("boundary_1024.txt", 1024, "boundary searchable"),     // Exactly 1024 - in 1-10KB
@@ -405,7 +405,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index diverse files
-        let test_data = vec![
+        let test_data = [
             ("repo-a", "v1.0", "rs", 512),   // < 1 KB
             ("repo-a", "v1.0", "rs", 5000),  // 1-10 KB
             ("repo-a", "v1.0", "js", 50000), // 10-100 KB

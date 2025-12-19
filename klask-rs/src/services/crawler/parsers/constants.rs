@@ -33,6 +33,12 @@ macro_rules! const_assert {
 const _: () = {
     const_assert!(ANALYSIS_SIZE > 0, "ANALYSIS_SIZE must be positive");
     const_assert!(ANALYSIS_SIZE < 10000, "ANALYSIS_SIZE should not be too large");
-    const_assert!(TEXT_CONFIDENCE_THRESHOLD <= 100, "TEXT_CONFIDENCE_THRESHOLD must be 0-100");
-    const_assert!(TEXT_CONFIDENCE_THRESHOLD >= 50, "TEXT_CONFIDENCE_THRESHOLD should be at least 50");
+    const_assert!(
+        TEXT_CONFIDENCE_THRESHOLD <= 100,
+        "TEXT_CONFIDENCE_THRESHOLD must be 0-100"
+    );
+    const_assert!(
+        TEXT_CONFIDENCE_THRESHOLD >= 50,
+        "TEXT_CONFIDENCE_THRESHOLD should be at least 50"
+    );
 };

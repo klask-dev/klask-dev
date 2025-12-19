@@ -561,7 +561,7 @@ mod search_repository_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files with different combinations
-        let files = vec![
+        let files = [
             ("repo-a", "v1.0", "rs"),
             ("repo-a", "v1.0", "js"),
             ("repo-a", "v2.0", "rs"),
