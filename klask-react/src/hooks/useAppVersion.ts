@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '../lib/config';
 
 interface VersionInfo {
   version: string;
@@ -51,7 +52,7 @@ export function useAppVersion() {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/version`, {
+        const response = await fetch(`${getApiBaseUrl()}/version`, {
           signal: controller.signal,
         });
 

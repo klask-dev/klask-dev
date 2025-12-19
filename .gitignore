@@ -139,5 +139,6 @@ Desktop.ini
 
 # index of tantivy
 index/
+index2/
 test_upsert_index*
 test_index*

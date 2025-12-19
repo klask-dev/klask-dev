@@ -528,17 +528,23 @@ async fn create_repository(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Encrypt access token if provided
-    let encrypted_token = if let Some(token) = &request.access_token {
-        match app_state.encryption_service.encrypt(token) {
-            Ok(encrypted) => Some(encrypted),
-            Err(e) => {
-                error!("Failed to encrypt access token: {}", e);
-                return Err(StatusCode::INTERNAL_SERVER_ERROR);
-            }
+    // Encrypt access token
+    // For FileSystem repositories, use empty string; for others, use provided token
+    let token_to_encrypt = match &request.access_token {
+        Some(token) => token.clone(),
+        None => {
+            // Use empty string for repos without tokens (e.g., FileSystem)
+            // This allows validation to distinguish between "no token needed" and "token not set"
+            String::new()
         }
-    } else {
-        None
+    };
+
+    let encrypted_token = match app_state.encryption_service.encrypt(&token_to_encrypt) {
+        Ok(encrypted) => Some(encrypted),
+        Err(e) => {
+            error!("Failed to encrypt access token: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
     };
 
     // Helper function to clean empty strings from optional fields
@@ -782,6 +788,20 @@ async fn update_repository(
                 }
             };
             info!("Access token updated and encrypted");
+        }
+    } else if matches!(repository.repository_type, RepositoryType::FileSystem) {
+        // For FileSystem repositories, ensure we have an encrypted empty token
+        if repository.access_token.is_none() {
+            match app_state.encryption_service.encrypt("") {
+                Ok(encrypted) => {
+                    repository.access_token = Some(encrypted);
+                    info!("Set empty encrypted token for FileSystem repository");
+                }
+                Err(e) => {
+                    error!("Failed to encrypt empty token for FileSystem repository: {}", e);
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
         }
     }
 

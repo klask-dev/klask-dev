@@ -533,6 +533,13 @@ impl CrawlerService {
         if let Some(token) = tokens.get(&repository_id) {
             info!("Cancellation requested for repository: {}", repository_id);
             token.cancel();
+
+            // Force flush the index to stop background Tantivy merge operations
+            // and prevent high CPU usage from continued indexing
+            if let Err(e) = self.search_service.force_flush().await {
+                warn!("Failed to force flush index during crawl cancellation: {}", e);
+            }
+
             Ok(true)
         } else {
             warn!("No active crawl found for repository: {}", repository_id);

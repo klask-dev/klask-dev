@@ -6,6 +6,7 @@ pub mod git_operations;
 pub mod git_tree_walker;
 pub mod github_crawler;
 pub mod gitlab_crawler;
+pub mod parsers;
 pub mod service;
 
 // Re-export main service and commonly used types
