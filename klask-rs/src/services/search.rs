@@ -419,9 +419,24 @@ impl SearchService {
         let query = TermQuery::new(term.clone(), tantivy::schema::IndexRecordOption::Basic);
         let _ = writer.delete_query(Box::new(query));
 
+        // Check for oversized content that might cause token length issues
+        if file_data.content.len() > tantivy::tokenizer::MAX_TOKEN_LEN {
+            let max_line_len = file_data.content.lines().map(|l| l.len()).max().unwrap_or(0);
+            if max_line_len > tantivy::tokenizer::MAX_TOKEN_LEN {
+                warn!(
+                    "File '{}' (file_id='{}') has a line exceeding MAX_TOKEN_LEN: {} chars. This may cause indexing issues.",
+                    file_data.file_path, file_id_str, max_line_len
+                );
+            }
+        }
+
         debug!(
-            "Indexing file '{}' with file_id='{}', repository='{}', project='{}'",
-            file_data.file_path, file_id_str, file_data.repository, file_data.project
+            "Indexing file '{}' with file_id='{}', repository='{}', project='{}', size={} bytes",
+            file_data.file_path,
+            file_id_str,
+            file_data.repository,
+            file_data.project,
+            file_data.content.len()
         );
 
         // Add the new document

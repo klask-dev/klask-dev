@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 use uuid::Uuid;
 
 // Application state that will be shared across handlers
@@ -55,7 +55,7 @@ impl FromRequestParts<AppState> for AdminUser {
     type Rejection = AuthError;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
-        debug!("Attempting to extract AdminUser from request");
+        trace!("Attempting to extract AdminUser from request");
 
         let token = extract_token_from_auth_header(&parts.headers)?;
         let auth_user = extract_authenticated_user(state, &token).await?;
@@ -68,7 +68,7 @@ impl FromRequestParts<AppState> for AdminUser {
             return Err(AuthError::InsufficientPermissions);
         }
 
-        debug!("AdminUser extracted successfully for user: {}", auth_user.user.username);
+        trace!("AdminUser extracted successfully for user: {}", auth_user.user.username);
         Ok(AdminUser(auth_user))
     }
 }
@@ -109,7 +109,7 @@ fn extract_token_from_auth_header(headers: &axum::http::HeaderMap) -> Result<Str
 
 /// Helper function to extract and validate an authenticated user from a token
 async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<AuthenticatedUser, AuthError> {
-    debug!("Extracting AuthenticatedUser from request");
+    trace!("Extracting AuthenticatedUser from request");
 
     // Decode and validate token
     let claims = state.jwt_service.decode_token(token).map_err(|e| {
@@ -117,7 +117,7 @@ async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<Aut
         AuthError::InvalidToken(e.to_string())
     })?;
 
-    debug!("Token decoded successfully for user ID: {}", claims.sub);
+    trace!("Token decoded successfully for user ID: {}", claims.sub);
 
     // Check if token is expired
     if claims.is_expired() {
@@ -139,7 +139,7 @@ async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<Aut
             AuthError::UserNotFound
         })?;
 
-    debug!("User found: {}", user.username);
+    trace!("User found: {}", user.username);
 
     // Verify user is active
     if !user.active {
@@ -147,6 +147,6 @@ async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<Aut
         return Err(AuthError::UserInactive);
     }
 
-    debug!("AuthenticatedUser extracted successfully: {}", user.username);
+    trace!("AuthenticatedUser extracted successfully: {}", user.username);
     Ok(AuthenticatedUser { user, claims })
 }

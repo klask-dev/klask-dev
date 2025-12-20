@@ -38,8 +38,7 @@ struct VersionInfo {
 async fn main() -> Result<()> {
     // Initialize tracing
     // Build the filter with quiet modules first, then apply RUST_LOG or defaults
-    let rust_log = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "klask_rs=debug,tower_http=debug,tantivy=info,sqlx=warn".to_string());
+    let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "klask_rs=debug,tantivy=info,sqlx=warn".to_string());
     let filter_str = format!("tantivy::directory::managed_directory=off,{}", rust_log);
 
     tracing_subscriber::registry()
