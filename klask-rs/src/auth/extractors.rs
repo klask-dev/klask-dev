@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use tracing::{debug, error, trace, warn};
+use tracing::{error, trace, warn};
 use uuid::Uuid;
 
 // Application state that will be shared across handlers
