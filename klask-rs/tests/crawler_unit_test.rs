@@ -120,6 +120,7 @@ async fn test_supported_file_extensions() -> Result<()> {
                     | "procfile"
                     | "readme"
                     | "license"
+                    | "licence"
                     | "changelog"
                     | "authors"
                     | "contributors"

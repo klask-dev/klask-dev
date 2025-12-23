@@ -8,14 +8,14 @@ impl BinaryParser {
     /// List of binary file extensions handled by this parser
     const BINARY_EXTENSIONS: &'static [&'static str] = &[
         // Images
-        "png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "svg", "ico", "rlib", "rmeta", "pak", "pack", "jar", // Archives
+        "png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "svg", "ico", "rlib", "rmeta", "pak", "pack",
+        "jar", // Archives
         "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "lz4", // Documents
         "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", // Audio/Video
         "mp3", "mp4", "wav", "flac", "aac", "m4a", "ogg", "webm", "mkv", "avi", "mov", // Executables
         "exe", "dll", "so", "dylib", "a", "o", "class", "pyc", // Compiled
         "bin", "dat", "blob", "wasm", "rev", "mo", // Other binary formats
-        "icns", "cur", "db", "sqlite", "iso", "dmg",
-        "eot","otf", "ttf", "woff2", "woff2", // fonts
+        "icns", "cur", "db", "sqlite", "iso", "dmg", "eot", "otf", "ttf", "woff2", "woff2", // fonts
     ];
 
     pub fn can_parse(&self, extension: &str) -> bool {
