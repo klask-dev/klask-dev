@@ -32,7 +32,7 @@ impl UnknownParser {
         // If detected as binary, reject immediately
         if analysis.is_likely_binary() {
             if analysis.stats.null_bytes > 0 {
-                debug!(
+                info!(
                     "Unknown parser: rejected '{}' - contains {} null bytes (binary indicator)",
                     filename_str, analysis.stats.null_bytes
                 );

@@ -1,5 +1,4 @@
 use super::branch_processor::{BranchProcessor, CrawlProgress};
-use super::file_processing::SUPPORTED_EXTENSIONS;
 use super::git_operations::GitOperations;
 use super::github_crawler::GitHubCrawler;
 use super::gitlab_crawler::GitLabCrawler;
@@ -458,43 +457,6 @@ impl CrawlerService {
                         None, // No parent project name for regular Git repos
                     )
                     .await
-            }
-        }
-    }
-
-    /// Check if a file is supported for indexing based on its extension or name
-    #[allow(dead_code)]
-    pub fn is_supported_file(&self, file_path: &Path) -> bool {
-        Self::is_supported_file_static(file_path)
-    }
-
-    /// Static version of is_supported_file for use without instance
-    pub fn is_supported_file_static(file_path: &Path) -> bool {
-        if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
-            SUPPORTED_EXTENSIONS.contains(&extension.to_lowercase().as_str())
-        } else {
-            // Support files without extensions that might be scripts or config files
-            if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-                matches!(
-                    file_name.to_lowercase().as_str(),
-                    "dockerfile"
-                        | "makefile"
-                        | "rakefile"
-                        | "gemfile"
-                        | "vagrantfile"
-                        | "procfile"
-                        | "readme"
-                        | "license"
-                        | "changelog"
-                        | "authors"
-                        | "contributors"
-                        | "copying"
-                        | "install"
-                        | "news"
-                        | "todo"
-                )
-            } else {
-                false
             }
         }
     }

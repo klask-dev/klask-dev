@@ -8,70 +8,6 @@ use std::sync::Arc;
 use tracing::{debug, error};
 use uuid::Uuid;
 
-/// Supported file extensions for indexing
-pub const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "rs",
-    "py",
-    "js",
-    "ts",
-    "java",
-    "c",
-    "cpp",
-    "h",
-    "hpp",
-    "go",
-    "rb",
-    "php",
-    "cs",
-    "swift",
-    "kt",
-    "scala",
-    "clj",
-    "hs",
-    "ml",
-    "fs",
-    "elm",
-    "dart",
-    "vue",
-    "jsx",
-    "tsx",
-    "html",
-    "css",
-    "scss",
-    "less",
-    "sql",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "ps1",
-    "bat",
-    "cmd",
-    "dockerfile",
-    "yaml",
-    "yml",
-    "json",
-    "toml",
-    "xml",
-    "md",
-    "txt",
-    "cfg",
-    "conf",
-    "ini",
-    "properties",
-    "gradle",
-    "maven",
-    "pom",
-    "sbt",
-    "cmake",
-    "makefile",
-    "r",
-    "m",
-    "perl",
-    "pl",
-    "lua",
-];
-
 /// File processing utilities for the crawler
 #[derive(Clone)]
 pub struct FileProcessor {
@@ -238,46 +174,6 @@ impl FileProcessor {
         }
 
         Ok(())
-    }
-
-    /// Check if a file is supported for indexing based on its extension or name
-    #[allow(dead_code)]
-    pub fn is_supported_file(file_path: &Path) -> bool {
-        if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
-            SUPPORTED_EXTENSIONS.contains(&extension.to_lowercase().as_str())
-        } else {
-            // Support files without extensions that might be scripts or config files
-            if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-                matches!(
-                    file_name.to_lowercase().as_str(),
-                    "dockerfile"
-                        | "makefile"
-                        | "rakefile"
-                        | "gemfile"
-                        | "vagrantfile"
-                        | "procfile"
-                        | "readme"
-                        | "license"
-                        | "changelog"
-                        | "authors"
-                        | "contributors"
-                        | "copying"
-                        | "install"
-                        | "news"
-                        | "todo"
-                )
-            } else {
-                false
-            }
-        }
-    }
-
-    /// Collect all supported files from a directory recursively
-    #[allow(dead_code)]
-    pub fn collect_supported_files(repo_path: &Path) -> Result<Vec<PathBuf>> {
-        let mut files = Vec::new();
-        Self::collect_files_recursive(repo_path, &mut files)?;
-        Ok(files.into_iter().filter(|path| Self::is_supported_file(path)).collect())
     }
 
     /// Recursively collect files from a directory
