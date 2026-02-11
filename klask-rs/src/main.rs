@@ -34,6 +34,26 @@ struct VersionInfo {
     timestamp: Option<String>,
 }
 
+/// Sanitize database URL by masking password for logging
+fn sanitize_db_url(url: &str) -> String {
+    if let Some(at_pos) = url.rfind('@') {
+        // Find the password part (between :// and @)
+        if let Some(scheme_end) = url.find("://") {
+            let scheme_part = &url[..scheme_end + 3]; // "postgresql://"
+            let host_part = &url[at_pos..]; // "@host:port/db"
+
+            // Extract username (between :// and first :)
+            let credentials_part = &url[scheme_end + 3..at_pos];
+            if let Some(colon_pos) = credentials_part.find(':') {
+                let username = &credentials_part[..colon_pos];
+                return format!("{}{}:****{}", scheme_part, username, host_part);
+            }
+        }
+    }
+    // If parsing fails, just mask the entire thing for safety
+    "postgresql://****:****@****".to_string()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
@@ -62,7 +82,11 @@ async fn main() -> Result<()> {
             db
         }
         Err(e) => {
-            error!("Failed to connect to database: {}", e);
+            error!(
+                "Failed to connect to database {}: {}",
+                sanitize_db_url(&config.database.url),
+                e
+            );
             info!("Continuing without database connection for development");
             // For development, we'll create a dummy database
             return Err(e);
@@ -269,5 +293,36 @@ async fn health_handler(database: Database) -> &'static str {
     match database.health_check().await {
         Ok(_) => "OK",
         Err(_) => "Database connection failed",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_db_url() {
+        // Test normal PostgreSQL URL
+        let url = "postgresql://klask_user:secret_password@localhost:5432/klask_dev";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://klask_user:****@localhost:5432/klask_dev");
+        assert!(!sanitized.contains("secret_password"));
+
+        // Test with special characters in password
+        let url = "postgresql://user:p@ssw0rd!@host:5432/db";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://user:****@host:5432/db");
+        assert!(!sanitized.contains("p@ssw0rd!"));
+
+        // Test with complex password
+        let url = "postgresql://admin:My$ecret123!@db.example.com:5432/production";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://admin:****@db.example.com:5432/production");
+        assert!(!sanitized.contains("My$ecret123!"));
+
+        // Test malformed URL (fallback to full mask)
+        let url = "invalid-url";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://****:****@****");
     }
 }
