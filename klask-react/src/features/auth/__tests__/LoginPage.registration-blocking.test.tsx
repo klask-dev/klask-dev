@@ -123,7 +123,7 @@ describe('LoginPage - Registration Blocking Feature', () => {
 
       await waitFor(() => {
         expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
       });
     });
@@ -194,7 +194,7 @@ describe('LoginPage - Registration Blocking Feature', () => {
       });
 
       const usernameInput = screen.getByLabelText(/username/i);
-      const passwordInput = screen.getByLabelText(/password/i);
+      const passwordInput = screen.getByLabelText(/^password$/i);
       const submitButton = screen.getByRole('button', { name: /sign in/i });
 
       fireEvent.change(usernameInput, { target: { value: 'testuser' } });
@@ -375,7 +375,7 @@ describe('LoginPage - Registration Blocking Feature', () => {
 
       await waitFor(() => {
         const usernameField = screen.getByLabelText(/username/i);
-        const passwordField = screen.getByLabelText(/password/i);
+        const passwordField = screen.getByLabelText(/^password$/i);
 
         expect(usernameField).toBeInTheDocument();
         expect(passwordField).toBeInTheDocument();
