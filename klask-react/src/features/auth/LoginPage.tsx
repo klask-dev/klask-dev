@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,7 @@ const LoginPage: React.FC = () => {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
   const [registrationAllowed, setRegistrationAllowed] = useState(false);
+  const usernameInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -57,6 +58,13 @@ const LoginPage: React.FC = () => {
     checkSetup();
   }, [navigate]);
 
+  // Auto-focus username input when page loads
+  useEffect(() => {
+    if (!isCheckingSetup && usernameInputRef.current) {
+      usernameInputRef.current.focus();
+    }
+  }, [isCheckingSetup]);
+
   const onSubmit = async (data: LoginForm) => {
     try {
       setServerError(null);
@@ -81,7 +89,7 @@ const LoginPage: React.FC = () => {
           });
         });
       } else if (error instanceof Error) {
-        const apiError = error as any;
+        const apiError = error as Error & { details?: { error?: string } };
         // If we have a detailed error from the API, use that
         if (apiError.details?.error) {
           setServerError(apiError.details.error);
@@ -147,6 +155,10 @@ const LoginPage: React.FC = () => {
                   autoComplete="username"
                   className={`input-field ${errors.username ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : ''}`}
                   placeholder="Enter your username"
+                  ref={(e) => {
+                    register('username').ref(e);
+                    usernameInputRef.current = e;
+                  }}
                 />
                 {errors.username && (
                   <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
@@ -171,6 +183,8 @@ const LoginPage: React.FC = () => {
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
                     <EyeSlashIcon className="h-5 w-5 text-gray-400" />
@@ -181,29 +195,6 @@ const LoginPage: React.FC = () => {
                 {errors.password && (
                   <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
                 )}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                  Remember me
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <Link
-                  to="/forgot-password"
-                  className="font-medium text-blue-600 hover:text-primary-500"
-                >
-                  Forgot your password?
-                </Link>
               </div>
             </div>
 
