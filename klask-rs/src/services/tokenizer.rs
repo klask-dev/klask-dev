@@ -1027,7 +1027,7 @@ mod tests {
     fn test_go_style_interface() {
         let tokens = tokenize_code("io.Reader");
         // The dot is not a split character, so it should be part of token
-        assert!(tokens.len() >= 1);
+        assert!(!tokens.is_empty());
     }
 
     // ==================== Case Sensitivity ====================
@@ -1066,7 +1066,7 @@ mod tests {
     #[test]
     fn test_token_offset_values() {
         let tokens = tokenize_code("HTMLParser");
-        assert!(tokens[0].offset_from >= 0, "First token offset should be >= 0");
+        assert!(!tokens.is_empty(), "Should have at least one token");
         // With case-preserving tokens, we have multiple tokens at the same position
         // so we just verify that offsets are valid, not strictly increasing
         for token in &tokens {

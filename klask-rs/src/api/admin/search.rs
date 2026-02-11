@@ -405,6 +405,6 @@ mod tests {
     #[test]
     fn test_module_compiles() {
         // Placeholder test to ensure module compiles
-        assert!(true);
+        // This test intentionally does nothing, just verifies the module compiles
     }
 }

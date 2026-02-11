@@ -1,4 +1,5 @@
 use crate::models::{Repository, RepositoryType};
+use crate::services::crawler::parsers::ParserDispatcher;
 use crate::services::search::{FileData, SearchService};
 use anyhow::Result;
 use sha2::{Digest, Sha256};
@@ -6,70 +7,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{debug, error};
 use uuid::Uuid;
-
-/// Supported file extensions for indexing
-pub const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "rs",
-    "py",
-    "js",
-    "ts",
-    "java",
-    "c",
-    "cpp",
-    "h",
-    "hpp",
-    "go",
-    "rb",
-    "php",
-    "cs",
-    "swift",
-    "kt",
-    "scala",
-    "clj",
-    "hs",
-    "ml",
-    "fs",
-    "elm",
-    "dart",
-    "vue",
-    "jsx",
-    "tsx",
-    "html",
-    "css",
-    "scss",
-    "less",
-    "sql",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
-    "ps1",
-    "bat",
-    "cmd",
-    "dockerfile",
-    "yaml",
-    "yml",
-    "json",
-    "toml",
-    "xml",
-    "md",
-    "txt",
-    "cfg",
-    "conf",
-    "ini",
-    "properties",
-    "gradle",
-    "maven",
-    "pom",
-    "sbt",
-    "cmake",
-    "makefile",
-    "r",
-    "m",
-    "perl",
-    "pl",
-    "lua",
-];
 
 /// File processing utilities for the crawler
 #[derive(Clone)]
@@ -131,152 +68,112 @@ impl FileProcessor {
         parent_project_name: Option<&str>,
         provided_content: Option<String>,
     ) -> Result<()> {
+        let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_string();
+        let file_name = file_path.file_name().and_then(|name| name.to_str()).unwrap_or("").to_string();
+
+        // Check if file should be filtered (only binary files are filtered)
+        if ParserDispatcher::should_filter(&extension) {
+            debug!("Skipping binary file (extension {}): {}", extension, relative_path);
+            return Ok(());
+        }
+
+        // Get the appropriate parser for this file extension
+        let parser = ParserDispatcher::get_parser(&extension);
+
         // Read file content - use provided content if available, otherwise read from disk
-        let content = if let Some(content) = provided_content {
+        let raw_content = if let Some(content) = provided_content {
             debug!(
                 "[GIT READ] Processing file {} in branch '{}' from Git (provided content: {} bytes)",
                 relative_path,
                 branch_name,
                 content.len()
             );
-
-            // Skip binary files or files with invalid UTF-8
-            if content.chars().any(|c| c == '\0') {
-                debug!(
-                    "[GIT READ] Skipping binary file (contains null bytes): {}",
-                    relative_path
-                );
-                return Ok(());
-            }
-
-            Some(content)
+            content.into_bytes()
         } else {
             debug!(
                 "[DISK READ] Reading file {} in branch '{}' from filesystem",
                 relative_path, branch_name
             );
 
-            // Read from disk
-            match tokio::fs::read_to_string(file_path).await {
-                Ok(content) => {
-                    // Skip binary files or files with invalid UTF-8
-                    if content.chars().any(|c| c == '\0') {
-                        debug!(
-                            "[DISK READ] Skipping binary file (contains null bytes): {}",
-                            relative_path
-                        );
-                        return Ok(());
-                    }
-
+            match tokio::fs::read(file_path).await {
+                Ok(bytes) => {
                     debug!(
                         "[DISK READ] Successfully read file {} ({} bytes)",
                         relative_path,
-                        content.len()
+                        bytes.len()
                     );
-                    Some(content)
+                    bytes
                 }
                 Err(e) => {
-                    debug!(
-                        "[DISK READ] Could not read file as UTF-8: {} - Error: {}",
-                        relative_path, e
-                    );
-                    None
+                    debug!("[DISK READ] Could not read file: {} - Error: {}", relative_path, e);
+                    return Ok(());
                 }
             }
         };
 
-        let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_string();
-
-        let file_name = file_path.file_name().and_then(|name| name.to_str()).unwrap_or("").to_string();
-
-        // Index in Tantivy search engine if content is available
-        if let Some(content) = content {
-            // Generate a deterministic ID for Tantivy indexing to prevent duplicates
-            let file_id = Self::generate_deterministic_file_id(repository, relative_path, branch_name);
-            let version = branch_name.to_string();
-
-            // For repository: use parent project name if provided (for GitLab/GitHub multi-project repos),
-            // otherwise use repository name (for regular Git repos)
-            let repository_field = parent_project_name.unwrap_or(&repository.name);
-
-            debug!(
-                "Indexing file {} with deterministic ID {} for branch '{}' - repository: {}, project: {}",
-                relative_path, file_id, branch_name, repository_field, repository.name
-            );
-
-            // Use upsert to handle potential duplicates - this will update existing docs
-            match self
-                .search_service
-                .upsert_file(FileData {
-                    file_id,
-                    file_name: &file_name,
-                    file_path: relative_path,
-                    content: &content,
-                    repository: repository_field, // Parent repository for mass deletion
-                    project: &repository.name,    // Individual project name for facets
-                    version: &version,
-                    extension: &extension,
-                    size: content.len() as u64, // Calculate size from content length
-                })
-                .await
-            {
-                Ok(_) => {
-                    debug!(
-                        "Successfully upserted file {} to Tantivy index for branch '{}'",
-                        relative_path, branch_name
-                    );
-                }
+        // Parse the file content
+        // For empty files, use empty string directly (still index for filename)
+        let content = if raw_content.is_empty() {
+            debug!("File {} is empty, will be indexed with filename only", relative_path);
+            String::new()
+        } else {
+            match parser.parse(&raw_content, Some(relative_path)).await {
+                Ok(parsed_content) => parsed_content,
                 Err(e) => {
-                    error!(
-                        "Failed to upsert file {} to Tantivy index for branch '{}': {}",
-                        relative_path, branch_name, e
+                    debug!(
+                        "Failed to parse file {} (extension {}): {}",
+                        relative_path, extension, e
                     );
-                    return Err(e);
+                    return Ok(());
                 }
+            }
+        };
+
+        // Generate a deterministic ID for Tantivy indexing to prevent duplicates
+        let file_id = Self::generate_deterministic_file_id(repository, relative_path, branch_name);
+        let version = branch_name.to_string();
+
+        // For repository: use parent project name if provided (for GitLab/GitHub multi-project repos),
+        // otherwise use repository name (for regular Git repos)
+        let repository_field = parent_project_name.unwrap_or(&repository.name);
+
+        debug!(
+            "Indexing file {} with deterministic ID {} for branch '{}' - repository: {}, project: {}",
+            relative_path, file_id, branch_name, repository_field, repository.name
+        );
+
+        // Use upsert to handle potential duplicates - this will update existing docs
+        match self
+            .search_service
+            .upsert_file(FileData {
+                file_id,
+                file_name: &file_name,
+                file_path: relative_path,
+                content: &content,
+                repository: repository_field, // Parent repository for mass deletion
+                project: &repository.name,    // Individual project name for facets
+                version: &version,
+                extension: &extension,
+                size: raw_content.len() as u64, // Use raw file size (before parsing)
+            })
+            .await
+        {
+            Ok(_) => {
+                debug!(
+                    "Successfully upserted file {} to Tantivy index for branch '{}'",
+                    relative_path, branch_name
+                );
+            }
+            Err(e) => {
+                error!(
+                    "Failed to upsert file {} to Tantivy index for branch '{}': {}",
+                    relative_path, branch_name, e
+                );
+                return Err(e);
             }
         }
 
         Ok(())
-    }
-
-    /// Check if a file is supported for indexing based on its extension or name
-    #[allow(dead_code)]
-    pub fn is_supported_file(file_path: &Path) -> bool {
-        if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
-            SUPPORTED_EXTENSIONS.contains(&extension.to_lowercase().as_str())
-        } else {
-            // Support files without extensions that might be scripts or config files
-            if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-                matches!(
-                    file_name.to_lowercase().as_str(),
-                    "dockerfile"
-                        | "makefile"
-                        | "rakefile"
-                        | "gemfile"
-                        | "vagrantfile"
-                        | "procfile"
-                        | "readme"
-                        | "license"
-                        | "changelog"
-                        | "authors"
-                        | "contributors"
-                        | "copying"
-                        | "install"
-                        | "news"
-                        | "todo"
-                )
-            } else {
-                false
-            }
-        }
-    }
-
-    /// Collect all supported files from a directory recursively
-    #[allow(dead_code)]
-    pub fn collect_supported_files(repo_path: &Path) -> Result<Vec<PathBuf>> {
-        let mut files = Vec::new();
-        Self::collect_files_recursive(repo_path, &mut files)?;
-        Ok(files.into_iter().filter(|path| Self::is_supported_file(path)).collect())
     }
 
     /// Recursively collect files from a directory

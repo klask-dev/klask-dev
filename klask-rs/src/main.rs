@@ -6,12 +6,14 @@ mod models;
 mod repositories;
 mod services;
 mod utils;
+mod version;
 
 use anyhow::Result;
 use auth::{extractors::AppState, jwt::JwtService};
-use axum::{Router, routing::get};
+use axum::{Json, Router, routing::get};
 use config::AppConfig;
 use database::Database;
+use serde::Serialize;
 use services::{
     SearchService, crawler::CrawlerService, encryption::EncryptionService, progress::ProgressTracker,
     scheduler::SchedulerService,
@@ -25,12 +27,38 @@ use tower_http::trace::TraceLayer;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+#[derive(Serialize)]
+struct VersionInfo {
+    version: String,
+    commit: Option<String>,
+    timestamp: Option<String>,
+}
+
+/// Sanitize database URL by masking password for logging
+fn sanitize_db_url(url: &str) -> String {
+    if let Some(at_pos) = url.rfind('@') {
+        // Find the password part (between :// and @)
+        if let Some(scheme_end) = url.find("://") {
+            let scheme_part = &url[..scheme_end + 3]; // "postgresql://"
+            let host_part = &url[at_pos..]; // "@host:port/db"
+
+            // Extract username (between :// and first :)
+            let credentials_part = &url[scheme_end + 3..at_pos];
+            if let Some(colon_pos) = credentials_part.find(':') {
+                let username = &credentials_part[..colon_pos];
+                return format!("{}{}:****{}", scheme_part, username, host_part);
+            }
+        }
+    }
+    // If parsing fails, just mask the entire thing for safety
+    "postgresql://****:****@****".to_string()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
     // Build the filter with quiet modules first, then apply RUST_LOG or defaults
-    let rust_log = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "klask_rs=debug,tower_http=debug,tantivy=info,sqlx=warn".to_string());
+    let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "klask_rs=debug,tantivy=info,sqlx=warn".to_string());
     let filter_str = format!("tantivy::directory::managed_directory=off,{}", rust_log);
 
     tracing_subscriber::registry()
@@ -54,7 +82,11 @@ async fn main() -> Result<()> {
             db
         }
         Err(e) => {
-            error!("Failed to connect to database: {}", e);
+            error!(
+                "Failed to connect to database {}: {}",
+                sanitize_db_url(&config.database.url),
+                e
+            );
             info!("Continuing without database connection for development");
             // For development, we'll create a dummy database
             return Err(e);
@@ -226,6 +258,7 @@ async fn shutdown_signal() {
 async fn create_app(app_state: AppState) -> Result<Router> {
     let app = Router::new()
         .route("/", get(root_handler))
+        .route("/version", get(version_handler))
         .route(
             "/health",
             get({
@@ -241,13 +274,55 @@ async fn create_app(app_state: AppState) -> Result<Router> {
     Ok(app)
 }
 
-async fn root_handler() -> &'static str {
-    "Klask-RS: Modern Code Search Engine"
+async fn root_handler() -> String {
+    format!(
+        "Klask-RS: Modern Code Search Engine\n\nVersion: {}\n\nAPI: http://localhost:3000/api\nHealth: http://localhost:3000/health\nVersion Info: http://localhost:3000/version",
+        version::get_version()
+    )
+}
+
+async fn version_handler() -> Json<VersionInfo> {
+    Json(VersionInfo {
+        version: version::get_version().to_string(),
+        commit: version::get_commit_hash().map(|s| s.to_string()),
+        timestamp: version::get_build_timestamp().map(|s| s.to_string()),
+    })
 }
 
 async fn health_handler(database: Database) -> &'static str {
     match database.health_check().await {
         Ok(_) => "OK",
         Err(_) => "Database connection failed",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_db_url() {
+        // Test normal PostgreSQL URL
+        let url = "postgresql://klask_user:secret_password@localhost:5432/klask_dev";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://klask_user:****@localhost:5432/klask_dev");
+        assert!(!sanitized.contains("secret_password"));
+
+        // Test with special characters in password
+        let url = "postgresql://user:p@ssw0rd!@host:5432/db";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://user:****@host:5432/db");
+        assert!(!sanitized.contains("p@ssw0rd!"));
+
+        // Test with complex password
+        let url = "postgresql://admin:My$ecret123!@db.example.com:5432/production";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://admin:****@db.example.com:5432/production");
+        assert!(!sanitized.contains("My$ecret123!"));
+
+        // Test malformed URL (fallback to full mask)
+        let url = "invalid-url";
+        let sanitized = sanitize_db_url(url);
+        assert_eq!(sanitized, "postgresql://****:****@****");
     }
 }

@@ -17,11 +17,13 @@ import { clsx } from 'clsx';
 import { authSelectors, useAuthStore } from '../../stores/auth-store';
 import { IconButton } from '../ui/Button';
 import AvatarDisplay from '../common/AvatarDisplay';
+import { useAppVersion } from '../../hooks/useAppVersion';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const { fullVersion, isRelease } = useAppVersion();
 
   const user = authSelectors.user();
   const isAdmin = authSelectors.isAdmin();
@@ -73,8 +75,15 @@ export const Navbar: React.FC = () => {
                 alt="Klask Logo"
                 className="hidden md:block h-10 mr-3"
               />
-              <span className="ml-1 md:ml-0 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full hidden sm:inline-block">
-                v2.0
+              <span
+                className={`ml-1 md:ml-0 px-2 py-1 text-xs font-medium rounded-full hidden sm:inline-block ${
+                  isRelease
+                    ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                    : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                }`}
+                title={`Backend version: ${fullVersion}`}
+              >
+                {fullVersion}
               </span>
             </Link>
           </div>

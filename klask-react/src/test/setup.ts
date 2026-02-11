@@ -1,80 +1,84 @@
-import '@testing-library/jest-dom';
-import { cleanup, configure } from '@testing-library/react';
-import { afterEach, afterAll, vi } from 'vitest';
+import "@testing-library/jest-dom";
+import { cleanup, configure } from "@testing-library/react";
+import { afterEach, afterAll, vi } from "vitest";
+import React from "react";
 
 // Fix React 19 compatibility with testing-library
 // React 19 doesn't export act, but React Testing Library expects it
 // Provide a simple act implementation that just executes the callback
-import React from 'react';
 
-const mockAct = (callback: (() => void) | (() => Promise<void>)): any => {
-  const result = callback();
-  // If the callback returns a promise, return that promise
-  // Otherwise return the result (which might be undefined)
-  return result;
+const mockAct = (
+    callback: (() => void) | (() => Promise<void>),
+): void | Promise<void> => {
+    const result = callback();
+    // If the callback returns a promise, return that promise
+    // Otherwise return the result (which might be undefined)
+    return result;
 };
 
-Object.defineProperty(React, 'act', {
-  value: mockAct,
-  writable: true,
-  enumerable: true,
-  configurable: true,
+Object.defineProperty(React, "act", {
+    value: mockAct,
+    writable: true,
+    enumerable: true,
+    configurable: true,
 });
 
 // Configure testing-library to be less verbose
 configure({
-  getElementError: (message) => {
-    return new Error(
-      [
-        message,
-        'Tip: Try using a more specific selector or check if the element exists.',
-      ].join('\n\n')
-    );
-  },
+    getElementError: (message) => {
+        return new Error(
+            [
+                message,
+                "Tip: Try using a more specific selector or check if the element exists.",
+            ].join("\n\n"),
+        );
+    },
 });
 
 // Cleanup after each test
 afterEach(async () => {
-  cleanup();
-  vi.clearAllMocks();
-  vi.clearAllTimers();
+    cleanup();
+    vi.clearAllMocks();
+    vi.clearAllTimers();
 
-  // Clear QueryClient cache to free memory
-  // Dynamically import to avoid issues if not used
-  try {
-    const { clearQueryClientCache } = await import('./test-utils');
-    clearQueryClientCache();
-  } catch (e) {
-    // Ignore if test-utils is not available
-  }
+    // Clear QueryClient cache to free memory
+    // Dynamically import to avoid issues if not used
+    try {
+        const { clearQueryClientCache } = await import("./test-utils");
+        clearQueryClientCache();
+    } catch {
+        // Ignore if test-utils is not available
+    }
 });
 
 // Restore all mocks after all tests to free memory
 afterAll(() => {
-  vi.restoreAllMocks();
+    vi.restoreAllMocks();
 });
 
 // Mock localStorage
 const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
 };
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
-  observe = vi.fn();
-  unobserve = vi.fn();
-  disconnect = vi.fn();
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any;
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
-  observe = vi.fn();
-  unobserve = vi.fn();
-  disconnect = vi.fn();
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any;
 
 // Mock fetch
@@ -82,9 +86,9 @@ global.fetch = vi.fn();
 
 // Mock console methods to reduce noise in tests
 global.console = {
-  ...console,
-  warn: vi.fn(),
-  error: vi.fn(),
+    ...console,
+    warn: vi.fn(),
+    error: vi.fn(),
 };
 
 // Note: react-router-dom is mocked in individual test files as needed
@@ -98,33 +102,33 @@ global.addEventListener = vi.fn();
 global.removeEventListener = vi.fn();
 
 // Mock for React Query's window focus refetching
-Object.defineProperty(document, 'hidden', {
-  writable: true,
-  value: false,
+Object.defineProperty(document, "hidden", {
+    writable: true,
+    value: false,
 });
 
-Object.defineProperty(document, 'visibilityState', {
-  writable: true,
-  value: 'visible',
+Object.defineProperty(document, "visibilityState", {
+    writable: true,
+    value: "visible",
 });
 
 // Mock for React Query's network status
-Object.defineProperty(navigator, 'onLine', {
-  writable: true,
-  value: true,
+Object.defineProperty(navigator, "onLine", {
+    writable: true,
+    value: true,
 });
 
 // Mock matchMedia for react-hot-toast
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
+Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(), // deprecated
+        removeListener: vi.fn(), // deprecated
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    })),
 });

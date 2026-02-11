@@ -139,12 +139,12 @@ impl EncryptionService {
 
                 match self.decrypt(&encrypted_token) {
                     Ok(decrypted) => {
-                        if decrypted.is_empty() {
-                            return Err(anyhow::anyhow!(
-                                "ENCRYPTION_KEY validation failed: decrypted token is empty"
-                            ));
-                        }
-                        info!("Successfully decrypted existing token from database - ENCRYPTION_KEY is valid");
+                        // Empty tokens are valid (e.g., for FileSystem repositories)
+                        // The important thing is that decryption succeeded
+                        info!(
+                            "Successfully decrypted token from database - ENCRYPTION_KEY is valid (token content: {})",
+                            if decrypted.is_empty() { "empty (filesystem repo)" } else { "non-empty" }
+                        );
                         Ok(())
                     }
                     Err(e) => {

@@ -46,11 +46,11 @@ fn main() {
 
     for (expr, description) in test_cases {
         println!("\nExpression: {} ({})", expr, description);
-        if let Ok(cron) = expr.parse::<Cron>() {
-            if let Ok(next) = cron.find_next_occurrence(&now, false) {
-                let duration = next - now;
-                println!("Next: {} (in {}m)", next, duration.num_minutes());
-            }
+        if let Ok(cron) = expr.parse::<Cron>()
+            && let Ok(next) = cron.find_next_occurrence(&now, false)
+        {
+            let duration = next - now;
+            println!("Next: {} (in {}m)", next, duration.num_minutes());
         }
     }
 }

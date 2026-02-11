@@ -137,8 +137,9 @@ async fn test_full_name_validation() {
     let too_long_name = "a".repeat(300);
     assert!(too_long_name.len() > 255);
 
+    // Empty names should be considered invalid for validation purposes
     let empty_name = "";
-    assert!(empty_name.is_empty());
+    assert_eq!(empty_name.len(), 0);
 }
 
 #[tokio::test]
@@ -333,7 +334,7 @@ fn test_timezone_validation() {
 
     impl TimezoneValidator {
         fn is_valid(tz: &str) -> bool {
-            let valid_zones = vec![
+            let valid_zones = [
                 "UTC",
                 "GMT",
                 "Europe/London",

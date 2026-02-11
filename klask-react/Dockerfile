@@ -1,6 +1,11 @@
 # Multi-stage build for React frontend
 FROM node:22-alpine as builder
 
+# Accept build arguments for version info
+ARG VITE_APP_VERSION=2.0.0
+ARG VITE_APP_COMMIT=""
+ARG VITE_APP_BUILD_TIME=""
+
 # Install system dependencies for node-gyp and canvas
 RUN apk add --no-cache \
     python3 \
@@ -28,7 +33,10 @@ RUN npm ci --silent
 # Copy source code
 COPY . .
 
-# Build the application (API URL will be configured at runtime)
+# Build the application with version information injected as environment variables
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+ENV VITE_APP_COMMIT=${VITE_APP_COMMIT}
+ENV VITE_APP_BUILD_TIME=${VITE_APP_BUILD_TIME}
 RUN npm run build
 
 # Production stage with nginx

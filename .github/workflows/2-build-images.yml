@@ -83,6 +83,13 @@ jobs:
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
 
+    - name: Get build metadata (frontend)
+      id: build-meta-frontend
+      run: |
+        echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
     - name: Build and push frontend
       uses: docker/build-push-action@v5
       with:
@@ -91,6 +98,10 @@ jobs:
         push: true
         tags: ${{ steps.meta-frontend.outputs.tags }}
         labels: ${{ steps.meta-frontend.outputs.labels }}
+        build-args: |
+          VITE_APP_VERSION=${{ steps.build-meta-frontend.outputs.version }}
+          VITE_APP_COMMIT=${{ steps.build-meta-frontend.outputs.commit }}
+          VITE_APP_BUILD_TIME=${{ steps.build-meta-frontend.outputs.build_time }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
@@ -142,6 +153,13 @@ jobs:
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
 
+    - name: Get build metadata (backend)
+      id: build-meta-backend
+      run: |
+        echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
     - name: Build and push backend
       uses: docker/build-push-action@v5
       with:
@@ -150,6 +168,10 @@ jobs:
         push: true
         tags: ${{ steps.meta-backend.outputs.tags }}
         labels: ${{ steps.meta-backend.outputs.labels }}
+        build-args: |
+          KLASK_VERSION=${{ steps.build-meta-backend.outputs.version }}
+          GIT_COMMIT_HASH=${{ steps.build-meta-backend.outputs.commit }}
+          BUILD_TIMESTAMP=${{ steps.build-meta-backend.outputs.build_time }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 

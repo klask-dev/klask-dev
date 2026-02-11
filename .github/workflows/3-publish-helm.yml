@@ -5,15 +5,18 @@
 name: 3️⃣ Publish Helm Chart
 
 on:
+
   workflow_dispatch:  # Permettre déclenchement manuel
   workflow_run:
-    workflows: ["2️⃣ Build images"]
+    workflows: ["2️⃣ Build images", "Release"]
     types:
       - completed
     branches:
       - main
       - master
       - 'releases/**'
+  release:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
@@ -21,8 +24,8 @@ env:
 jobs:
   publish-helm-chart:
     runs-on: ubuntu-latest
-    # Only run if CI workflow succeeded OR manually triggered
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # Only run if CI workflow succeeded OR manually triggered OR release
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'release' }}
     permissions:
       contents: read
       packages: write
@@ -50,32 +53,46 @@ jobs:
         cd charts/klask
         BASE_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
 
-        if [[ "${{ github.event_name }}" == "workflow_run" && "${{ github.event.workflow_run.head_branch }}" == "main" ]] || [[ "${{ github.event_name }}" == "workflow_run" && "${{ github.event.workflow_run.head_branch }}" == "master" ]]; then
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          # Pour les releases: utiliser la version du tag
+          TAG_VERSION="${{ github.event.release.tag_name }}"
+          CHART_VERSION="${TAG_VERSION#v}"  # Enlever le 'v' si présent
+          APP_VERSION="${TAG_VERSION#v}"
+        elif [[ "${{ github.event_name }}" == "workflow_run" && "${{ github.event.workflow_run.head_branch }}" == "main" ]] || [[ "${{ github.event_name }}" == "workflow_run" && "${{ github.event.workflow_run.head_branch }}" == "master" ]]; then
           # Pour main/master: version stable
           CHART_VERSION="$BASE_VERSION"
+          APP_VERSION="$BASE_VERSION"
         elif [[ "${{ github.ref_type }}" == "tag" ]]; then
           # Pour les tags: utiliser la version du tag
           TAG_VERSION="${{ github.ref_name }}"
           CHART_VERSION="${TAG_VERSION#v}"  # Enlever le 'v' si présent
+          APP_VERSION="${TAG_VERSION#v}"
         else
           # Pour les PRs: version avec suffixe
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             PR_NUMBER=$(echo "${{ github.event.workflow_run.head_branch }}" | grep -o 'pr-[0-9]*' | cut -d'-' -f2 || echo "dev")
             CHART_VERSION="$BASE_VERSION-pr$PR_NUMBER"
+            APP_VERSION="$BASE_VERSION-pr$PR_NUMBER"
           else
             CHART_VERSION="$BASE_VERSION-dev"
+            APP_VERSION="$BASE_VERSION-dev"
           fi
         fi
 
         echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
+        echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
         echo "📦 Chart version will be: $CHART_VERSION"
+        echo "📦 App version will be: $APP_VERSION"
 
-    - name: Update chart version
+    - name: Update chart version and appVersion
       run: |
         cd charts/klask
-        # Mettre à jour la version dans Chart.yaml
+        # Mettre à jour la version et appVersion dans Chart.yaml
         sed -i "s/^version:.*/version: ${{ steps.chart-version.outputs.version }}/" Chart.yaml
+        sed -i "s/^appVersion:.*/appVersion: \"${{ steps.chart-version.outputs.app_version }}\"/" Chart.yaml
         echo "✅ Updated Chart.yaml version to ${{ steps.chart-version.outputs.version }}"
+        echo "✅ Updated Chart.yaml appVersion to ${{ steps.chart-version.outputs.app_version }}"
+        cat Chart.yaml
 
     - name: Package Helm chart
       run: |

@@ -16,7 +16,7 @@ use tantivy::{Index, IndexReader, IndexWriter, Term, doc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::services::tokenizer::{
     CaseSensitiveCodeTokenizer, CodeTokenizer, QueryTokenizer, QueryTokenizerCaseSensitive,
@@ -180,6 +180,7 @@ pub struct SearchService {
     index: Index,
     reader: IndexReader,
     writer: Arc<RwLock<IndexWriter>>,
+    #[allow(dead_code)]
     schema: Schema,
     fields: SearchFields,
     index_dir: std::path::PathBuf,
@@ -418,9 +419,24 @@ impl SearchService {
         let query = TermQuery::new(term.clone(), tantivy::schema::IndexRecordOption::Basic);
         let _ = writer.delete_query(Box::new(query));
 
+        // Check for oversized content that might cause token length issues
+        if file_data.content.len() > tantivy::tokenizer::MAX_TOKEN_LEN {
+            let max_line_len = file_data.content.lines().map(|l| l.len()).max().unwrap_or(0);
+            if max_line_len > tantivy::tokenizer::MAX_TOKEN_LEN {
+                warn!(
+                    "File '{}' (file_id='{}') has a line exceeding MAX_TOKEN_LEN: {} chars. This may cause indexing issues.",
+                    file_data.file_path, file_id_str, max_line_len
+                );
+            }
+        }
+
         debug!(
-            "Indexing file '{}' with file_id='{}', repository='{}', project='{}'",
-            file_data.file_path, file_id_str, file_data.repository, file_data.project
+            "Indexing file '{}' with file_id='{}', repository='{}', project='{}', size={} bytes",
+            file_data.file_path,
+            file_id_str,
+            file_data.repository,
+            file_data.project,
+            file_data.content.len()
         );
 
         // Add the new document
@@ -455,6 +471,17 @@ impl SearchService {
         let mut writer = self.writer.write().await;
         writer.commit()?;
         // Reload reader to ensure latest changes are visible
+        self.reader.reload()?;
+        Ok(())
+    }
+
+    /// Force flush the IndexWriter to disk immediately, discarding any pending changes
+    /// This is useful when cancelling a crawl to stop Tantivy's background merge operations
+    pub async fn force_flush(&self) -> Result<()> {
+        warn!("Force flushing IndexWriter - pending changes will be discarded");
+        let mut writer = self.writer.write().await;
+        // Commit any existing documents first, then discard pending ones
+        writer.commit()?;
         self.reader.reload()?;
         Ok(())
     }
@@ -572,24 +599,23 @@ impl SearchService {
 
     /// Rebuild the index with current schema (internal implementation shared by reset_index and rebuild_index)
     async fn rebuild_index_internal(&self) -> Result<()> {
-        // Delete the index directory and recreate it with a fresh, clean state
-        // This is necessary because Tantivy's IndexWriter cannot be safely reused after commit()
-        // Deleting and recreating ensures all internal state is fresh and valid
-        if self.index_dir.exists() {
-            std::fs::remove_dir_all(&self.index_dir)?;
-        }
-        std::fs::create_dir_all(&self.index_dir)?;
+        // Delete all documents from the index instead of deleting the directory
+        // This is safer than deleting the directory while IndexWriter has references to it
+        // which can cause race conditions and file corruption
+        info!("Rebuilding search index by clearing all documents");
 
-        // Recreate the index with current schema - this creates a completely fresh Tantivy index
-        let _new_index = Index::create_in_dir(&self.index_dir, self.schema.clone())?;
+        let mut writer = self.writer.write().await;
+        writer.delete_all_documents()?;
+        writer.commit()?;
+        drop(writer);
 
-        // After recreating the index on disk, we need to reload our reader and writer references
-        // so they point to the new fresh index instance
+        // Reload the reader to reflect the cleared index
         self.reader.reload()?;
 
         // Clear the schema mismatch flag since we've successfully rebuilt the index
         *self.schema_mismatch.write().await = false;
 
+        info!("Search index rebuild complete");
         Ok(())
     }
 

@@ -25,7 +25,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files with specific sizes distributed across buckets
-        let test_files = vec![
+        let test_files = [
             ("file1.txt", 512, "small file"),         // < 1 KB (0-1023)
             ("file2.txt", 2048, "medium file"),       // 1 KB - 10 KB
             ("file3.txt", 50000, "large file"),       // 10 KB - 100 KB
@@ -34,7 +34,7 @@ mod search_size_facets_tests {
             ("file6.txt", 50000000, "enormous file"), // > 1 MB
         ];
 
-        for (_i, (name, size, content)) in test_files.iter().enumerate() {
+        for (name, size, content) in test_files.iter() {
             let file_id = Uuid::new_v4();
             let file_data = FileData {
                 file_id,
@@ -81,7 +81,7 @@ mod search_size_facets_tests {
         assert_eq!(facets.size_ranges.len(), 5, "Should have exactly 5 size buckets");
 
         // Expected counts: one file in each bucket, except last bucket has 2 (merged from old buckets)
-        let expected_counts = vec![1, 1, 1, 1, 2];
+        let expected_counts = [1, 1, 1, 1, 2];
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -97,7 +97,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Test exact boundary values - all with searchable content
-        let boundary_files = vec![
+        let boundary_files = [
             ("boundary_0.txt", 0, "boundary searchable"),           // 0 bytes - in < 1KB
             ("boundary_1023.txt", 1023, "boundary searchable"),     // Exactly 1023 - in < 1KB
             ("boundary_1024.txt", 1024, "boundary searchable"),     // Exactly 1024 - in 1-10KB
@@ -112,7 +112,7 @@ mod search_size_facets_tests {
             ("boundary_over_10mb.txt", 10485761, "boundary searchable"), // Just over 10MB
         ];
 
-        for (_i, (name, size, content)) in boundary_files.iter().enumerate() {
+        for (name, size, content) in boundary_files.iter() {
             let file_id = Uuid::new_v4();
             let file_data = FileData {
                 file_id,
@@ -157,7 +157,7 @@ mod search_size_facets_tests {
         // 10 KB - 100 KB: files at 10240, 102399 = 2 files
         // 100 KB - 1 MB: files at 102400, 1048575 = 2 files
         // > 1 MB: files at 1048576, 10485759, 10485760, 10485761 = 4 files (merged old buckets)
-        let expected_counts = vec![2, 2, 2, 2, 4];
+        let expected_counts = [2, 2, 2, 2, 4];
 
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
@@ -253,7 +253,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // Verify expected counts
-        let expected_counts = vec![5, 3, 2, 0, 0, 0];
+        let expected_counts = [5, 3, 2, 0, 0, 0];
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -323,7 +323,7 @@ mod search_size_facets_tests {
 
         // Verify size_ranges only reflects project-a results
         // < 1 KB: 1, 1 KB - 10 KB: 1, 10 KB - 100 KB: 1, rest: 0
-        let expected_counts = vec![1, 1, 1, 0, 0, 0];
+        let expected_counts = [1, 1, 1, 0, 0, 0];
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -389,7 +389,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // Verify size_ranges only reflects RS files: 1 < 1KB, 1 in 1-10KB, rest 0
-        let expected_counts = vec![1, 1, 0, 0, 0, 0];
+        let expected_counts = [1, 1, 0, 0, 0, 0];
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -405,7 +405,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index diverse files
-        let test_data = vec![
+        let test_data = [
             ("repo-a", "v1.0", "rs", 512),   // < 1 KB
             ("repo-a", "v1.0", "rs", 5000),  // 1-10 KB
             ("repo-a", "v1.0", "js", 50000), // 10-100 KB
@@ -455,7 +455,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // Both files are in different size buckets: 512 < 1KB, 5000 in 1-10KB
-        let expected_counts = vec![1, 1, 0, 0, 0, 0];
+        let expected_counts = [1, 1, 0, 0, 0, 0];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -472,7 +472,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files across all size ranges
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             2048,     // 1-10 KB
             50000,    // 10-100 KB
@@ -532,7 +532,7 @@ mod search_size_facets_tests {
         // 100KB-1MB: 1 (500KB)
         // 1-10MB: 1 (5MB)
         // > 10MB: 1 (50MB)
-        let expected_counts = vec![1, 1, 1, 1, 2];
+        let expected_counts = [1, 1, 1, 1, 2];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -588,7 +588,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present even with no results");
 
         // All size buckets should have 0 count
-        let expected_counts = vec![0, 0, 0, 0, 0, 0];
+        let expected_counts = [0, 0, 0, 0, 0, 0];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -605,7 +605,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files only in < 1KB and > 10MB buckets
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             50000000, // > 10MB
         ];
@@ -650,7 +650,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // Expected: 1 file < 1KB, 0 in middle buckets, 1 file > 1MB (merged buckets)
-        let expected_counts = vec![1, 0, 0, 0, 1];
+        let expected_counts = [1, 0, 0, 0, 1];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -710,7 +710,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // All 10 files in 1-10KB bucket, rest empty
-        let expected_counts = vec![0, 10, 0, 0, 0, 0];
+        let expected_counts = [0, 10, 0, 0, 0, 0];
         for (i, (label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -727,7 +727,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files across all size ranges
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             2048,     // 1-10 KB
             50000,    // 10-100 KB
@@ -786,7 +786,7 @@ mod search_size_facets_tests {
         // 100KB-1MB: 1 (500000 - still shown even though filtered out of results)
         // 1-10MB: 1 (5000000 - still shown even though filtered out of results)
         // > 10MB: 1 (50000000 - still shown even though filtered out of results)
-        let expected_counts = vec![1, 1, 1, 1, 2];
+        let expected_counts = [1, 1, 1, 1, 2];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -803,7 +803,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index files across all size ranges
-        let sizes = vec![
+        let sizes = [
             512,      // < 1 KB
             2048,     // 1-10 KB
             50000,    // 10-100 KB
@@ -861,7 +861,7 @@ mod search_size_facets_tests {
         // 100KB-1MB: 1 (500000 - matches and shown)
         // 1-10MB: 1 (5000000 - still shown even though filtered out of results)
         // > 10MB: 1 (50000000 - still shown even though filtered out of results)
-        let expected_counts = vec![1, 1, 1, 1, 2];
+        let expected_counts = [1, 1, 1, 1, 2];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],
@@ -878,7 +878,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index one file in each bucket to verify order
-        let sizes = vec![512, 2048, 50000, 500000, 5000000, 50000000];
+        let sizes = [512, 2048, 50000, 500000, 5000000, 50000000];
 
         for (i, size) in sizes.iter().enumerate() {
             let file_id = Uuid::new_v4();
@@ -920,7 +920,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // Verify the expected order of buckets
-        let expected_labels = vec!["< 1 KB", "1 KB - 10 KB", "10 KB - 100 KB", "100 KB - 1 MB", "> 1 MB"];
+        let expected_labels = ["< 1 KB", "1 KB - 10 KB", "10 KB - 100 KB", "100 KB - 1 MB", "> 1 MB"];
 
         for (i, (actual_label, _count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
@@ -938,7 +938,7 @@ mod search_size_facets_tests {
         let (service, _temp_dir, _guard) = create_test_search_service().await;
 
         // Index very large files
-        let sizes = vec![
+        let sizes = [
             100000000,   // 100 MB (> 1 MB)
             1000000000,  // 1 GB (> 1 MB)
             10000000000, // 10 GB (> 1 MB)
@@ -986,7 +986,7 @@ mod search_size_facets_tests {
         let facets = results.facets.expect("Facets should be present");
 
         // All files should be in > 1 MB bucket (merged buckets)
-        let expected_counts = vec![0, 0, 0, 0, 3];
+        let expected_counts = [0, 0, 0, 0, 3];
         for (i, (_label, count)) in facets.size_ranges.iter().enumerate() {
             assert_eq!(
                 *count, expected_counts[i],

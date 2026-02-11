@@ -1,6 +1,11 @@
 # Multi-stage build for Rust backend
 FROM rust:slim-trixie as builder
 
+# Accept build arguments for version info
+ARG KLASK_VERSION=2.0.0
+ARG GIT_COMMIT_HASH=""
+ARG BUILD_TIMESTAMP=""
+
 # Install system dependencies (no more openssl/perl needed with rustls!)
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -25,8 +30,11 @@ COPY src/ ./src/
 COPY migrations/ ./migrations/
 # COPY .sqlx/ ./.sqlx/
 
-# Build the application
+# Build the application with version information
 ENV SQLX_OFFLINE=true
+ENV KLASK_VERSION=${KLASK_VERSION}
+ENV GIT_COMMIT_HASH=${GIT_COMMIT_HASH}
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 RUN touch src/main.rs && cargo build --release
 
 # Runtime stage

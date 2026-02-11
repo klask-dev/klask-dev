@@ -37,6 +37,7 @@ const SearchPageV3: React.FC = () => {
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const { filters, setFilters, setCurrentQuery, updateDynamicFilters } = useSearchFiltersContext();
   const sizeFilter = filters.size;
+  const previousFiltersRef = React.useRef<typeof filters | undefined>(undefined);
 
   // Function to update URL with current search state
   const updateURL = useCallback((searchQuery: string, allFilters: typeof filters, page: number = 1) => {
@@ -110,6 +111,7 @@ const SearchPageV3: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Initialize from URL parameters
+   
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const urlQuery = urlParams.get('q') || '';
@@ -176,6 +178,24 @@ const SearchPageV3: React.FC = () => {
     updateURL(query, filters, currentPage);
   }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch, caseSensitive]);
 
+  // Reset to page 1 when filters change (prevents showing empty results on non-existent pages)
+  useEffect(() => {
+    if (isInitializing) return;
+
+    // Compare current filters with previous filters
+    const previousFilters = previousFiltersRef.current;
+    const filtersChanged = JSON.stringify(previousFilters) !== JSON.stringify(filters);
+
+    // Only reset page if filters actually changed
+    if (filtersChanged && currentPage !== 1) {
+      setCurrentPage(1);
+    }
+
+    // Update ref for next comparison
+    previousFiltersRef.current = filters;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, isInitializing]);
+
   // Sync query to context for facet fetching
   useEffect(() => {
     setCurrentQuery(query);
@@ -184,7 +204,7 @@ const SearchPageV3: React.FC = () => {
   // Convert regex flags object to string (e.g., {i: true, m: false, s: true} → "is")
   const regexFlagsString = regexSearch
     ? Object.entries(regexFlags)
-        .filter(([_, enabled]) => enabled)
+        .filter(([, enabled]) => enabled)
         .map(([flag]) => flag)
         .join('')
     : undefined;
@@ -224,7 +244,7 @@ const SearchPageV3: React.FC = () => {
         extensions: facets.extensions,
         repositories: facets.repositories,
         // Backend returns size_ranges in snake_case, not camelCase
-        size_ranges: (facets as any).size_ranges || facets.sizeRanges || [],
+        size_ranges: ((facets as Record<string, unknown>).size_ranges as typeof facets.sizeRanges) || facets.sizeRanges || [],
       });
     }
     // If query exists but facets is still loading/undefined, keep existing filters
@@ -281,14 +301,17 @@ const SearchPageV3: React.FC = () => {
   // Toggle handlers with mutual exclusivity logic
   const handleFuzzyToggle = useCallback(() => {
     setSearchMode(prev => (prev === 'fuzzy' ? 'normal' : 'fuzzy'));
+    setCurrentPage(1); // Reset to page 1 when toggling search mode
   }, []);
 
   const handleRegexToggle = useCallback(() => {
     setSearchMode(prev => (prev === 'regex' ? 'normal' : 'regex'));
+    setCurrentPage(1); // Reset to page 1 when toggling search mode
   }, []);
 
   const handleCaseSensitiveToggle = useCallback(() => {
     setCaseSensitive(prev => !prev);
+    setCurrentPage(1); // Reset to page 1 when toggling case sensitivity
   }, []);
 
   // Regex flags toggle handlers
@@ -297,12 +320,10 @@ const SearchPageV3: React.FC = () => {
       ...prev,
       [flag]: !prev[flag],
     }));
+    setCurrentPage(1); // Reset to page 1 when toggling regex flags
   }, []);
 
   const searchError = isError ? getErrorMessage(error) : null;
-
-  // Count active size filter
-  const activeFiltersCount = sizeFilter && (sizeFilter.min !== undefined || sizeFilter.max !== undefined) ? 1 : 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">

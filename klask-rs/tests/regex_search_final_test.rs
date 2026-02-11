@@ -516,7 +516,7 @@ mod regex_search_final_tests {
         for result in &results.results {
             // Snippets should be generated (either highlighted or plain)
             assert!(
-                !result.content_snippet.is_empty() || result.file_name.len() > 0,
+                !result.content_snippet.is_empty() || !result.file_name.is_empty(),
                 "Should have content snippet or file info"
             );
         }

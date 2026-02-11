@@ -1,6 +1,7 @@
 use super::file_processing::FileProcessor;
 use super::filter::filter_branches;
 use super::git_tree_walker::GitTreeWalker;
+use super::parsers::ParserDispatcher;
 use crate::models::Repository;
 use crate::services::progress::ProgressTracker;
 use crate::services::search::SearchService;
@@ -624,14 +625,17 @@ impl BranchProcessor {
 
     /// Check if a file is supported for indexing based on its extension or name
     fn is_supported_file_static(file_path: &Path) -> bool {
-        use super::file_processing::SUPPORTED_EXTENSIONS;
+        let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
 
-        if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
-            SUPPORTED_EXTENSIONS.contains(&extension.to_lowercase().as_str())
-        } else {
-            // Support files without extensions that might be scripts or config files
+        // Check if the file should be filtered (binary files are filtered)
+        if ParserDispatcher::should_filter(extension) {
+            return false;
+        }
+
+        // If no extension, check for special file names that are supported
+        if extension.is_empty() {
             if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-                matches!(
+                return matches!(
                     file_name.to_lowercase().as_str(),
                     "dockerfile"
                         | "makefile"
@@ -648,10 +652,14 @@ impl BranchProcessor {
                         | "install"
                         | "news"
                         | "todo"
-                )
-            } else {
-                false
+                );
             }
+            return false;
         }
+
+        // File has an extension and is not in the binary filter list
+        // Let the parser dispatcher determine if it can be parsed
+        // (Unknown parser will try to parse it as text if it's not binary)
+        true
     }
 }

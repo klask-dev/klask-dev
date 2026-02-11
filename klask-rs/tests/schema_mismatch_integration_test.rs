@@ -49,8 +49,8 @@ mod schema_mismatch_integration_tests {
         };
 
         // Verify the response structure matches the API contract
-        assert_eq!(has_mismatch, false);
-        assert_eq!(index_available, true);
+        assert!(!has_mismatch);
+        assert!(index_available);
         assert!(message.is_none());
     }
 
@@ -73,8 +73,8 @@ mod schema_mismatch_integration_tests {
         // - schema_mismatch should be true
         // - index_available should be false
         // - message should contain helpful text
-        assert_eq!(has_mismatch, true);
-        assert_eq!(index_available, false);
+        assert!(has_mismatch);
+        assert!(!index_available);
         assert!(message.is_some());
         assert!(message.unwrap().contains("rebuild"));
     }
@@ -132,7 +132,7 @@ mod schema_mismatch_integration_tests {
         // Response should include:
         // - schema_was_mismatch: true (indicating we detected and fixed it)
         // - current schema_mismatch: false (indicating it's now fixed)
-        assert_eq!(schema_was_mismatch, true);
+        assert!(schema_was_mismatch);
         assert!(!app_state.get_mismatch().await);
     }
 
@@ -148,7 +148,7 @@ mod schema_mismatch_integration_tests {
         app_state.set_mismatch(false).await;
 
         // Response should include schema_was_mismatch: false
-        assert_eq!(schema_was_mismatch, false);
+        assert!(!schema_was_mismatch);
         assert!(!app_state.get_mismatch().await);
     }
 

@@ -6,6 +6,7 @@ pub mod models;
 pub mod repositories;
 pub mod services;
 pub mod utils;
+pub mod version;
 
 // Testing utilities - centralized test database setup
 #[cfg(any(test, debug_assertions))]

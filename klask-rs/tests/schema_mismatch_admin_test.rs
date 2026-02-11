@@ -14,8 +14,8 @@ mod schema_mismatch_admin_tests {
         // Simulate response when there's no schema mismatch
         let response = SearchStatusResponse { schema_mismatch: false, index_available: true, message: None };
 
-        assert_eq!(response.schema_mismatch, false);
-        assert_eq!(response.index_available, true);
+        assert!(!response.schema_mismatch);
+        assert!(response.index_available);
         assert!(response.message.is_none());
         println!("✅ Search status response structure (no mismatch) is correct");
     }
@@ -31,8 +31,8 @@ mod schema_mismatch_admin_tests {
             message: Some("Index schema mismatch detected. Please rebuild the index in admin settings.".to_string()),
         };
 
-        assert_eq!(response.schema_mismatch, true);
-        assert_eq!(response.index_available, false);
+        assert!(response.schema_mismatch);
+        assert!(!response.index_available);
         assert!(response.message.is_some());
         assert!(response.message.unwrap().contains("rebuild the index"));
         println!("✅ Search status response structure (with mismatch) is correct");
@@ -69,8 +69,8 @@ mod schema_mismatch_admin_tests {
         }"#;
 
         let response: SearchStatusResponse = serde_json::from_str(json).expect("Failed to deserialize");
-        assert_eq!(response.schema_mismatch, true);
-        assert_eq!(response.index_available, false);
+        assert!(response.schema_mismatch);
+        assert!(!response.index_available);
         assert!(response.message.is_some());
         println!("✅ SearchStatusResponse deserializes from JSON correctly");
     }
@@ -87,8 +87,8 @@ mod schema_mismatch_admin_tests {
         }"#;
 
         let response: SearchStatusResponse = serde_json::from_str(json).expect("Failed to deserialize");
-        assert_eq!(response.schema_mismatch, false);
-        assert_eq!(response.index_available, true);
+        assert!(!response.schema_mismatch);
+        assert!(response.index_available);
         assert!(response.message.is_none());
         println!("✅ Status endpoint correctly omits message when healthy");
     }
@@ -214,7 +214,7 @@ mod schema_mismatch_admin_tests {
     /// Verifies that repeated status checks don't show inconsistent data.
     #[test]
     fn test_status_checks_consistency() {
-        let responses = vec![
+        let responses = [
             SearchStatusResponse { schema_mismatch: false, index_available: true, message: None },
             SearchStatusResponse { schema_mismatch: false, index_available: true, message: None },
             SearchStatusResponse { schema_mismatch: false, index_available: true, message: None },
@@ -222,13 +222,13 @@ mod schema_mismatch_admin_tests {
 
         // All responses should be identical (in a healthy state)
         for (i, response) in responses.iter().enumerate() {
-            assert_eq!(
-                response.schema_mismatch, false,
+            assert!(
+                !response.schema_mismatch,
                 "Response {} should have schema_mismatch=false",
                 i
             );
-            assert_eq!(
-                response.index_available, true,
+            assert!(
+                response.index_available,
                 "Response {} should have index_available=true",
                 i
             );

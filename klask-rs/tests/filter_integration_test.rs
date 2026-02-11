@@ -4,7 +4,6 @@
 /// Note: These tests focus on the filtering logic integration without requiring
 /// actual database or network connections. They validate the behavior of filters
 /// when applied to discovered projects/repositories during crawling.
-
 // Test utilities for creating mock data structures
 /// Mock GitLab project structure
 #[derive(Clone, Debug)]
@@ -820,6 +819,6 @@ mod edge_case_tests {
             true
         };
 
-        items.into_iter().filter(|item| pattern.map_or(true, |p| matches_pattern(item, p))).collect()
+        items.into_iter().filter(|item| pattern.is_none_or(|p| matches_pattern(item, p))).collect()
     }
 }
