@@ -223,13 +223,11 @@ impl SchedulerService {
     pub async fn get_next_run_time(&self, repository_id: Uuid) -> Option<DateTime<Utc>> {
         let jobs = self.jobs.read().await;
 
-        if let Some(job) = jobs.get(&repository_id) {
-            // Parse the cron and get next occurrence
-            if let Ok(cron) = job.cron_expression.parse::<Cron>()
-                && let Ok(next) = cron.find_next_occurrence(&Utc::now(), false)
-            {
-                return Some(next);
-            }
+        if let Some(job) = jobs.get(&repository_id)
+            && let Ok(cron) = job.cron_expression.parse::<Cron>() // Parse the cron and get next occurrence
+            && let Ok(next) = cron.find_next_occurrence(&Utc::now(), false)
+        {
+            return Some(next);
         }
 
         None

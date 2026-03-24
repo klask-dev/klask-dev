@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod crawl_edge_cases_tests {
     use klask_rs::services::progress::{CrawlStatus, ProgressTracker};
-    use rand::Rng;
+    use rand::RngExt;
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::time::{sleep, timeout};
@@ -205,11 +205,12 @@ mod crawl_edge_cases_tests {
 
         // Apply random operations
         let mut handles = vec![];
+        let mut rng = rand::rng();
         for _ in 0..500 {
-            let repo_id = repo_ids[rand::rng().random_range(0..repo_ids.len())];
+            let repo_id = repo_ids[rng.random_range(0..repo_ids.len())];
             let tracker_clone = Arc::clone(&tracker);
 
-            let random_operation = rand::rng().random_range(0..8);
+            let random_operation = rng.random_range(0..8);
             let handle = tokio::spawn(async move {
                 match random_operation {
                     0 => tracker_clone.is_crawling(repo_id).await,

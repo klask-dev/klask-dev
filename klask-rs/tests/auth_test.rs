@@ -91,7 +91,7 @@ async fn test_auth_endpoints_exist() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Test that auth endpoints exist (should return method not allowed or bad request, not 404)
         let login_response = server.get("/api/auth/login").await;
@@ -119,7 +119,7 @@ async fn test_register_validation() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Test registration with invalid data
         let invalid_register = json!({
@@ -145,7 +145,7 @@ async fn test_login_without_credentials() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Test login without credentials
         let response = server.post("/api/auth/login").json(&json!({})).await;
@@ -165,7 +165,7 @@ async fn test_protected_routes_require_auth() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Test that protected endpoints require authentication
 
@@ -225,7 +225,7 @@ async fn test_public_endpoints_work_without_auth() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Test that public endpoints work without authentication
         let status_response = server.get("/api/status").await;
@@ -350,7 +350,7 @@ async fn test_registration_status_when_enabled() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         let response = server.get("/api/auth/registration/status").await;
 
@@ -370,7 +370,7 @@ async fn test_registration_status_when_disabled() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         let response = server.get("/api/auth/registration/status").await;
 
@@ -394,7 +394,7 @@ async fn test_registration_blocked_when_disabled() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         let register_request = json!({
             "username": "testuser",
@@ -422,7 +422,7 @@ async fn test_registration_blocked_error_message() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         let register_request = json!({
             "username": "anotheruser",
@@ -451,7 +451,7 @@ async fn test_registration_allowed_when_enabled() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Test with invalid data - should fail validation, not registration disabled
         let invalid_register = json!({
@@ -485,7 +485,7 @@ async fn test_registration_check_happens_before_validation() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Even with invalid data, should get registration disabled error
         let invalid_register = json!({
@@ -516,7 +516,7 @@ async fn test_registration_status_is_accurate() {
     })) {
         let router_disabled = api::create_router().await.expect("Failed to create router");
         let app_disabled = router_disabled.with_state(app_state_disabled);
-        let server_disabled = TestServer::new(app_disabled).expect("Failed to create test server");
+        let server_disabled = TestServer::new(app_disabled);
 
         let status_response = server_disabled.get("/api/auth/registration/status").await;
         assert_eq!(status_response.status_code(), StatusCode::OK);
@@ -539,7 +539,7 @@ async fn test_multiple_registration_attempts_when_disabled() {
     })) {
         let router = api::create_router().await.expect("Failed to create router");
         let app = router.with_state(app_state);
-        let server = TestServer::new(app).expect("Failed to create test server");
+        let server = TestServer::new(app);
 
         // Try multiple registration attempts
         for i in 0..3 {
