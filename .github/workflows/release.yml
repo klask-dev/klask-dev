@@ -64,6 +64,7 @@ jobs:
         tags: |
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.version.outputs.tag }}
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:stable
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
         build-args: |
           VITE_APP_VERSION=${{ steps.build-meta.outputs.version }}
           VITE_APP_COMMIT=${{ steps.build-meta.outputs.commit }}
@@ -80,6 +81,7 @@ jobs:
         tags: |
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.version.outputs.tag }}
           ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:stable
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:latest
         build-args: |
           KLASK_VERSION=${{ steps.build-meta.outputs.version }}
           GIT_COMMIT_HASH=${{ steps.build-meta.outputs.commit }}
