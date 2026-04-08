@@ -8,7 +8,7 @@ on:
 
   workflow_dispatch:  # Permettre déclenchement manuel
   workflow_run:
-    workflows: ["2️⃣ Build images", "Release"]
+    workflows: ["Release"]
     types:
       - completed
     branches:
