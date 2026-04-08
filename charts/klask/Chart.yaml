@@ -3,8 +3,8 @@ icon: https://raw.githubusercontent.com/klask-dev/klask-dev/refs/heads/master/re
 name: klask
 description: A Helm chart for Klask - Modern code search engine written in Rust
 type: application
-version: 0.2.0
-appVersion: "0.1.0"
+version: 2.1.0
+appVersion: "2.1.0"
 home: https://github.com/klask-dev/klask-dev
 sources:
   - https://github.com/klask-dev/klask-dev
