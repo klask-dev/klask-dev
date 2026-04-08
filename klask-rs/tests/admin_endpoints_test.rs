@@ -61,7 +61,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
     };
 
     let app = klask_rs::api::create_router().await?.with_state(app_state.clone());
-    let server = TestServer::new(app)?;
+    let server = TestServer::new(app);
 
     Ok((server, app_state))
 }

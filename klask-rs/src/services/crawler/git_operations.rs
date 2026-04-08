@@ -117,6 +117,7 @@ impl GitOperations {
                     let token_for_creds = token.clone();
                     prep = prep.configure_connection(move |connection| {
                         let token_for_closure = token_for_creds.clone();
+                        #[allow(clippy::result_large_err)] // external lib should fix this issue
                         connection.set_credentials(move |action| {
                             // Extract context from the action
                             if let gix::credentials::helper::Action::Get(ctx) = action {
@@ -139,6 +140,7 @@ impl GitOperations {
                 } else {
                     // No token - refuse credentials to prevent prompting
                     prep = prep.configure_connection(move |connection| {
+                        #[allow(clippy::result_large_err)] // external lib should fix this issue
                         connection.set_credentials(move |_action| Err(gix::credentials::protocol::Error::Quit));
                         Ok(())
                     });
