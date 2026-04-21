@@ -77,3 +77,4 @@ _ parfois j'ai INFO tantivy::indexer::index_writer: Buffer limit reached, flushi
 - faire des tests sur les regex, elles ne fonctionnent pas
 - Implémenter vraiment "Remember me"  - Sans checkbox : sessionStorage (expire à la fermeture)  - Avec checkbox : localStorage (persiste)
 - Implémenter vraiment le forgot Password - nécessite la configuration d'un serveur de Mail
+- les nouvelles branches créées sur un repo git ne sont pas vu lors les crawls les jours suivants
