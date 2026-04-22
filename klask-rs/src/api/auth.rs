@@ -6,9 +6,9 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use uuid::Uuid;
 use validator::Validate;
-use tracing::warn;
 
 use crate::auth::{AuthError, AuthenticatedUser, extractors::AppState};
 use crate::models::user::{
@@ -121,7 +121,10 @@ async fn login(
                     let remaining_time = LOGIN_RATE_LIMIT_WINDOW_SECS - elapsed.as_secs();
                     warn!("Login rate limit exceeded for user: {}", username);
                     return Err(AuthError::TooManyAttempts(
-                        format!("Too many login attempts. Please try again in {} seconds", remaining_time),
+                        format!(
+                            "Too many login attempts. Please try again in {} seconds",
+                            remaining_time
+                        ),
                         remaining_time as u32,
                     ));
                 }

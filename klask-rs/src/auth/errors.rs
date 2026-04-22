@@ -87,7 +87,8 @@ impl IntoResponse for AuthError {
 
         // Add Retry-After header if rate limited
         if let Some(retry_after_secs) = retry_after
-            && let Ok(header_value) = retry_after_secs.to_string().parse() {
+            && let Ok(header_value) = retry_after_secs.to_string().parse()
+        {
             response.headers_mut().insert("Retry-After", header_value);
         }
 

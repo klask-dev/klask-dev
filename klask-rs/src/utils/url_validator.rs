@@ -40,7 +40,8 @@ pub fn validate_external_url(url: &str) -> Result<(), String> {
 
     // Try to parse as IP address to check for private ranges
     if let Ok(ip) = hostname.parse::<IpAddr>()
-        && is_private_ip(ip) {
+        && is_private_ip(ip)
+    {
         return Err("URL hostname cannot be a private IP address".to_string());
     }
 

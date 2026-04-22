@@ -555,7 +555,8 @@ async fn create_repository(
 
     // Validate FileSystem path if it's a FileSystem repository
     if request.repository_type == RepositoryType::FileSystem
-        && let Err(e) = validate_filesystem_path(&request.url) {
+        && let Err(e) = validate_filesystem_path(&request.url)
+    {
         error!("Invalid FileSystem path '{}': {}", request.url, e);
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -705,7 +706,8 @@ async fn update_repository(
     if let Some(repository_type) = request.repository_type {
         // If changing to FileSystem, validate the URL
         if repository_type == RepositoryType::FileSystem
-            && let Err(e) = validate_filesystem_path(&repository.url) {
+            && let Err(e) = validate_filesystem_path(&repository.url)
+        {
             error!("Invalid FileSystem path '{}': {}", repository.url, e);
             return Err(StatusCode::BAD_REQUEST);
         }
