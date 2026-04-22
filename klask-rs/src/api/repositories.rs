@@ -3,6 +3,7 @@ use crate::models::{Repository, RepositoryType};
 use crate::repositories::RepositoryRepository;
 use crate::services::github::{GitHubRepository, GitHubService};
 use crate::services::gitlab::{GitLabProject, GitLabService};
+use crate::utils::url_validator::validate_external_url;
 use anyhow::Result;
 use axum::{
     Router,
@@ -1096,6 +1097,12 @@ async fn discover_gitlab_repositories(
     State(_app_state): State<AppState>,
     Json(request): Json<DiscoverGitLabRequest>,
 ) -> Result<Json<DiscoverGitLabResponse>, StatusCode> {
+    // Validate GitLab URL against SSRF
+    if let Err(e) = validate_external_url(&request.gitlab_url) {
+        warn!("SSRF validation failed for GitLab URL: {}", e);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     info!(
         "Discovering GitLab projects from {} with namespace: {:?}",
         request.gitlab_url, request.namespace
@@ -1124,6 +1131,15 @@ async fn test_gitlab_token(
     State(_app_state): State<AppState>,
     Json(request): Json<TestGitLabTokenRequest>,
 ) -> Result<Json<TestTokenResponse>, StatusCode> {
+    // Validate GitLab URL against SSRF
+    if let Err(e) = validate_external_url(&request.gitlab_url) {
+        warn!("SSRF validation failed for GitLab URL: {}", e);
+        return Ok(Json(TestTokenResponse {
+            valid: false,
+            message: format!("Invalid GitLab URL: {}", e),
+        }));
+    }
+
     info!("Testing GitLab token for URL: {}", request.gitlab_url);
 
     let gitlab_service = GitLabService::new();
