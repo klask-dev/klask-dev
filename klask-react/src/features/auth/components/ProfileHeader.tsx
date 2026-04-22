@@ -9,8 +9,11 @@ const ProfileHeader: React.FC = () => {
   const [dragOver, setDragOver] = useState(false);
 
   const handleFileSelect = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+    // Whitelist of allowed image MIME types
+    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      alert('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
       return;
     }
 
