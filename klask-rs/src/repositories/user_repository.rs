@@ -51,6 +51,39 @@ impl UserRepository {
         Ok(result)
     }
 
+    /// Atomically creates the first admin user if no users exist yet.
+    /// This prevents race conditions during initial setup.
+    /// Returns Some(user) if the user was created, None if a user already existed.
+    pub async fn create_first_admin_if_not_exists(&self, user: &User) -> Result<Option<User>> {
+        let result = sqlx::query_as::<_, User>(
+            "INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count)
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+             WHERE NOT EXISTS (SELECT 1 FROM users)
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count"
+        )
+        .bind(user.id)
+        .bind(&user.username)
+        .bind(&user.email)
+        .bind(&user.password_hash)
+        .bind(&user.role)
+        .bind(user.active)
+        .bind(user.created_at)
+        .bind(user.updated_at)
+        .bind(user.last_login)
+        .bind(user.last_activity)
+        .bind(&user.avatar_url)
+        .bind(&user.bio)
+        .bind(&user.full_name)
+        .bind(&user.phone)
+        .bind(&user.timezone)
+        .bind(&user.preferences)
+        .bind(user.login_count)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result)
+    }
+
     pub async fn find_by_username(&self, username: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count FROM users WHERE username = $1"

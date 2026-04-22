@@ -219,17 +219,10 @@ async fn initial_setup(
 
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
-    // Check if any users exist
-    let user_count = user_repo.count_users().await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
-
-    if user_count > 0 {
-        return Err(AuthError::Forbidden("Setup already completed".to_string()));
-    }
-
     // Hash password
     let password_hash = hash_password(&req.password).map_err(|_| AuthError::InvalidCredentials)?;
 
-    // Create the first admin user
+    // Create the first admin user atomically
     let admin_user = User {
         id: Uuid::new_v4(),
         username: req.username.clone(),
@@ -250,7 +243,12 @@ async fn initial_setup(
         login_count: 0,
     };
 
-    let user = user_repo.create_user(&admin_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    // Use atomic insert: only succeeds if no users exist
+    let user = user_repo
+        .create_first_admin_if_not_exists(&admin_user)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
+        .ok_or_else(|| AuthError::Forbidden("Setup already completed".to_string()))?;
 
     // Generate JWT token
     let token = app_state
