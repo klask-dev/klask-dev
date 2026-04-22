@@ -142,3 +142,12 @@ index/
 index2/
 test_upsert_index*
 test_index*
+
+######################
+# Environment files
+######################
+.env
+.env.local
+.env.*.local
+klask-rs/.env
+klask-react/.env
