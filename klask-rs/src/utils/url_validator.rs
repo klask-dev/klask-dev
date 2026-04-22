@@ -18,13 +18,7 @@ pub fn validate_external_url(url: &str) -> Result<(), String> {
     // Extract hostname from URL
     // Remove the https:// prefix and get everything before the first / or :
     let url_after_scheme = &url[8..]; // Skip "https://"
-    let hostname = url_after_scheme
-        .split('/')
-        .next()
-        .unwrap_or("")
-        .split(':')
-        .next()
-        .unwrap_or("");
+    let hostname = url_after_scheme.split('/').next().unwrap_or("").split(':').next().unwrap_or("");
 
     if hostname.is_empty() {
         return Err("URL must contain a valid hostname".to_string());
@@ -40,19 +34,14 @@ pub fn validate_external_url(url: &str) -> Result<(), String> {
     }
 
     // Reject loopback IPs and special cases
-    if hostname == "127.0.0.1"
-        || hostname == "::1"
-        || hostname == "0.0.0.0"
-        || hostname == "localhost"
-    {
+    if hostname == "127.0.0.1" || hostname == "::1" || hostname == "0.0.0.0" || hostname == "localhost" {
         return Err("URL hostname cannot be a loopback address".to_string());
     }
 
     // Try to parse as IP address to check for private ranges
-    if let Ok(ip) = hostname.parse::<IpAddr>() {
-        if is_private_ip(ip) {
-            return Err("URL hostname cannot be a private IP address".to_string());
-        }
+    if let Ok(ip) = hostname.parse::<IpAddr>()
+        && is_private_ip(ip) {
+        return Err("URL hostname cannot be a private IP address".to_string());
     }
 
     Ok(())

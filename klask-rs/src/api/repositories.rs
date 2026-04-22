@@ -554,11 +554,10 @@ async fn create_repository(
     let repo_repository = RepositoryRepository::new(app_state.database.pool().clone());
 
     // Validate FileSystem path if it's a FileSystem repository
-    if request.repository_type == RepositoryType::FileSystem {
-        if let Err(e) = validate_filesystem_path(&request.url) {
-            error!("Invalid FileSystem path '{}': {}", request.url, e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if request.repository_type == RepositoryType::FileSystem
+        && let Err(e) = validate_filesystem_path(&request.url) {
+        error!("Invalid FileSystem path '{}': {}", request.url, e);
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     // Validate GitHub namespace if provided
@@ -697,21 +696,18 @@ async fn update_repository(
             .as_ref()
             .map(|t| t == &RepositoryType::FileSystem)
             .unwrap_or_else(|| repository.repository_type == RepositoryType::FileSystem);
-        if is_filesystem {
-            if let Err(e) = validate_filesystem_path(&url) {
-                error!("Invalid FileSystem path '{}': {}", url, e);
-                return Err(StatusCode::BAD_REQUEST);
-            }
+        if is_filesystem && let Err(e) = validate_filesystem_path(&url) {
+            error!("Invalid FileSystem path '{}': {}", url, e);
+            return Err(StatusCode::BAD_REQUEST);
         }
         repository.url = url;
     }
     if let Some(repository_type) = request.repository_type {
         // If changing to FileSystem, validate the URL
-        if repository_type == RepositoryType::FileSystem {
-            if let Err(e) = validate_filesystem_path(&repository.url) {
-                error!("Invalid FileSystem path '{}': {}", repository.url, e);
-                return Err(StatusCode::BAD_REQUEST);
-            }
+        if repository_type == RepositoryType::FileSystem
+            && let Err(e) = validate_filesystem_path(&repository.url) {
+            error!("Invalid FileSystem path '{}': {}", repository.url, e);
+            return Err(StatusCode::BAD_REQUEST);
         }
         repository.repository_type = repository_type;
     }

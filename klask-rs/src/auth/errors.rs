@@ -51,18 +51,28 @@ impl IntoResponse for AuthError {
             AuthError::InvalidToken(_) | AuthError::TokenExpired => {
                 (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string(), None)
             }
-            AuthError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "Invalid username or password".to_string(), None),
+            AuthError::InvalidCredentials => (
+                StatusCode::UNAUTHORIZED,
+                "Invalid username or password".to_string(),
+                None,
+            ),
             AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "User not found".to_string(), None),
             AuthError::UserInactive => (StatusCode::UNAUTHORIZED, "User account is inactive".to_string(), None),
             AuthError::InsufficientPermissions => (StatusCode::FORBIDDEN, "Insufficient permissions".to_string(), None),
             AuthError::UsernameExists => (StatusCode::CONFLICT, "Username already exists".to_string(), None),
             AuthError::EmailExists => (StatusCode::CONFLICT, "Email already exists".to_string(), None),
-            AuthError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string(), None),
+            AuthError::DatabaseError(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+                None,
+            ),
             AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone(), None),
             AuthError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone(), None),
-            AuthError::RegistrationDisabled => {
-                (StatusCode::FORBIDDEN, "Registration is currently disabled".to_string(), None)
-            }
+            AuthError::RegistrationDisabled => (
+                StatusCode::FORBIDDEN,
+                "Registration is currently disabled".to_string(),
+                None,
+            ),
             AuthError::TooManyAttempts(msg, retry_after_secs) => {
                 (StatusCode::TOO_MANY_REQUESTS, msg.clone(), Some(*retry_after_secs))
             }
@@ -76,10 +86,9 @@ impl IntoResponse for AuthError {
         let mut response = (status, Json(body)).into_response();
 
         // Add Retry-After header if rate limited
-        if let Some(retry_after_secs) = retry_after {
-            if let Ok(header_value) = retry_after_secs.to_string().parse() {
-                response.headers_mut().insert("Retry-After", header_value);
-            }
+        if let Some(retry_after_secs) = retry_after
+            && let Ok(header_value) = retry_after_secs.to_string().parse() {
+            response.headers_mut().insert("Retry-After", header_value);
         }
 
         response
