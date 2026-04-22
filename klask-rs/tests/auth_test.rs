@@ -42,9 +42,7 @@ async fn create_test_app_state() -> AppState {
             jwt_expires_in: "1h".to_string(),
             allow_registration: true,
         },
-        cors: klask_rs::config::CorsConfig {
-            allowed_origins: vec!["http://localhost:5173".to_string()],
-        },
+        cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
     };
 
     // Create JWT service
@@ -273,9 +271,7 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
             jwt_expires_in: "1h".to_string(),
             allow_registration,
         },
-        cors: klask_rs::config::CorsConfig {
-            allowed_origins: vec!["http://localhost:5173".to_string()],
-        },
+        cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
     };
 
     // Create JWT service
