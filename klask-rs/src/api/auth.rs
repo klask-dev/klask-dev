@@ -8,6 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
+use tracing::warn;
 
 use crate::auth::{AuthError, AuthenticatedUser, extractors::AppState};
 use crate::models::user::{
@@ -95,14 +96,49 @@ async fn login(
     State(app_state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<AuthResponse>, AuthError> {
+    const MAX_LOGIN_ATTEMPTS: u32 = 10;
+    const LOGIN_RATE_LIMIT_WINDOW_SECS: u64 = 900; // 15 minutes
+
     // Validate request
     req.validate().map_err(|_| AuthError::InvalidCredentials)?;
+
+    let username = req.username.clone();
+    let now = std::time::SystemTime::now();
+
+    // Check rate limiting for login attempts
+    {
+        let mut limiter = app_state.login_rate_limiter.write().await;
+
+        if let Some((attempts, last_reset)) = limiter.get_mut(&username) {
+            // Check if we need to reset the counter
+            if let Ok(elapsed) = now.duration_since(*last_reset) {
+                if elapsed.as_secs() > LOGIN_RATE_LIMIT_WINDOW_SECS {
+                    // Reset the counter
+                    *attempts = 0;
+                    *last_reset = now;
+                } else if *attempts >= MAX_LOGIN_ATTEMPTS {
+                    // Too many login attempts
+                    let remaining_time = LOGIN_RATE_LIMIT_WINDOW_SECS - elapsed.as_secs();
+                    warn!("Login rate limit exceeded for user: {}", username);
+                    return Err(AuthError::TooManyAttempts(
+                        format!("Too many login attempts. Please try again in {} seconds", remaining_time),
+                        remaining_time as u32,
+                    ));
+                }
+            }
+            // Increment attempt counter
+            *attempts += 1;
+        } else {
+            // First attempt for this username
+            limiter.insert(username.clone(), (1, now));
+        }
+    }
 
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
     // Find user by username
     let user = user_repo
-        .find_by_username(&req.username)
+        .find_by_username(&username)
         .await
         .map_err(|e| AuthError::DatabaseError(e.to_string()))?
         .ok_or(AuthError::InvalidCredentials)?;
@@ -118,6 +154,9 @@ async fn login(
     if !is_valid {
         return Err(AuthError::InvalidCredentials);
     }
+
+    // Clear rate limit on successful login
+    app_state.login_rate_limiter.write().await.remove(&username);
 
     // Update last_login and last_activity timestamps
     let user = user_repo.update_last_login(user.id).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;

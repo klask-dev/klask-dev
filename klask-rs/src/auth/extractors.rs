@@ -29,6 +29,8 @@ pub struct AppState {
     pub startup_time: Instant,
     /// Rate limiter for delete account attempts (user_id -> (attempts, last_reset_time))
     pub delete_account_rate_limiter: Arc<RwLock<HashMap<Uuid, (u32, std::time::SystemTime)>>>,
+    /// Rate limiter for login attempts (username -> (attempts, last_reset_time))
+    pub login_rate_limiter: Arc<RwLock<HashMap<String, (u32, std::time::SystemTime)>>>,
 }
 
 #[derive(Debug, Clone)]

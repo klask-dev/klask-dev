@@ -10,7 +10,7 @@ mod version;
 
 use anyhow::Result;
 use auth::{extractors::AppState, jwt::JwtService};
-use axum::{Json, Router, routing::get, http};
+use axum::{Json, Router, http, routing::get};
 use config::AppConfig;
 use database::Database;
 use serde::Serialize;
@@ -209,6 +209,7 @@ async fn main() -> Result<()> {
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time,
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     };
 
     // Build application router
@@ -258,22 +259,16 @@ async fn shutdown_signal() {
 
 async fn create_app(app_state: AppState, config: AppConfig) -> Result<Router> {
     // Build CORS layer with configured allowed origins
-    let allowed_origins: Vec<_> = config
-        .cors
-        .allowed_origins
-        .iter()
-        .filter_map(|origin| origin.parse::<http::HeaderValue>().ok())
-        .collect();
+    let allowed_origins: Vec<_> =
+        config.cors.allowed_origins.iter().filter_map(|origin| origin.parse::<http::HeaderValue>().ok()).collect();
 
     let cors = CorsLayer::new()
-        .allow_origin(
-            if allowed_origins.is_empty() {
-                // Fallback: create a list with localhost if none configured
-                vec!["http://localhost:5173".parse().unwrap(), "http://localhost:8080".parse().unwrap()]
-            } else {
-                allowed_origins
-            }
-        )
+        .allow_origin(if allowed_origins.is_empty() {
+            // Fallback: create a list with localhost if none configured
+            vec!["http://localhost:5173".parse().unwrap(), "http://localhost:8080".parse().unwrap()]
+        } else {
+            allowed_origins
+        })
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
@@ -281,10 +276,7 @@ async fn create_app(app_state: AppState, config: AppConfig) -> Result<Router> {
             axum::http::Method::DELETE,
             axum::http::Method::PATCH,
         ])
-        .allow_headers([
-            axum::http::header::AUTHORIZATION,
-            axum::http::header::CONTENT_TYPE,
-        ]);
+        .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]);
 
     let app = Router::new()
         .route("/", get(root_handler))
