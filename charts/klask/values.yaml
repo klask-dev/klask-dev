@@ -28,7 +28,7 @@ serviceAccount:
   ## @param serviceAccount.create Specifies whether a ServiceAccount should be created
   create: true
   ## @param serviceAccount.automount Automatically mount a ServiceAccount's API credentials?
-  automount: true
+  automount: false
   ## @param serviceAccount.annotations Annotations to add to the service account
   annotations: {}
   ## @param serviceAccount.name The name of the ServiceAccount to use.
