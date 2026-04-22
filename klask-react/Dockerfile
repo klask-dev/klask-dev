@@ -42,6 +42,9 @@ RUN npm run build
 # Production stage with nginx
 FROM nginx:alpine
 
+# Install jq for secure JSON encoding in entrypoint.sh
+RUN apk add --no-cache jq
+
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
