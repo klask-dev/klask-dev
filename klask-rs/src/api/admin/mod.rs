@@ -149,7 +149,10 @@ pub async fn create_router() -> Result<Router<AppState>> {
     Ok(router)
 }
 
-async fn get_dashboard_data(State(app_state): State<AppState>) -> Result<Json<AdminDashboardData>, StatusCode> {
+async fn get_dashboard_data(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<AdminDashboardData>, StatusCode> {
     debug!("Getting dashboard data for admin user");
     let pool = app_state.database.pool().clone();
 
@@ -194,14 +197,20 @@ async fn get_dashboard_data(State(app_state): State<AppState>) -> Result<Json<Ad
     Ok(Json(dashboard_data))
 }
 
-async fn get_system_stats(State(app_state): State<AppState>) -> Result<Json<SystemStats>, StatusCode> {
+async fn get_system_stats(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<SystemStats>, StatusCode> {
     match get_system_stats_impl(&app_state).await {
         Ok(stats) => Ok(Json(stats)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
-async fn get_user_stats(State(app_state): State<AppState>) -> Result<Json<UserStats>, StatusCode> {
+async fn get_user_stats(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<UserStats>, StatusCode> {
     let pool = app_state.database.pool().clone();
     match get_user_stats_impl(&pool).await {
         Ok(stats) => Ok(Json(stats)),
@@ -209,7 +218,10 @@ async fn get_user_stats(State(app_state): State<AppState>) -> Result<Json<UserSt
     }
 }
 
-async fn get_repository_stats(State(app_state): State<AppState>) -> Result<Json<RepositoryStats>, StatusCode> {
+async fn get_repository_stats(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<RepositoryStats>, StatusCode> {
     let pool = app_state.database.pool().clone();
     match get_repository_stats_impl(&pool).await {
         Ok(stats) => Ok(Json(stats)),
@@ -217,14 +229,20 @@ async fn get_repository_stats(State(app_state): State<AppState>) -> Result<Json<
     }
 }
 
-async fn get_search_stats(State(app_state): State<AppState>) -> Result<Json<SearchStats>, StatusCode> {
+async fn get_search_stats(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<SearchStats>, StatusCode> {
     match get_search_stats_impl(&app_state).await {
         Ok(stats) => Ok(Json(stats)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
-async fn get_content_stats(State(app_state): State<AppState>) -> Result<Json<ContentStats>, StatusCode> {
+async fn get_content_stats(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<ContentStats>, StatusCode> {
     let pool = app_state.database.pool().clone();
     match get_content_stats_impl(&pool).await {
         Ok(stats) => Ok(Json(stats)),
@@ -232,7 +250,10 @@ async fn get_content_stats(State(app_state): State<AppState>) -> Result<Json<Con
     }
 }
 
-async fn get_recent_activity(State(app_state): State<AppState>) -> Result<Json<RecentActivity>, StatusCode> {
+async fn get_recent_activity(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<RecentActivity>, StatusCode> {
     let pool = app_state.database.pool().clone();
     match get_recent_activity_impl(&pool).await {
         Ok(activity) => Ok(Json(activity)),
@@ -449,7 +470,10 @@ async fn get_recent_activity_impl(pool: &PgPool) -> Result<RecentActivity> {
 
 // Seeding endpoints
 
-async fn seed_database(State(app_state): State<AppState>) -> Result<Json<SeedingStats>, StatusCode> {
+async fn seed_database(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<SeedingStats>, StatusCode> {
     info!("Admin user requested database seeding");
     let pool = app_state.database.pool().clone();
     let seeding_service = SeedingService::new(pool);
@@ -468,7 +492,10 @@ async fn seed_database(State(app_state): State<AppState>) -> Result<Json<Seeding
     Ok(Json(stats))
 }
 
-async fn clear_seed_data(State(app_state): State<AppState>) -> Result<Json<SeedingStats>, StatusCode> {
+async fn clear_seed_data(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<SeedingStats>, StatusCode> {
     info!("Admin user requested seed data clearing");
     let pool = app_state.database.pool().clone();
     let seeding_service = SeedingService::new(pool);
@@ -487,7 +514,10 @@ async fn clear_seed_data(State(app_state): State<AppState>) -> Result<Json<Seedi
     Ok(Json(stats))
 }
 
-async fn get_seed_stats(State(app_state): State<AppState>) -> Result<Json<SeedingStats>, StatusCode> {
+async fn get_seed_stats(
+    _admin_user: AdminUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<SeedingStats>, StatusCode> {
     debug!("Getting seeding stats for admin user");
     let pool = app_state.database.pool().clone();
     let seeding_service = SeedingService::new(pool);
