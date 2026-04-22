@@ -356,7 +356,7 @@ impl SchedulerService {
         }
 
         // Sort by next run time
-        next_runs.sort_by(|a, b| a.next_run_at.cmp(&b.next_run_at));
+        next_runs.sort_by_key(|a| a.next_run_at);
 
         let scheduled_count = jobs.len();
 
