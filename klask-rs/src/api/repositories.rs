@@ -190,7 +190,8 @@ fn validate_filesystem_path(path: &str) -> Result<(), String> {
     }
 
     // Reject access to dangerous system directories
-    let forbidden_dirs = ["/etc", "/proc", "/sys", "/root", "/boot", "/dev", "/sbin", "/bin", "/lib", "/usr/bin", "/usr/sbin"];
+    let forbidden_dirs =
+        ["/etc", "/proc", "/sys", "/root", "/boot", "/dev", "/sbin", "/bin", "/lib", "/usr/bin", "/usr/sbin"];
     let path_str = path;
 
     for forbidden in &forbidden_dirs {
@@ -535,16 +536,18 @@ async fn create_repository(
     State(app_state): State<AppState>,
     body: Bytes,
 ) -> Result<Json<Repository>, StatusCode> {
-    debug!("Received raw JSON body: {:?}", String::from_utf8_lossy(&body));
+    debug!("Received create repository request");
 
-    let request: CreateRepositoryRequest = match serde_json::from_slice(&body) {
+    let request: CreateRepositoryRequest = match serde_json::from_slice::<CreateRepositoryRequest>(&body) {
         Ok(req) => {
-            debug!("Successfully parsed create repository request: {:?}", req);
+            debug!(
+                "Successfully parsed create repository request: name={}, type={:?}",
+                req.name, req.repository_type
+            );
             req
         }
         Err(e) => {
             error!("Failed to parse JSON request: {}", e);
-            error!("Raw body: {}", String::from_utf8_lossy(&body));
             return Err(StatusCode::UNPROCESSABLE_ENTITY);
         }
     };
@@ -689,7 +692,11 @@ async fn update_repository(
     }
     if let Some(url) = request.url {
         // Validate FileSystem path if it's a FileSystem repository (either existing or being changed to)
-        let is_filesystem = request.repository_type.as_ref().map(|t| t == &RepositoryType::FileSystem).unwrap_or_else(|| repository.repository_type == RepositoryType::FileSystem);
+        let is_filesystem = request
+            .repository_type
+            .as_ref()
+            .map(|t| t == &RepositoryType::FileSystem)
+            .unwrap_or_else(|| repository.repository_type == RepositoryType::FileSystem);
         if is_filesystem {
             if let Err(e) = validate_filesystem_path(&url) {
                 error!("Invalid FileSystem path '{}': {}", url, e);
