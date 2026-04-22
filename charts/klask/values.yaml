@@ -555,7 +555,7 @@ postgresql:
 
 networkPolicy:
   ## @param networkPolicy.enabled Enable NetworkPolicy
-  enabled: false
+  enabled: true
 
   ## @param networkPolicy.ingress Ingress controller configuration for NetworkPolicy
   ingress:
