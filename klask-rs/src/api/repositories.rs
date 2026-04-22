@@ -173,6 +173,35 @@ fn validate_github_namespace(namespace: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Validates FileSystem repository paths against path traversal attacks
+fn validate_filesystem_path(path: &str) -> Result<(), String> {
+    use std::path::{Component, Path};
+
+    let pb = Path::new(path);
+
+    // Must be an absolute path
+    if !pb.is_absolute() {
+        return Err("FileSystem path must be absolute".to_string());
+    }
+
+    // Check for ".." components (parent directory traversal)
+    if pb.components().any(|c| c == Component::ParentDir) {
+        return Err("FileSystem path must not contain '..'".to_string());
+    }
+
+    // Reject access to dangerous system directories
+    let forbidden_dirs = ["/etc", "/proc", "/sys", "/root", "/boot", "/dev", "/sbin", "/bin", "/lib", "/usr/bin", "/usr/sbin"];
+    let path_str = path;
+
+    for forbidden in &forbidden_dirs {
+        if path_str == *forbidden || path_str.starts_with(&format!("{}/", forbidden)) {
+            return Err("FileSystem path points to a restricted directory".to_string());
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/", get(list_repositories).post(create_repository))
@@ -521,6 +550,14 @@ async fn create_repository(
     };
     let repo_repository = RepositoryRepository::new(app_state.database.pool().clone());
 
+    // Validate FileSystem path if it's a FileSystem repository
+    if request.repository_type == RepositoryType::FileSystem {
+        if let Err(e) = validate_filesystem_path(&request.url) {
+            error!("Invalid FileSystem path '{}': {}", request.url, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+
     // Validate GitHub namespace if provided
     if let Some(ref github_namespace) = request.github_namespace
         && let Err(e) = validate_github_namespace(github_namespace)
@@ -651,9 +688,24 @@ async fn update_repository(
         repository.name = name;
     }
     if let Some(url) = request.url {
+        // Validate FileSystem path if it's a FileSystem repository (either existing or being changed to)
+        let is_filesystem = request.repository_type.as_ref().map(|t| t == &RepositoryType::FileSystem).unwrap_or_else(|| repository.repository_type == RepositoryType::FileSystem);
+        if is_filesystem {
+            if let Err(e) = validate_filesystem_path(&url) {
+                error!("Invalid FileSystem path '{}': {}", url, e);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
         repository.url = url;
     }
     if let Some(repository_type) = request.repository_type {
+        // If changing to FileSystem, validate the URL
+        if repository_type == RepositoryType::FileSystem {
+            if let Err(e) = validate_filesystem_path(&repository.url) {
+                error!("Invalid FileSystem path '{}': {}", repository.url, e);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
         repository.repository_type = repository_type;
     }
     if let Some(branch) = request.branch {
