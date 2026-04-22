@@ -58,6 +58,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
         startup_time: Instant::now(),
         encryption_service: Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap()),
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     };
 
     let app = klask_rs::api::create_router().await?.with_state(app_state.clone());
