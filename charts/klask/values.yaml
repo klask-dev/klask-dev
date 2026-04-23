@@ -579,6 +579,17 @@ postgresql:
     ## @param postgresql.external.url External database full URL
     ## If provided, overrides host/port/database/username/password
     ## Format: postgresql://user:password@host:port/database
+    ## SECURITY: TLS is added by default with sslmode=prefer
+    ##
+    ## To require TLS in production, append ?sslmode=require to your URL:
+    ##   postgresql://user:password@host:port/database?sslmode=require
+    ##
+    ## Valid sslmode values:
+    ##   disable     - No SSL connection (not recommended)
+    ##   prefer      - Use SSL if available (default, added automatically)
+    ##   require     - Always use SSL, fail if unavailable (production)
+    ##   verify-ca   - Require SSL with CA certificate verification
+    ##   verify-full - Require SSL with full certificate validation
     url: ""
 
 ## @section Network Policy parameters

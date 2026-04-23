@@ -169,7 +169,7 @@ Construct PostgreSQL connection URL
 {{- $database := include "klask.postgresql.database" . -}}
 {{- $username := include "klask.postgresql.username" . -}}
 {{- $password := include "klask.postgresql.password" . -}}
-{{- printf "postgresql://%s:%s@%s:%s/%s" $username $password $host $port $database -}}
+{{- printf "postgresql://%s:%s@%s:%s/%s?sslmode=prefer" $username $password $host $port $database -}}
 {{- end -}}
 {{- end -}}
 
