@@ -89,6 +89,14 @@ impl AppConfig {
                     if secret.is_empty() {
                         return Err(anyhow::anyhow!("JWT_SECRET environment variable cannot be empty"));
                     }
+                    if secret.len() < 32 {
+                        return Err(anyhow::anyhow!(
+                            "JWT_SECRET must be at least 32 characters long for adequate security. \
+                            Current length: {}. Generate a strong secret with: \
+                            openssl rand -hex 32",
+                            secret.len()
+                        ));
+                    }
                     secret
                 },
                 jwt_expires_in: std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "24h".to_string()),
