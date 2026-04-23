@@ -42,6 +42,11 @@ impl GitLabService {
             tracing::warn!(
                 "GitLab client configured to accept invalid certificates (KLASK_GITLAB_ACCEPT_INVALID_CERTS=true)"
             );
+            eprintln!(
+                "SECURITY WARNING: GitLab TLS certificate validation is DISABLED. \
+                This should only be used for testing with self-signed certificates. \
+                For production, provide a custom CA via KLASK_GITLAB_CUSTOM_CA_PATH environment variable."
+            );
             builder = builder.danger_accept_invalid_certs(true);
         }
 
