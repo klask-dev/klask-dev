@@ -1,3 +1,4 @@
+use crate::api::auth::validate_password_strength;
 use crate::auth::AuthError;
 use crate::auth::extractors::{AdminUser, AppState};
 use crate::models::{User, UserRole};
@@ -219,6 +220,8 @@ async fn update_user(
 
     // Update password if provided
     if let Some(password) = payload.password {
+        // Validate password strength
+        validate_password_strength(&password)?;
         let password_hash = match hash_password(&password) {
             Ok(hash) => hash,
             Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),

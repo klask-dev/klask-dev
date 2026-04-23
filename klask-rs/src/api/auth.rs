@@ -509,7 +509,7 @@ async fn delete_account(
 }
 
 /// Validate password meets minimum security requirements
-fn validate_password_strength(password: &str) -> Result<(), AuthError> {
+pub fn validate_password_strength(password: &str) -> Result<(), AuthError> {
     if password.len() < 8 {
         return Err(AuthError::InvalidInput(
             "Password must be at least 8 characters".to_string(),
