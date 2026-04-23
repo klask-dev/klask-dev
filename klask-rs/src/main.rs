@@ -276,7 +276,14 @@ async fn create_app(app_state: AppState, config: AppConfig) -> Result<Router> {
             axum::http::Method::DELETE,
             axum::http::Method::PATCH,
         ])
-        .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]);
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::COOKIE,
+        ])
+        // Required for browser clients to send HttpOnly cookies cross-origin.
+        // Works because we use explicit origins (not Any).
+        .allow_credentials(true);
 
     let app = Router::new()
         .route("/", get(root_handler))

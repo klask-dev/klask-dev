@@ -44,7 +44,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AuthError;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
-        let token = extract_token_from_auth_header(&parts.headers)?;
+        let token = extract_token(&parts.headers)?;
         extract_authenticated_user(state, &token).await
     }
 }
@@ -59,7 +59,7 @@ impl FromRequestParts<AppState> for AdminUser {
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         trace!("Attempting to extract AdminUser from request");
 
-        let token = extract_token_from_auth_header(&parts.headers)?;
+        let token = extract_token(&parts.headers)?;
         let auth_user = extract_authenticated_user(state, &token).await?;
 
         if auth_user.user.role != UserRole::Admin {
@@ -83,7 +83,7 @@ impl FromRequestParts<AppState> for OptionalUser {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
-        let token = match extract_token_from_auth_header(&parts.headers) {
+        let token = match extract_token(&parts.headers) {
             Ok(t) => t,
             Err(_) => return Ok(OptionalUser(None)),
         };
@@ -93,6 +93,25 @@ impl FromRequestParts<AppState> for OptionalUser {
             Err(_) => Ok(OptionalUser(None)),
         }
     }
+}
+
+/// Extract a JWT token from the request.
+/// Priority:
+///   1. `Authorization: Bearer <token>` header  (API clients / backward compat)
+///   2. `auth_token` HttpOnly cookie             (browser clients)
+fn extract_token(headers: &axum::http::HeaderMap) -> Result<String, AuthError> {
+    // 1. Try Authorization header first (API clients)
+    if let Ok(token) = extract_token_from_auth_header(headers) {
+        return Ok(token);
+    }
+
+    // 2. Fallback: read from HttpOnly cookie (browser clients)
+    let cookies = headers
+        .get("cookie")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    extract_token_from_cookie(cookies, "auth_token").ok_or(AuthError::MissingAuthHeader)
 }
 
 fn extract_token_from_auth_header(headers: &axum::http::HeaderMap) -> Result<String, AuthError> {
@@ -107,6 +126,22 @@ fn extract_token_from_auth_header(headers: &axum::http::HeaderMap) -> Result<Str
     } else {
         Err(AuthError::InvalidAuthHeader)
     }
+}
+
+/// Parse a cookie string like "a=1; auth_token=XYZ; b=2" and return the value for `name`.
+fn extract_token_from_cookie(cookies: &str, name: &str) -> Option<String> {
+    for part in cookies.split(';') {
+        let part = part.trim();
+        if let Some(value) = part.strip_prefix(name)
+            && let Some(value) = value.strip_prefix('=')
+        {
+            let token = value.trim().to_string();
+            if !token.is_empty() {
+                return Some(token);
+            }
+        }
+    }
+    None
 }
 
 /// Helper function to extract and validate an authenticated user from a token
@@ -151,4 +186,36 @@ async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<Aut
 
     trace!("AuthenticatedUser extracted successfully: {}", user.username);
     Ok(AuthenticatedUser { user, claims })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_token_from_cookie() {
+        // Basic case
+        assert_eq!(
+            extract_token_from_cookie("auth_token=abc123", "auth_token"),
+            Some("abc123".to_string())
+        );
+
+        // Multiple cookies
+        assert_eq!(
+            extract_token_from_cookie("session=xyz; auth_token=mytoken; other=val", "auth_token"),
+            Some("mytoken".to_string())
+        );
+
+        // Missing cookie
+        assert_eq!(
+            extract_token_from_cookie("session=xyz; other=val", "auth_token"),
+            None
+        );
+
+        // Empty value
+        assert_eq!(
+            extract_token_from_cookie("auth_token=", "auth_token"),
+            None
+        );
+    }
 }

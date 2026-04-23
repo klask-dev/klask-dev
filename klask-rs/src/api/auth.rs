@@ -2,7 +2,9 @@ use anyhow::Result;
 use axum::{
     Router,
     extract::State,
-    response::Json,
+    http::HeaderValue,
+    http::header::SET_COOKIE,
+    response::{IntoResponse, Json},
     routing::{delete, get, post, put},
 };
 use serde::{Deserialize, Serialize};
@@ -16,6 +18,30 @@ use crate::models::user::{
 };
 use crate::repositories::user_repository::{UpdateProfileData, UserRepository};
 use crate::utils::password::{hash_password, verify_password};
+
+/// Build a Set-Cookie header value for the auth_token HttpOnly cookie.
+/// max_age_secs should match the JWT expiry duration.
+fn build_auth_cookie(token: &str, max_age_secs: i64) -> String {
+    format!(
+        "auth_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
+        token, max_age_secs
+    )
+}
+
+/// Parse `JWT_EXPIRES_IN` string (e.g. "24h", "7d", "30m") into seconds.
+fn parse_expires_in_secs(expires_in: &str) -> i64 {
+    if expires_in.ends_with('h') {
+        expires_in.trim_end_matches('h').parse::<i64>().unwrap_or(24) * 3600
+    } else if expires_in.ends_with('d') {
+        expires_in.trim_end_matches('d').parse::<i64>().unwrap_or(1) * 86400
+    } else if expires_in.ends_with('m') {
+        expires_in.trim_end_matches('m').parse::<i64>().unwrap_or(60) * 60
+    } else if expires_in.ends_with('s') {
+        expires_in.trim_end_matches('s').parse::<i64>().unwrap_or(86400)
+    } else {
+        expires_in.parse::<i64>().unwrap_or(24) * 3600
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginRequest {
@@ -79,6 +105,7 @@ impl From<User> for UserInfo {
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/login", post(login))
+        .route("/logout", post(logout))
         .route("/register", post(register))
         .route("/registration/status", get(get_registration_status))
         .route("/profile", get(get_profile).put(update_profile))
@@ -92,10 +119,21 @@ pub async fn create_router() -> Result<Router<AppState>> {
     Ok(router)
 }
 
+/// Attach an HttpOnly auth cookie to an AuthResponse and return it as a full response.
+fn auth_response_with_cookie(auth_response: AuthResponse, expires_in: String) -> impl IntoResponse {
+    let max_age = parse_expires_in_secs(&expires_in);
+    let cookie_value = build_auth_cookie(&auth_response.token, max_age);
+    let mut response = Json(auth_response).into_response();
+    if let Ok(hv) = HeaderValue::from_str(&cookie_value) {
+        response.headers_mut().insert(SET_COOKIE, hv);
+    }
+    response
+}
+
 async fn login(
     State(app_state): State<AppState>,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<AuthResponse>, AuthError> {
+) -> Result<impl IntoResponse, AuthError> {
     const MAX_LOGIN_ATTEMPTS: u32 = 10;
     const LOGIN_RATE_LIMIT_WINDOW_SECS: u64 = 900; // 15 minutes
 
@@ -178,13 +216,25 @@ async fn login(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
+    Ok(auth_response_with_cookie(
+        AuthResponse { token, user: UserInfo::from(user) },
+        app_state.config.auth.jwt_expires_in.clone(),
+    ))
+}
+
+/// Logout: clear the auth_token cookie by setting Max-Age=0.
+async fn logout() -> impl IntoResponse {
+    let cookie = "auth_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0";
+    (
+        [(SET_COOKIE, cookie)],
+        Json(serde_json::json!({"message": "Logged out successfully"})),
+    )
 }
 
 async fn register(
     State(app_state): State<AppState>,
     Json(req): Json<RegisterRequest>,
-) -> Result<Json<AuthResponse>, AuthError> {
+) -> Result<impl IntoResponse, AuthError> {
     // Check if registration is allowed
     if !app_state.config.auth.allow_registration {
         return Err(AuthError::RegistrationDisabled);
@@ -237,7 +287,10 @@ async fn register(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
+    Ok(auth_response_with_cookie(
+        AuthResponse { token, user: UserInfo::from(user) },
+        app_state.config.auth.jwt_expires_in.clone(),
+    ))
 }
 
 async fn get_profile(auth_user: AuthenticatedUser) -> Result<Json<UserProfile>, AuthError> {
@@ -263,7 +316,7 @@ async fn get_registration_status(
 async fn initial_setup(
     State(app_state): State<AppState>,
     Json(req): Json<SetupRequest>,
-) -> Result<Json<AuthResponse>, AuthError> {
+) -> Result<impl IntoResponse, AuthError> {
     // Validate request
     req.validate().map_err(|_| AuthError::InvalidCredentials)?;
 
@@ -306,7 +359,10 @@ async fn initial_setup(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
+    Ok(auth_response_with_cookie(
+        AuthResponse { token, user: UserInfo::from(user) },
+        app_state.config.auth.jwt_expires_in.clone(),
+    ))
 }
 
 /// Update user profile with new information
