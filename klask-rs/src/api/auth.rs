@@ -140,11 +140,19 @@ async fn login(
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
     // Find user by username
-    let user = user_repo
+    let user = match user_repo
         .find_by_username(&username)
         .await
         .map_err(|e| AuthError::DatabaseError(e.to_string()))?
-        .ok_or(AuthError::InvalidCredentials)?;
+    {
+        Some(user) => user,
+        None => {
+            // Perform a dummy password verification to mitigate timing attacks
+            // This equalizes the response time between "user not found" and "wrong password"
+            let _ = verify_password(&req.password, crate::utils::password::get_dummy_hash());
+            return Err(AuthError::InvalidCredentials);
+        }
+    };
 
     // Verify user is active
     if !user.active {

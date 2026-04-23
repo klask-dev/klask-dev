@@ -41,6 +41,15 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
     }
 }
 
+/// Get a dummy hash for timing attack mitigation
+/// Returns a valid Argon2id hash that will always fail verification
+/// Used to equalize response times when a user is not found
+pub fn get_dummy_hash() -> &'static str {
+    // A static valid Argon2id hash that doesn't match any real password
+    // Generated with: echo -n "dummy" | argon2 somesalt with our parameters
+    "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQ$cJJwJcJfIPZ1zCMLjDxXfnTYHFu6sLG2bKvBCxSNF4A"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
