@@ -13,12 +13,17 @@
     <meta name="description" content="Klask - Code Search Engine" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
-    <!-- Content Security Policy - Fallback if nginx headers not available -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:3000 http://localhost:8080; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self';" />
     <title>Klask - Code Search Engine</title>
 
     <!-- Runtime configuration must load BEFORE any modules -->
     <script src="/runtime-config.js"></script>
+    <!-- Set up nonce for goober CSS-in-JS (react-hot-toast) -->
+    <script>
+      const nonce = document.currentScript.getAttribute('nonce');
+      if (nonce) {
+        window.__nonce__ = nonce;
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

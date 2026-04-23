@@ -28,5 +28,11 @@ EOF
 
 echo "✅ Runtime configuration complete"
 
+# Add nonce attribute to scripts in index.html for CSP support
+# The nonce is generated per-request in nginx, this adds the attribute placeholder
+sed -i 's|<script|<script nonce="__CSP_NONCE__"|g' /usr/share/nginx/html/index.html
+
+echo "✅ CSP nonce attributes added"
+
 # Start nginx
 exec nginx -g "daemon off;"
