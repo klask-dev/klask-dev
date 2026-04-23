@@ -242,17 +242,21 @@ backend:
   ## @param backend.auth Authentication and encryption secrets configuration
   auth:
     ## @param backend.auth.encryptionKey Encryption key for sensitive data at rest (e.g., OAuth tokens)
-    ## If not provided, a random 32-character value will be auto-generated on first install
-    ## WARNING: Auto-generated values are preserved across upgrades via lookup()
-    ## To regenerate: kubectl delete secret klask-backend-auth -n <namespace>
-    ## Generate custom key with: openssl rand -hex 32
+    ## REQUIRED FOR PRODUCTION: Must be set using cryptographically secure random data (e.g., openssl rand -hex 32)
+    ## If left empty, a WEAK auto-generated value will be used on first install (NOT recommended for production)
+    ## Auto-generated values are preserved across upgrades via lookup()
+    ## WARNING: Values generated with randAlphaNum are NOT cryptographically secure (INFRA-012)
+    ## To regenerate after deployment: kubectl delete secret klask-backend-auth -n <namespace>
+    ## Secure generation: openssl rand -hex 32
     encryptionKey: ""
 
     ## @param backend.auth.jwtSecret Secret key for JWT token signing and validation
-    ## If not provided, a random 32-character value will be auto-generated on first install
-    ## WARNING: Auto-generated values are preserved across upgrades via lookup()
-    ## To regenerate: kubectl delete secret klask-backend-auth -n <namespace>
-    ## Generate custom key with: openssl rand -hex 32
+    ## REQUIRED FOR PRODUCTION: Must be set using cryptographically secure random data (e.g., openssl rand -hex 32)
+    ## If left empty, a WEAK auto-generated value will be used on first install (NOT recommended for production)
+    ## Auto-generated values are preserved across upgrades via lookup()
+    ## WARNING: Values generated with randAlphaNum are NOT cryptographically secure (INFRA-012)
+    ## To regenerate after deployment: kubectl delete secret klask-backend-auth -n <namespace>
+    ## Secure generation: openssl rand -hex 32
     jwtSecret: ""
 
   ## @param backend.config Backend configuration (non-sensitive)
@@ -482,8 +486,10 @@ postgresql:
     existingSecret: ""
 
     ## @param postgresql.auth.postgresPassword PostgreSQL admin (postgres user) password
-    ## If empty, a random 32-character password is generated
-    ## WARNING: Auto-generated passwords are preserved across upgrades via lookup()
+    ## RECOMMENDED FOR PRODUCTION: Set this explicitly using a secure random value
+    ## If empty, a WEAK auto-generated password is used (NOT cryptographically secure, INFRA-012)
+    ## Auto-generated passwords are preserved across upgrades via lookup()
+    ## Secure generation: openssl rand -hex 32
     postgresPassword: ""
 
     ## @param postgresql.auth.username PostgreSQL application username
@@ -492,8 +498,10 @@ postgresql:
     username: "klask"
 
     ## @param postgresql.auth.password PostgreSQL application user password
-    ## If empty, a random 32-character password is generated
-    ## WARNING: Auto-generated passwords are preserved across upgrades via lookup()
+    ## RECOMMENDED FOR PRODUCTION: Set this explicitly using a secure random value
+    ## If empty, a WEAK auto-generated password is used (NOT cryptographically secure, INFRA-012)
+    ## Auto-generated passwords are preserved across upgrades via lookup()
+    ## Secure generation: openssl rand -hex 32
     password: ""
 
     ## @param postgresql.auth.database PostgreSQL database name
@@ -585,17 +593,22 @@ postgresql:
     ## @param postgresql.external.url External database full URL
     ## If provided, overrides host/port/database/username/password
     ## Format: postgresql://user:password@host:port/database
-    ## SECURITY: TLS is added by default with sslmode=prefer
+    ## SECURITY (INFRA-011): Always include TLS configuration in production
     ##
-    ## To require TLS in production, append ?sslmode=require to your URL:
-    ##   postgresql://user:password@host:port/database?sslmode=require
+    ## For embedded PostgreSQL (postgresql.enabled=true): In-cluster communication does not use TLS by default.
+    ## For external PostgreSQL: Include TLS parameters in your URL:
     ##
-    ## Valid sslmode values:
-    ##   disable     - No SSL connection (not recommended)
-    ##   prefer      - Use SSL if available (default, added automatically)
-    ##   require     - Always use SSL, fail if unavailable (production)
-    ##   verify-ca   - Require SSL with CA certificate verification
-    ##   verify-full - Require SSL with full certificate validation
+    ## Recommended TLS modes:
+    ##   ?sslmode=require     - Require TLS, fail if unavailable (strongly recommended for production)
+    ##   ?sslmode=verify-ca   - Require TLS with CA certificate verification
+    ##   ?sslmode=verify-full - Require TLS with full certificate validation (strictest)
+    ##
+    ## Other TLS modes (not recommended):
+    ##   ?sslmode=prefer      - Use TLS if available (default if not specified)
+    ##   ?sslmode=disable     - No TLS connection (only for non-sensitive local development)
+    ##
+    ## Example production URL with TLS required:
+    ##   postgresql://user:password@db.example.com:5432/klask?sslmode=require
     url: ""
 
 ## @section Network Policy parameters
