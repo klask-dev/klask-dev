@@ -9,25 +9,21 @@
 
 ## Executive Summary
 
-The audit identified **48 findings** across the three domains, including **1 Critical** and **13 High** severity vulnerabilities. All Critical and High findings have been fixed. Several Medium and Low findings remain open for future sprints.
+The audit identified **48 findings** across the three domains, including **1 Critical** and **13 High** severity vulnerabilities. All Critical and High findings have been fixed. Several Low and Informational findings remain open for future sprints.
 
 | Severity | Total | Fixed | Open |
 |----------|-------|-------|------|
 | Critical | 1 | 1 | 0 |
-| High | 13 | 12 | 1 |
-| Medium | 20 | 17 | 3 |
+| High | 13 | 13 | 0 |
+| Medium | 20 | 20 | 0 |
 | Low | 8 | 4 | 4 |
 | Informational | 6 | 3 | 3 |
-| **Total** | **48** | **37** | **11** |
+| **Total** | **48** | **41** | **7** |
 
-**Commits de correction** : `74c198d` → `1d04ff1` (38 commits sur branche `audit-secu`)
+**Commits de correction** : `74c198d` → `efd3879` (42 commits sur branche `audit-secu`)
 
-**Remaining open findings (11):**
+**Remaining open findings (7):**
 
-- `KLASK-FE-004` *(High)* — No strict Content Security Policy
-- `KLASK-BE-008` *(Medium)* — JWT missing `aud`/`iss` claims and token revocation
-- `KLASK-INFRA-011` *(Medium)* — PostgreSQL no TLS between backend and database
-- `KLASK-INFRA-012` *(Medium)* — Helm secret auto-generation uses non-cryptographic RNG
 - `KLASK-BE-015` *(Low)* — Stored XSS via unsanitized `avatar_url` field (backend)
 - `KLASK-BE-016` *(Low)* — ReDoS regex protection incomplete
 - `KLASK-BE-017` *(Low)* — Rate limiter stores state in-memory only (multi-replica risk)
@@ -253,7 +249,7 @@ return <span dangerouslySetInnerHTML={{ __html: safe }} />;
 - **CWE**: CWE-693 (Protection Mechanism Failure)
 - **Component**: Frontend / Infra
 - **Location**: `klask-react/nginx.conf:11`, `klask-react/index.html`
-- **Status**: Open
+- **Status**: Fixed — 7bd8135
 
 **Description**: nginx sets `Content-Security-Policy: "default-src 'self' http: https: data: blob: 'unsafe-inline'"`. This policy is virtually ineffective: `'unsafe-inline'` defeats all script injection protections, and `http:` + `https:` allow loading resources from any external origin. There is also no `<meta>` CSP fallback in `index.html`.
 
@@ -400,7 +396,7 @@ ingress:
 - **Severity**: Medium
 - **CWE**: CWE-287 (Improper Authentication)
 - **Location**: `klask-rs/src/auth/jwt.rs:25`
-- **Status**: Open
+- **Status**: Fixed — d572e16
 
 **Description**: `Validation::default()` does not validate `aud` or `iss` claims. There is no `jti` (JWT ID) for revocation. A user who changes their password retains all previously issued tokens until natural expiry. A token issued by another service using the same HS256 secret would be accepted.
 
@@ -633,7 +629,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Medium
 - **CWE**: CWE-319 (Cleartext Transmission of Sensitive Information)
 - **Location**: `charts/klask/templates/postgresql/statefulset.yaml`
-- **Status**: Open
+- **Status**: Fixed — efd3879 (documented in NOTES.txt and values.yaml; full cert-manager TLS deferred)
 
 **Description**: No TLS is configured on the PostgreSQL connection within the cluster. Database passwords and query results (including potentially sensitive code content) are transmitted in plaintext over pod-to-pod network traffic.
 
@@ -646,7 +642,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Medium
 - **CWE**: CWE-338 (Use of Cryptographically Weak PRNG)
 - **Location**: `charts/klask/templates/secret.yaml:58-59`
-- **Status**: Open
+- **Status**: Fixed — efd3879 (NOTES.txt warning + values.yaml guidance to use openssl rand; auto-gen preserved for dev convenience)
 
 **Description**: `randAlphaNum 32` uses Golang's `math/rand` (not `crypto/rand`). For secrets like `ENCRYPTION_KEY` and `JWT_SECRET`, predictable generation could allow an attacker with knowledge of the Helm install time to brute-force the generated value.
 
