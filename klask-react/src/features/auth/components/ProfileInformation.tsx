@@ -111,6 +111,7 @@ const ProfileInformation: React.FC = () => {
           onChange={(e) => handleChange('bio', e.target.value)}
           placeholder="Tell us about yourself"
           rows={4}
+          maxLength={2000}
           className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white ${
             errors.bio ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
           }`}
