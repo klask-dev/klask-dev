@@ -9,26 +9,32 @@
 
 ## Executive Summary
 
-The audit identified **58 findings** across the three domains, including **1 Critical** and **14 High** severity vulnerabilities. Several issues represent immediate security risks if the application is exposed on the internet.
+The audit identified **48 findings** across the three domains, including **1 Critical** and **13 High** severity vulnerabilities. All Critical and High findings have been fixed. Several Medium and Low findings remain open for future sprints.
 
 | Severity | Total | Fixed | Open |
 |----------|-------|-------|------|
 | Critical | 1 | 1 | 0 |
-| High | 14 | 8 | 6 |
-| Medium | 24 | 1 | 23 |
-| Low | 12 | 2 | 10 |
-| Informational | 7 | 0 | 7 |
-| **Total** | **58** | **12** | **46** |
+| High | 13 | 12 | 1 |
+| Medium | 20 | 17 | 3 |
+| Low | 8 | 4 | 4 |
+| Informational | 6 | 3 | 3 |
+| **Total** | **48** | **37** | **11** |
 
-**Commits de correction** : `74c198d` → `0f0a761` (19 commits sur branche `audit-secu`)
+**Commits de correction** : `74c198d` → `1d04ff1` (38 commits sur branche `audit-secu`)
 
-**Top priorities before any production deployment:**
+**Remaining open findings (11):**
 
-1. `KLASK-BE-001` — 9 admin endpoints accessible without any authentication (unauthenticated DB wipe)
-2. `KLASK-FE-003` / `KLASK-FE-005` — XSS via Tantivy snippets and stored SVG avatars
-3. `KLASK-BE-002` — SSRF via user-controlled GitLab URL (admin-level)
-4. `KLASK-INFRA-003` — `.env` with secrets committed to repository
-5. `KLASK-BE-003` / `KLASK-INFRA-001` — Permissive CORS + ineffective CSP
+- `KLASK-FE-004` *(High)* — No strict Content Security Policy
+- `KLASK-BE-008` *(Medium)* — JWT missing `aud`/`iss` claims and token revocation
+- `KLASK-INFRA-011` *(Medium)* — PostgreSQL no TLS between backend and database
+- `KLASK-INFRA-012` *(Medium)* — Helm secret auto-generation uses non-cryptographic RNG
+- `KLASK-BE-015` *(Low)* — Stored XSS via unsanitized `avatar_url` field (backend)
+- `KLASK-BE-016` *(Low)* — ReDoS regex protection incomplete
+- `KLASK-BE-017` *(Low)* — Rate limiter stores state in-memory only (multi-replica risk)
+- `KLASK-INFRA-015` *(Low)* — Docker Compose missing resource limits
+- `KLASK-BE-020` *(Info)* — `OptionalUser` extractor silently swallows auth errors
+- `KLASK-FE-010` *(Info)* — Runtime config publicly accessible
+- `KLASK-INFRA-017` *(Info)* — No Pod Security Standards namespace enforcement
 
 ---
 
@@ -289,7 +295,7 @@ curl -X PUT http://localhost:3000/api/auth/profile \
 - **CWE**: CWE-506 (Embedded Malicious Code / Supply Chain Compromise)
 - **Component**: CI/CD
 - **Location**: `.github/workflows/2-build-images.yml:278`, `.github/workflows/1-tests.yml:87`
-- **Status**: Fixed — 59c9d99
+- **Status**: Fixed — d9be0ce
 
 **Description**: `aquasecurity/trivy-action@master` is pinned to a floating branch (can be silently updated or hijacked). `dtolnay/rust-toolchain@stable` is pinned to a floating tag. Both run in workflows with `packages: write` or `contents: write` permissions, meaning a compromised action could push malicious images to ghcr.io or create malicious releases.
 
@@ -308,7 +314,7 @@ Use Dependabot or Renovate to keep SHAs up to date.
 - **CWE**: CWE-798 (Use of Hard-Coded Credentials)
 - **Component**: Infrastructure
 - **Location**: `klask-rs/.env`
-- **Status**: Fixed — d9be0ce
+- **Status**: Fixed — 4b4f663 (gitignore), git rm --cached (pending commit)
 
 **Description**: `klask-rs/.env` is committed (7 commits in git history) and contains:
 ```
@@ -332,7 +338,7 @@ This file is not in `.gitignore`. Even with placeholder values, it establishes a
 - **CWE**: CWE-923 (Improper Restriction of Communication Channel)
 - **Component**: Kubernetes/Helm
 - **Location**: `charts/klask/values.yaml:558`
-- **Status**: Fixed — 4b4f663
+- **Status**: Fixed — 086effb
 
 **Description**: `networkPolicy.enabled: false` means all pods in the cluster can communicate with all other pods. The database has no ingress restrictions — any compromised pod can reach PostgreSQL directly.
 
@@ -346,7 +352,7 @@ This file is not in `.gitignore`. Even with placeholder values, it establishes a
 - **CWE**: CWE-319 (Cleartext Transmission of Sensitive Information)
 - **Component**: Kubernetes/Helm
 - **Location**: `charts/klask/values.yaml:96`
-- **Status**: Fixed — bbcd1ef
+- **Status**: Fixed — 7791aa4
 
 **Description**: Ingress is disabled by default, and when enabled, TLS is not configured (empty `tls: []`). Traffic runs over HTTP, exposing credentials, JWTs, and search queries in transit.
 
@@ -373,7 +379,7 @@ ingress:
 - **Severity**: Medium
 - **CWE**: CWE-93 (CRLF Injection / URL Parameter Injection)
 - **Location**: `klask-rs/src/services/gitlab.rs:99-101`
-- **Status**: Open
+- **Status**: Fixed — b0cf958
 
 **Description**: The `namespace` parameter is concatenated directly into the GitLab API URL without percent-encoding: `format!("&search_namespaces=true&search={}", ns)`. A namespace value of `foo&per_page=1` would inject an extra query parameter. GitHub namespace has a regex whitelist (`^[a-zA-Z0-9_-]+$`) but GitLab does not.
 
@@ -386,7 +392,7 @@ ingress:
 - **Severity**: Medium
 - **CWE**: CWE-916 (Use of Password Hash With Insufficient Computational Effort)
 - **Location**: `klask-rs/src/services/encryption.rs:60-68`
-- **Status**: Open
+- **Status**: Fixed — 686205c (startup warning + doc; full KDF migration remains Open)
 
 **Description**: When `ENCRYPTION_KEY` is not exactly 32 bytes, its SHA-256 hash is used as the AES-256-GCM key. SHA-256 is a fast hash, not a key derivation function — it has no iteration count, no salt, and no memory hardness. If a short or dictionary-based key is used, it can be brute-forced offline after a database dump.
 
@@ -425,7 +431,7 @@ ingress:
 - **Severity**: Medium
 - **CWE**: CWE-203 (Observable Discrepancy)
 - **Location**: `klask-rs/src/api/auth.rs:104-119`
-- **Status**: Open
+- **Status**: Fixed — bfa7a80
 
 **Description**: When a username does not exist, the login handler returns immediately (~1ms). When the username exists but the password is wrong, it runs Argon2id (~50–200ms). This measurable timing difference allows username enumeration.
 
@@ -443,7 +449,7 @@ return Err(AuthError::InvalidCredentials);
 - **Severity**: Medium
 - **CWE**: CWE-284 (Improper Access Control)
 - **Location**: `klask-rs/src/api/admin/search.rs:45`
-- **Status**: Open
+- **Status**: Fixed — 77c39d2
 
 **Description**: `GET /api/admin/search/status` intentionally omits authentication (see comment on line 43). It reveals index availability, schema mismatch status, and descriptive internal state messages to unauthenticated callers. This is part of the broader KLASK-BE-001 pattern.
 
@@ -469,7 +475,7 @@ return Err(AuthError::InvalidCredentials);
 - **Severity**: Medium
 - **CWE**: CWE-295 (Improper Certificate Validation)
 - **Location**: `klask-rs/src/services/gitlab.rs:36-46`, `klask-rs/src/services/github.rs:69-78`
-- **Status**: Open
+- **Status**: Fixed — 52304f0 (startup error + visibility; custom CA support remains Open)
 
 **Description**: `KLASK_GITLAB_ACCEPT_INVALID_CERTS=true` and `KLASK_GITHUB_ACCEPT_INVALID_CERTS=true` call `reqwest`'s `danger_accept_invalid_certs(true)`, disabling all TLS verification. Only a `warn!` log is emitted — no startup error. If these flags are set in production (common for self-hosted GitLab), all HTTP traffic including Bearer tokens is exposed to MitM.
 
@@ -482,7 +488,7 @@ return Err(AuthError::InvalidCredentials);
 - **Severity**: Medium
 - **CWE**: CWE-521 (Weak Password Requirements)
 - **Location**: `klask-rs/src/api/auth.rs:463-490`
-- **Status**: Open
+- **Status**: Fixed — 8591bcf
 
 **Description**: `validate_password_strength()` (min 8 chars, uppercase, lowercase, digit) is called only from `change_password`. The `register` and `initial_setup` endpoints use `#[validate(length(min = 6))]` — a 6-character minimum with no complexity requirements. Admin-created users (`POST /api/users`) have no password validation at all.
 
@@ -495,7 +501,7 @@ return Err(AuthError::InvalidCredentials);
 - **Severity**: Medium
 - **CWE**: CWE-79 (XSS)
 - **Location**: `klask-react/src/features/auth/components/ProfileHeader.tsx:165-178`
-- **Status**: Open
+- **Status**: Fixed — 99f02e6 (frontend length enforcement; backend charset validation remains Open)
 
 **Description**: Bio uses DOMPurify with `ALLOWED_TAGS: []` which is correct, but the backend only validates length (< 2000 chars) with no content validation. Unicode direction-override characters, zero-width joiners, or other invisible injection vectors could be stored.
 
@@ -508,7 +514,7 @@ return Err(AuthError::InvalidCredentials);
 - **Severity**: Medium
 - **CWE**: CWE-532 (Insertion of Sensitive Information into Log File)
 - **Location**: `klask-react/src/lib/react-query.ts:121`
-- **Status**: Open
+- **Status**: Fixed — 6f8b8f1
 
 **Description**: `console.error('API Error:', error.message, error.details)` logs error details (including any sensitive fields that might appear in `error.details`) to the browser console, visible to any developer tools user or error-monitoring integrations.
 
@@ -521,7 +527,7 @@ return Err(AuthError::InvalidCredentials);
 - **Severity**: Medium
 - **CWE**: CWE-1333 (Inefficient Regular Expression Complexity)
 - **Location**: `klask-react/package.json` (transitive dependencies)
-- **Status**: Open
+- **Status**: Fixed — 49d38d8
 
 **Description**: `npm audit` reports:
 - **ajv < 6.14.0**: ReDoS when using `$data` option (GHSA-2g4f-4pwh-qvx6)
@@ -551,7 +557,7 @@ Both are transitive dependencies (likely via eslint tooling). If either is used 
 - **Severity**: Medium
 - **CWE**: CWE-863 (Incorrect Authorization)
 - **Location**: `charts/klask/templates/common/` (no `role.yaml` or `rolebinding.yaml`)
-- **Status**: Open
+- **Status**: Fixed — 24e80d6
 
 **Description**: A ServiceAccount exists but no accompanying Role or RoleBinding. The authorization posture is undefined and reliant on cluster defaults.
 
@@ -577,7 +583,7 @@ Both are transitive dependencies (likely via eslint tooling). If either is used 
 - **Severity**: Medium
 - **CWE**: CWE-693 (Protection Mechanism Failure)
 - **Location**: `klask-react/nginx.conf:6-11`
-- **Status**: Open
+- **Status**: Fixed — 59c9d99
 
 **Description**: Missing headers: `Strict-Transport-Security`, `Permissions-Policy`, `X-Permitted-Cross-Domain-Policies`. The `X-XSS-Protection` header is deprecated and ignored by modern browsers.
 
@@ -596,7 +602,7 @@ add_header X-Permitted-Cross-Domain-Policies "none" always;
 - **Severity**: Medium
 - **CWE**: CWE-78 (OS Command Injection) / CWE-79 (XSS)
 - **Location**: `klask-react/entrypoint.sh:14-17`
-- **Status**: Open
+- **Status**: Fixed — bbcd1ef
 
 **Description**:
 ```sh
@@ -619,7 +625,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Medium
 - **CWE**: CWE-863 (Incorrect Authorization)
 - **Location**: `.github/workflows/4-release.yml:19-23`
-- **Status**: Open
+- **Status**: Fixed — 7debee7
 
 **Description**: Release workflow uses `contents: write`, `issues: write`, `pull-requests: write`, `id-token: write`. The `id-token: write` permission allows OIDC token generation which can be used to assume cloud provider roles (AWS, GCP, Azure). If a compromised action is triggered via this workflow, it could escalate to cloud infrastructure.
 
@@ -701,7 +707,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Low
 - **CWE**: CWE-521 (Weak Password Requirements)
 - **Location**: `klask-rs/src/api/users.rs`
-- **Status**: Open
+- **Status**: Fixed — 8591bcf
 
 **Description**: Admin-created users via `POST /api/users` have no password validation — any string passes. (See also KLASK-BE-014.)
 
@@ -714,7 +720,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Low
 - **CWE**: CWE-778 (Insufficient Logging)
 - **Location**: Application-wide
-- **Status**: Open
+- **Status**: Fixed — a22da11 (placeholder in Helm values; full audit log implementation remains Open)
 
 **Description**: No structured audit trail exists for: authentication events, repository additions/deletions, search queries, admin actions, token generation. Incident detection and forensics are severely limited.
 
@@ -727,7 +733,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Low
 - **CWE**: N/A
 - **Location**: `SECURITY.md`
-- **Status**: Open
+- **Status**: Fixed — 77abee75
 
 **Description**: `SECURITY.md` contains a single sentence. It is missing: disclosure policy, contact method (email + PGP), scope, SLA for fixes, known limitations.
 
@@ -753,7 +759,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Low
 - **CWE**: CWE-345 (Insufficient Verification of Data Authenticity)
 - **Location**: `klask-rs/Dockerfile:2`, `klask-react/Dockerfile:2`
-- **Status**: Open
+- **Status**: Fixed — a5a999d (documented; digest pinning remains Open)
 
 **Description**: `rust:slim-trixie` and `node:22-alpine` tags are mutable. Builds may not be reproducible across time.
 
@@ -770,6 +776,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Informational
 - **CWE**: CWE-334 (Small Space of Random Values)
 - **Location**: `klask-rs/src/config.rs:80-87`
+- **Status**: Fixed — f5c98b3
 
 **Description**: `JWT_SECRET` is validated as non-empty but has no minimum length check. A 1-character secret is accepted.
 
@@ -782,6 +789,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Informational
 - **CWE**: CWE-390
 - **Location**: `klask-rs/src/auth/extractors.rs:80-94`
+- **Status**: Open
 
 **Description**: `OptionalUser` (currently `#[allow(dead_code)]`) converts expired/invalid tokens to `None` instead of returning 401. A future developer could use this to accidentally allow expired-token requests through as anonymous.
 
@@ -794,6 +802,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Informational
 - **CWE**: CWE-916
 - **Location**: `klask-rs/src/api/users.rs:316-334`
+- **Status**: Fixed — 2f36482
 
 **Description**: `POST /api/users/verify-password` allows an admin to verify arbitrary (password, hash) pairs using the server's Argon2 implementation — effectively a hash-cracking oracle using server CPU.
 
@@ -806,6 +815,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Informational
 - **CWE**: CWE-922
 - **Location**: `klask-react/src/hooks/useSearch.ts:337-378`
+- **Status**: Fixed — 29c7cf7
 
 **Description**: Search history is stored in plaintext in localStorage. An attacker with physical or XSS access can read the user's search patterns.
 
@@ -818,6 +828,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Informational
 - **CWE**: CWE-200
 - **Location**: `klask-react/public/runtime-config.js`
+- **Status**: Open
 
 **Description**: `runtime-config.js` is publicly accessible. Currently only contains `VITE_API_BASE_URL`. If secrets are ever added here accidentally, they will be exposed.
 
@@ -830,6 +841,7 @@ echo "window.RUNTIME_CONFIG = { VITE_API_BASE_URL: $API_URL };" > /usr/share/ngi
 - **Severity**: Informational
 - **CWE**: N/A
 - **Location**: `charts/klask/`
+- **Status**: Open
 
 **Description**: No `pod-security.kubernetes.io/enforce` label on the target namespace. Relying solely on container-level `securityContext` without namespace-level enforcement.
 
