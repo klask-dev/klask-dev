@@ -97,7 +97,7 @@ impl GitLabService {
 
             // If namespace is provided, filter by it
             if let Some(ns) = namespace {
-                url.push_str(&format!("&search_namespaces=true&search={}", ns));
+                url.push_str(&format!("&search_namespaces=true&search={}", urlencoding::encode(ns)));
             }
 
             tracing::debug!("Making GitLab API request to: {}", url);
