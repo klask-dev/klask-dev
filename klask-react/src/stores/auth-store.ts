@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types';
 import { UserRole } from '../types';
-import { apiClient, decodeToken, isTokenExpired } from '../lib/api';
+import { apiClient } from '../lib/api';
 
 interface AuthState {
   user: User | null;
@@ -55,20 +55,22 @@ export const useAuthStore = create<AuthState>()(
         apiClient.setToken(token);
       },
 
-      logout: () => {
+      logout: async () => {
+        // Clear the HttpOnly cookie via server-side logout endpoint.
+        await apiClient.auth.logout();
         set({
           user: null,
           token: null,
           isAuthenticated: false,
           isLoading: false,
         });
-        apiClient.auth.logout();
+        // Clean up any leftover localStorage keys from the old auth scheme.
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('csrfToken');
       },
 
       refreshUser: async () => {
-        const { token } = get();
-        if (!token) return;
-
+        // Cookie-based auth: no token needed to refresh — browser sends the cookie.
         try {
           set({ isLoading: true });
           const user = await apiClient.auth.getProfile();
@@ -82,65 +84,56 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkTokenValidity: () => {
-        const { token } = get();
-        if (!token) return false;
-
-        try {
-          return !isTokenExpired(token);
-        } catch {
-          return false;
-        }
+        // With cookie-based auth the token is not accessible from JS.
+        // Return true if user info is present (session validated on rehydrate).
+        const { user } = get();
+        return !!user;
       },
 
       clearAuth: () => {
+        // Best-effort: ask server to clear the cookie.
+        apiClient.auth.logout().catch(() => {/* ignore */});
         set({
           user: null,
           token: null,
           isAuthenticated: false,
           isLoading: false,
         });
-        apiClient.auth.logout();
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('csrfToken');
       },
     }),
     {
       name: 'klask-auth',
+      // Do NOT persist the token: the browser stores the HttpOnly cookie.
+      // Only persist user info for instant UI rendering on load.
       partialize: (state) => ({ 
-        token: state.token,
         user: state.user 
       }),
       onRehydrateStorage: () => (state) => {
-        if (state?.token) {
-          // Set token in API client
-          apiClient.setToken(state.token);
-          
-          // Check token validity on rehydration
-          const isValid = !isTokenExpired(state.token);
-          if (!isValid) {
-            state.clearAuth();
-          } else {
-            // Token is valid, refresh user data
-            state.refreshUser();
-          }
+        if (state?.user) {
+          // Validate the session by refreshing user data from the server.
+          // The HttpOnly cookie is sent automatically by the browser.
+          state.refreshUser();
         }
       },
     }
   )
 );
 
-// Selectors for convenient access to auth state
+// Selectors for convenient access to auth state (use getState() — safe outside React components)
 export const authSelectors = {
-  isAuthenticated: () => useAuthStore((state) => state.isAuthenticated),
-  user: () => useAuthStore((state) => state.user),
-  token: () => useAuthStore((state) => state.token),
-  isLoading: () => useAuthStore((state) => state.isLoading),
-  isAdmin: () => useAuthStore((state) => state.user?.role === UserRole.ADMIN),
-  hasRole: (role: UserRole) => useAuthStore((state) => state.user?.role === role),
+  isAuthenticated: () => useAuthStore.getState().isAuthenticated,
+  user: () => useAuthStore.getState().user,
+  token: () => useAuthStore.getState().token,
+  isLoading: () => useAuthStore.getState().isLoading,
+  isAdmin: () => useAuthStore.getState().user?.role === UserRole.ADMIN,
+  hasRole: (role: UserRole) => useAuthStore.getState().user?.role === role,
 };
 
 // Initialize auth on app start
 export const initializeAuth = () => {
-  const store = useAuthStore.getState();
-  if (store.token && !store.checkTokenValidity()) {
-    store.logout();
-  }
+  // Clean up any leftover localStorage data from the old cookie-less auth scheme.
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('csrfToken');
 };

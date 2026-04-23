@@ -106,10 +106,7 @@ fn extract_token(headers: &axum::http::HeaderMap) -> Result<String, AuthError> {
     }
 
     // 2. Fallback: read from HttpOnly cookie (browser clients)
-    let cookies = headers
-        .get("cookie")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+    let cookies = headers.get("cookie").and_then(|v| v.to_str().ok()).unwrap_or("");
 
     extract_token_from_cookie(cookies, "auth_token").ok_or(AuthError::MissingAuthHeader)
 }
@@ -207,15 +204,9 @@ mod tests {
         );
 
         // Missing cookie
-        assert_eq!(
-            extract_token_from_cookie("session=xyz; other=val", "auth_token"),
-            None
-        );
+        assert_eq!(extract_token_from_cookie("session=xyz; other=val", "auth_token"), None);
 
         // Empty value
-        assert_eq!(
-            extract_token_from_cookie("auth_token=", "auth_token"),
-            None
-        );
+        assert_eq!(extract_token_from_cookie("auth_token=", "auth_token"), None);
     }
 }

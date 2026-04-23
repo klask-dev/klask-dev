@@ -178,11 +178,7 @@ async fn login(
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
     // Find user by username
-    let user = match user_repo
-        .find_by_username(&username)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
-    {
+    let user = match user_repo.find_by_username(&username).await.map_err(|e| AuthError::DatabaseError(e.to_string()))? {
         Some(user) => user,
         None => {
             // Perform a dummy password verification to mitigate timing attacks
