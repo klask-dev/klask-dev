@@ -1,0 +1,12 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "klask.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+# Empty rules: Klask does not require Kubernetes API access
+# Following the principle of least privilege, no API permissions are granted
+rules: []
+{{- end }}
