@@ -22,7 +22,33 @@ Check that your values file doesn't violate immutable field constraints:
 ./.claude/validators/helm-values-validator.sh my-values.yaml
 ```
 
-### 3. Deploy Safely
+### 3. Prepare Kubernetes Namespace with Pod Security Standards
+
+Before deploying, ensure your namespace enforces Pod Security Standards:
+
+```bash
+# Create namespace with PSS (Pod Security Standards) enforcement
+kubectl create namespace klask --kubeconfig ~/.kube/test || true
+
+# Apply Pod Security Standards labels (restricted policy)
+kubectl label namespace klask \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/enforce-version=latest \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/warn=restricted \
+  --kubeconfig ~/.kube/test --overwrite
+
+# Verify the labels are applied
+kubectl get ns klask -o yaml --kubeconfig ~/.kube/test | grep pod-security
+```
+
+The `restricted` policy ensures:
+- Containers run as non-root
+- Read-only root filesystem is enforced
+- Privileged escalation is prevented
+- Linux capabilities are restricted
+
+### 4. Deploy Safely
 
 Use the automated deployment script:
 
@@ -189,6 +215,11 @@ Before every deployment, verify:
 - [ ] Are you using the latest chart version?
 - [ ] Is your kubeconfig correctly set?
 - [ ] Are you deploying to the right namespace?
+- [ ] Is Pod Security Standards `restricted` applied to the namespace?
+  ```bash
+  kubectl get ns klask -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}' --kubeconfig ~/.kube/test
+  # Should output: restricted
+  ```
 
 ---
 
