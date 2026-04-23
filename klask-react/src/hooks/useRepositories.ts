@@ -58,8 +58,10 @@ export const useUpdateRepository = () => {
     mutationFn: ({ id, data }: { id: string; data: Partial<CreateRepositoryRequest> }) =>
       apiClient.updateRepository(id, data),
     onSuccess: (updatedRepo) => {
-      console.log('Update success - updatedRepo:', updatedRepo);
-      console.log('updatedRepo.id:', updatedRepo?.id);
+      if (import.meta.env.DEV) {
+        console.log('Update success - updatedRepo:', updatedRepo);
+        console.log('updatedRepo.id:', updatedRepo?.id);
+      }
 
       // Invalidate queries to force refetch from backend
       // This ensures we get the latest calculated fields like next_crawl_at
@@ -67,7 +69,9 @@ export const useUpdateRepository = () => {
       queryClient.invalidateQueries({ queryKey: ['repositories', updatedRepo.id] });
     },
     onError: (error) => {
-      console.error('Failed to update repository:', getErrorMessage(error));
+      if (import.meta.env.DEV) {
+        console.error('Failed to update repository:', getErrorMessage(error));
+      }
     },
   });
 };
