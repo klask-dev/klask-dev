@@ -60,8 +60,16 @@ impl EncryptionService {
         let key_bytes = if key_string.len() == 32 {
             key_string.as_bytes().to_vec()
         } else {
-            // Hash the key to get exactly 32 bytes
+            // Warn if key is not the correct length
+            // Using SHA256 as a basic KDF fallback (not PBKDF2-level security)
             use sha2::{Digest, Sha256};
+            tracing::warn!(
+                "ENCRYPTION_KEY is {} characters long, should be exactly 32 bytes (characters). \
+                Using SHA256-based derivation as fallback. \
+                For production, provide a properly-sized 32-byte encryption key. \
+                Generate with: openssl rand -hex 32",
+                key_string.len()
+            );
             let mut hasher = Sha256::new();
             hasher.update(key_string.as_bytes());
             hasher.finalize().to_vec()
