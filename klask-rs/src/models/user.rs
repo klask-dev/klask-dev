@@ -23,6 +23,7 @@ pub struct User {
     pub timezone: Option<String>,
     pub preferences: Option<serde_json::Value>,
     pub login_count: i32,
+    pub password_changed_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Type)]

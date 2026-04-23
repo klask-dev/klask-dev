@@ -181,6 +181,11 @@ async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<Aut
         return Err(AuthError::UserInactive);
     }
 
+    if claims.iat < user.password_changed_at.timestamp() {
+        warn!("Token issued before password change for user: {}", user.username);
+        return Err(AuthError::TokenExpired);
+    }
+
     trace!("AuthenticatedUser extracted successfully: {}", user.username);
     Ok(AuthenticatedUser { user, claims })
 }

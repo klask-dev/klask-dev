@@ -135,6 +135,7 @@ async fn create_user(
         Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),
     };
 
+    let now = chrono::Utc::now();
     let new_user = User {
         id: Uuid::new_v4(),
         username: payload.username,
@@ -142,8 +143,8 @@ async fn create_user(
         password_hash,
         role: payload.role.unwrap_or(UserRole::User),
         active: payload.active.unwrap_or(true),
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        created_at: now,
+        updated_at: now,
         last_login: None,
         last_activity: None,
         avatar_url: None,
@@ -153,6 +154,7 @@ async fn create_user(
         timezone: Some("UTC".to_string()),
         preferences: None,
         login_count: 0,
+        password_changed_at: now,
     };
 
     match user_repository.create_user(&new_user).await {

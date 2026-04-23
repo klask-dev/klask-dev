@@ -255,6 +255,7 @@ async fn register(
     let password_hash = hash_password(&req.password).map_err(|_| AuthError::InvalidCredentials)?;
 
     // Create new user
+    let now = chrono::Utc::now();
     let new_user = User {
         id: Uuid::new_v4(),
         username: req.username.clone(),
@@ -262,8 +263,8 @@ async fn register(
         password_hash,
         role: UserRole::User, // Default role
         active: true,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        created_at: now,
+        updated_at: now,
         last_login: None,
         last_activity: None,
         avatar_url: None,
@@ -273,6 +274,7 @@ async fn register(
         timezone: Some("UTC".to_string()),
         preferences: None,
         login_count: 0,
+        password_changed_at: now,
     };
 
     let user = user_repo.create_user(&new_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
@@ -322,6 +324,7 @@ async fn initial_setup(
     let password_hash = hash_password(&req.password).map_err(|_| AuthError::InvalidCredentials)?;
 
     // Create the first admin user atomically
+    let now = chrono::Utc::now();
     let admin_user = User {
         id: Uuid::new_v4(),
         username: req.username.clone(),
@@ -329,8 +332,8 @@ async fn initial_setup(
         password_hash,
         role: UserRole::Admin, // First user is always admin
         active: true,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        created_at: now,
+        updated_at: now,
         last_login: None,
         last_activity: None,
         avatar_url: None,
@@ -340,6 +343,7 @@ async fn initial_setup(
         timezone: Some("UTC".to_string()),
         preferences: None,
         login_count: 0,
+        password_changed_at: now,
     };
 
     // Use atomic insert: only succeeds if no users exist

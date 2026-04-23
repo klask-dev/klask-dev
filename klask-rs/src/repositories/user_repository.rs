@@ -24,9 +24,9 @@ impl UserRepository {
 
     pub async fn create_user(&self, user: &User) -> Result<User> {
         let result = sqlx::query_as::<_, User>(
-            "INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count"
+            "INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at"
         )
         .bind(user.id)
         .bind(&user.username)
@@ -45,6 +45,7 @@ impl UserRepository {
         .bind(&user.timezone)
         .bind(&user.preferences)
         .bind(user.login_count)
+        .bind(user.password_changed_at)
         .fetch_one(&self.pool)
         .await?;
 
@@ -56,10 +57,10 @@ impl UserRepository {
     /// Returns Some(user) if the user was created, None if a user already existed.
     pub async fn create_first_admin_if_not_exists(&self, user: &User) -> Result<Option<User>> {
         let result = sqlx::query_as::<_, User>(
-            "INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count)
-             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+            "INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at)
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
              WHERE NOT EXISTS (SELECT 1 FROM users)
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count"
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at"
         )
         .bind(user.id)
         .bind(&user.username)
@@ -78,6 +79,7 @@ impl UserRepository {
         .bind(&user.timezone)
         .bind(&user.preferences)
         .bind(user.login_count)
+        .bind(user.password_changed_at)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -86,7 +88,7 @@ impl UserRepository {
 
     pub async fn find_by_username(&self, username: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
-            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count FROM users WHERE username = $1"
+            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at FROM users WHERE username = $1"
         )
         .bind(username)
         .fetch_optional(&self.pool)
@@ -97,7 +99,7 @@ impl UserRepository {
 
     pub async fn find_by_email(&self, email: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
-            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count FROM users WHERE email = $1"
+            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at FROM users WHERE email = $1"
         )
         .bind(email)
         .fetch_optional(&self.pool)
@@ -108,7 +110,7 @@ impl UserRepository {
 
     pub async fn get_user(&self, id: Uuid) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
-            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count FROM users WHERE id = $1"
+            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at FROM users WHERE id = $1"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -122,7 +124,7 @@ impl UserRepository {
         let offset = offset.unwrap_or(0);
 
         let users = sqlx::query_as::<_, User>(
-            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count
+            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at
              FROM users
              ORDER BY created_at DESC
              LIMIT $1 OFFSET $2",
@@ -144,7 +146,7 @@ impl UserRepository {
         let updated_user = sqlx::query_as::<_, User>(
             "UPDATE users SET username = $2, email = $3, updated_at = NOW()
              WHERE id = $1
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count",
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at",
         )
         .bind(id)
         .bind(updated_username)
@@ -159,7 +161,7 @@ impl UserRepository {
         let updated_user = sqlx::query_as::<_, User>(
             "UPDATE users SET role = $2, updated_at = NOW()
              WHERE id = $1
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count",
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at",
         )
         .bind(id)
         .bind(&role)
@@ -173,7 +175,7 @@ impl UserRepository {
         let updated_user = sqlx::query_as::<_, User>(
             "UPDATE users SET active = $2, updated_at = NOW()
              WHERE id = $1
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count",
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at",
         )
         .bind(id)
         .bind(active)
@@ -217,7 +219,7 @@ impl UserRepository {
         let updated_user = sqlx::query_as::<_, User>(
             "UPDATE users SET last_login = NOW(), last_activity = NOW(), login_count = login_count + 1, updated_at = NOW()
              WHERE id = $1
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count",
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at",
         )
         .bind(id)
         .fetch_one(&self.pool)
@@ -231,7 +233,7 @@ impl UserRepository {
         let updated_user = sqlx::query_as::<_, User>(
             "UPDATE users SET last_activity = NOW(), updated_at = NOW()
              WHERE id = $1
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count",
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at",
         )
         .bind(id)
         .fetch_one(&self.pool)
@@ -242,9 +244,9 @@ impl UserRepository {
 
     pub async fn update_user_password(&self, id: Uuid, password_hash: &str) -> Result<User> {
         let updated_user = sqlx::query_as::<_, User>(
-            "UPDATE users SET password_hash = $2, updated_at = NOW()
+            "UPDATE users SET password_hash = $2, password_changed_at = NOW(), updated_at = NOW()
              WHERE id = $1
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count",
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at",
         )
         .bind(id)
         .bind(password_hash)
@@ -269,7 +271,7 @@ impl UserRepository {
         let updated_user = sqlx::query_as::<_, User>(
             "UPDATE users SET avatar_url = $2, bio = $3, full_name = $4, phone = $5, timezone = $6, preferences = $7, updated_at = NOW()
              WHERE id = $1
-             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count",
+             RETURNING id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at",
         )
         .bind(id)
         .bind(updated_avatar)

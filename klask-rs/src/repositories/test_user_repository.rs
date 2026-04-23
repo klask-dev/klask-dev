@@ -24,8 +24,8 @@ impl TestUserRepository {
     pub async fn create_user(&self, user: &User) -> Result<()> {
         sqlx::query(
             r#"
-            INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+            INSERT INTO users (id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
             "#,
         )
         .bind(user.id.to_string())
@@ -45,6 +45,7 @@ impl TestUserRepository {
         .bind(&user.timezone)
         .bind(&user.preferences)
         .bind(user.login_count)
+        .bind(user.password_changed_at)
         .execute(&self.pool)
         .await?;
 
@@ -54,7 +55,7 @@ impl TestUserRepository {
     #[allow(dead_code)]
     pub async fn get_user(&self, id: Uuid) -> Result<Option<User>> {
         let row = sqlx::query(
-            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count FROM users WHERE id = ?1"
+            "SELECT id, username, email, password_hash, role, active, created_at, updated_at, last_login, last_activity, avatar_url, bio, full_name, phone, timezone, preferences, login_count, password_changed_at FROM users WHERE id = ?1"
         )
         .bind(id.to_string())
         .fetch_optional(&self.pool)
@@ -79,6 +80,7 @@ impl TestUserRepository {
                 timezone: row.get("timezone"),
                 preferences: row.get("preferences"),
                 login_count: row.get("login_count"),
+                password_changed_at: row.get("password_changed_at"),
             };
             Ok(Some(user))
         } else {

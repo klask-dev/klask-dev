@@ -81,6 +81,7 @@ impl SeedingService {
                 timezone: Some("UTC".to_string()),
                 preferences: None,
                 login_count: 5,
+                password_changed_at: Utc::now() - Duration::days(30),
             },
             User {
                 id: Uuid::new_v4(),
@@ -100,6 +101,7 @@ impl SeedingService {
                 timezone: Some("Europe/London".to_string()),
                 preferences: None,
                 login_count: 12,
+                password_changed_at: Utc::now() - Duration::days(15),
             },
             User {
                 id: Uuid::new_v4(),
@@ -119,6 +121,7 @@ impl SeedingService {
                 timezone: Some("America/New_York".to_string()),
                 preferences: None,
                 login_count: 3,
+                password_changed_at: Utc::now() - Duration::days(7),
             },
             User {
                 id: Uuid::new_v4(),
@@ -138,6 +141,7 @@ impl SeedingService {
                 timezone: Some("UTC".to_string()),
                 preferences: None,
                 login_count: 1,
+                password_changed_at: Utc::now() - Duration::days(60),
             },
             User {
                 id: Uuid::new_v4(),
@@ -157,6 +161,7 @@ impl SeedingService {
                 timezone: Some("Asia/Tokyo".to_string()),
                 preferences: None,
                 login_count: 8,
+                password_changed_at: Utc::now() - Duration::days(5),
             },
         ];
 
