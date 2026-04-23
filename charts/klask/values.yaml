@@ -263,6 +263,12 @@ backend:
     logFormat: "json"
     ## @param backend.config.gitlabAcceptInvalidCerts Accept invalid SSL certificates for GitLab (useful for self-signed certificates)
     gitlabAcceptInvalidCerts: "false"
+    ## @param backend.config.auditLog Audit logging configuration for security events
+    auditLog:
+      ## @param backend.config.auditLog.enabled Enable structured audit logging for production
+      ## When enabled, the backend logs authentication events, admin actions,
+      ## and repository modifications to stdout in JSON format
+      enabled: false
     ## @param backend.config.extra Additional configuration variables
     extra: {}
 
