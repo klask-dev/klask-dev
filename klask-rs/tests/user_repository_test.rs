@@ -29,6 +29,7 @@ mod user_repository_tests {
             timezone: None,
             preferences: None,
             login_count: 0,
+            password_changed_at: Utc::now(),
         }
     }
 
@@ -88,6 +89,7 @@ mod user_repository_tests {
             timezone: row.get("timezone"),
             preferences: row.get("preferences"),
             login_count: row.get("login_count"),
+            password_changed_at: Utc::now(),
         }))
     }
 
@@ -118,6 +120,7 @@ mod user_repository_tests {
             timezone: row.get("timezone"),
             preferences: row.get("preferences"),
             login_count: row.get("login_count"),
+            password_changed_at: Utc::now(),
         }))
     }
 

@@ -30,6 +30,7 @@ async fn test_sqlite_user_repository() -> Result<()> {
         timezone: None,
         preferences: None,
         login_count: 0,
+        password_changed_at: Utc::now(),
     };
 
     // Test create
@@ -79,6 +80,7 @@ async fn test_sqlite_isolation() -> Result<()> {
         timezone: None,
         preferences: None,
         login_count: 0,
+        password_changed_at: Utc::now(),
     };
     user_repo1.create_user(&user1).await?;
 
@@ -101,6 +103,7 @@ async fn test_sqlite_isolation() -> Result<()> {
         timezone: None,
         preferences: None,
         login_count: 0,
+        password_changed_at: Utc::now(),
     };
     user_repo2.create_user(&user2).await?;
 
@@ -147,6 +150,7 @@ async fn test_sqlite_concurrent_access() -> Result<()> {
                 timezone: None,
                 preferences: None,
                 login_count: 0,
+                password_changed_at: Utc::now(),
             };
 
             user_repo.create_user(&user).await?;

@@ -93,6 +93,7 @@ async fn create_admin_token(app_state: &AppState) -> Result<String> {
         timezone: None,
         preferences: None,
         login_count: 0,
+        password_changed_at: chrono::Utc::now(),
     };
 
     // Insert admin user
@@ -117,6 +118,8 @@ async fn create_admin_token(app_state: &AppState) -> Result<String> {
         role: admin_user.role.to_string(),
         exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp(),
         iat: chrono::Utc::now().timestamp(),
+        iss: "klask".to_string(),
+        aud: vec!["klask".to_string()],
     };
 
     let token = jsonwebtoken::encode(
@@ -147,6 +150,7 @@ async fn create_regular_user_token(app_state: &AppState) -> Result<String> {
         timezone: None,
         preferences: None,
         login_count: 0,
+        password_changed_at: chrono::Utc::now(),
     };
 
     // Insert regular user
@@ -171,6 +175,8 @@ async fn create_regular_user_token(app_state: &AppState) -> Result<String> {
         role: user.role.to_string(),
         exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp(),
         iat: chrono::Utc::now().timestamp(),
+        iss: "klask".to_string(),
+        aud: vec!["klask".to_string()],
     };
 
     let token = jsonwebtoken::encode(
