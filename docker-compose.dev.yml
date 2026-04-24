@@ -33,6 +33,11 @@ services:
         networks:
             - klask-network
         restart: unless-stopped
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.0"
+                    memory: 512M
 
     # Klask Backend (Rust)
     klask-backend:
@@ -58,6 +63,11 @@ services:
         networks:
             - klask-network
         restart: unless-stopped
+        deploy:
+            resources:
+                limits:
+                    cpus: "2.0"
+                    memory: 2G
 
 
     # Klask Frontend (React)
@@ -75,6 +85,11 @@ services:
             # Backend is exposed on localhost:3000, frontend calls it directly
             # No nginx proxy needed since backend has permissive CORS
             BACKEND_BASE_URL: "http://localhost:3001"
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.5"
+                    memory: 256M
 
     # Welcome message service - displays URLs and status once everything is ready
     welcome:
@@ -88,6 +103,11 @@ services:
         networks:
             - klask-network
         restart: "no"
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.1"
+                    memory: 32M
         entrypoint: /bin/sh
         command:
             - -c
@@ -126,6 +146,11 @@ services:
         profiles:
             - tools
         restart: unless-stopped
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.5"
+                    memory: 512M
 
     # Redis for caching (optional for future use)
     redis:
@@ -141,6 +166,11 @@ services:
         profiles:
             - tools
         restart: unless-stopped
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.5"
+                    memory: 256M
 
 volumes:
     postgres_data:

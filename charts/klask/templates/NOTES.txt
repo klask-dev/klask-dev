@@ -38,14 +38,17 @@ For external PostgreSQL: Verify your DATABASE_URL includes TLS parameters:
   - Example: postgresql://user:password@host:5432/klask?sslmode=require
 {{ end }}
 
-Pod Security Standards:
-=======================
-Ensure your namespace has Pod Security Standards enforced:
+3. Pod Security Standards (INFRA-017)
+--------------------------------------
+Label the namespace to enforce Kubernetes Pod Security Standards at admission time.
+This ensures no pod can be deployed with elevated privileges, even if Helm values are overridden:
 
   kubectl label namespace {{ .Release.Namespace }} \
     pod-security.kubernetes.io/enforce=restricted \
     pod-security.kubernetes.io/enforce-version=latest \
     --overwrite
+
+Without this label, the securityContext settings in the chart are declared but not enforced by the cluster.
 
 ---
 

@@ -75,25 +75,6 @@ impl FromRequestParts<AppState> for AdminUser {
     }
 }
 
-// Optional authentication extractor for endpoints that can work with or without auth
-#[allow(dead_code)]
-pub struct OptionalUser(pub Option<AuthenticatedUser>);
-
-impl FromRequestParts<AppState> for OptionalUser {
-    type Rejection = std::convert::Infallible;
-
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
-        let token = match extract_token(&parts.headers) {
-            Ok(t) => t,
-            Err(_) => return Ok(OptionalUser(None)),
-        };
-
-        match extract_authenticated_user(state, &token).await {
-            Ok(user) => Ok(OptionalUser(Some(user))),
-            Err(_) => Ok(OptionalUser(None)),
-        }
-    }
-}
 
 /// Extract a JWT token from the request.
 /// Priority:

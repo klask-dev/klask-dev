@@ -389,10 +389,10 @@ async fn update_profile(
     }
 
     if let Some(ref avatar_url) = payload.avatar_url {
-        // Allow large base64 data URIs (typical avatar ~100KB base64 = ~133KB string)
         if avatar_url.len() > 1_000_000 {
             return Err(AuthError::InvalidInput("Avatar URL must be 1MB or less".to_string()));
         }
+        validate_avatar_url(avatar_url)?;
     }
 
     if let Some(ref phone) = payload.phone
@@ -562,6 +562,31 @@ async fn delete_account(
         "success": true,
         "message": "Account deleted successfully"
     })))
+}
+
+/// Validate avatar_url is a safe https:// URL or an allowed data URI (jpeg/png/gif/webp only).
+/// Rejects SVG and any other MIME type to prevent stored XSS via malicious SVG payloads.
+fn validate_avatar_url(url: &str) -> Result<(), AuthError> {
+    // Allow plain https:// external image URLs
+    if url.starts_with("https://") {
+        return Ok(());
+    }
+
+    // Allow only safe raster image data URIs
+    const ALLOWED_PREFIXES: &[&str] = &[
+        "data:image/jpeg;base64,",
+        "data:image/jpg;base64,",
+        "data:image/png;base64,",
+        "data:image/gif;base64,",
+        "data:image/webp;base64,",
+    ];
+    if ALLOWED_PREFIXES.iter().any(|p| url.starts_with(p)) {
+        return Ok(());
+    }
+
+    Err(AuthError::InvalidInput(
+        "avatar_url must be an https:// URL or a data URI with MIME type image/jpeg, image/png, image/gif, or image/webp".to_string(),
+    ))
 }
 
 /// Validate password meets minimum security requirements
