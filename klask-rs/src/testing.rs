@@ -106,7 +106,8 @@ async fn setup_schema(pool: &Pool<Sqlite>) -> Result<()> {
             phone TEXT,
             timezone TEXT,
             preferences TEXT,
-            login_count INTEGER NOT NULL DEFAULT 0
+            login_count INTEGER NOT NULL DEFAULT 0,
+            password_changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         "#,
     )
