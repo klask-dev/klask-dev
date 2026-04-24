@@ -75,7 +75,6 @@ impl FromRequestParts<AppState> for AdminUser {
     }
 }
 
-
 /// Extract a JWT token from the request.
 /// Priority:
 ///   1. `Authorization: Bearer <token>` header  (API clients / backward compat)
