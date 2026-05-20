@@ -37,17 +37,12 @@ impl GitOperations {
 
                     info!("Fetching latest changes from remote");
 
-                    if let Ok(remote) = git_repo.find_remote("origin")
-                        && let Ok(conn) = remote.connect(gix::remote::Direction::Fetch)
-                        && let Ok(prep) = conn.prepare_fetch(gix::progress::Discard, Default::default())
-                    {
-                        if let Err(e) = prep.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED) {
-                            warn!("Failed to receive fetch: {}", e);
-                        } else {
-                            info!("Successfully fetched latest changes");
-                        }
-                    }
+                    let remote = git_repo.find_remote("origin")?;
+                    let conn = remote.connect(gix::remote::Direction::Fetch)?;
+                    let prep = conn.prepare_fetch(gix::progress::Discard, Default::default())?;
+                    prep.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
 
+                    info!("Successfully fetched latest changes");
                     Ok(git_repo)
                 }),
             )
@@ -96,8 +91,8 @@ impl GitOperations {
         tokio::time::timeout(
             std::time::Duration::from_secs(300),
             tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
-                // Prepare clone
-                let mut prep = gix::prepare_clone(clone_url, &repo_path_owned)
+                // Bare clone: no working tree needed, avoids packed-refs conflicts on fetch
+                let mut prep = gix::prepare_clone_bare(clone_url, &repo_path_owned)
                     .map_err(|e| anyhow!("Failed to prepare clone: {}", e))?;
 
                 // Configure for non-interactive mode (no credential prompts)
