@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{BooleanQuery, QueryParser, RegexQuery, TermQuery};
+use tantivy::query::{BooleanQuery, PhraseQuery, Query, QueryParser, RegexQuery, TermQuery};
 use tantivy::schema::{
     FAST, Field, IndexRecordOption, STORED, STRING, Schema, TEXT, TextFieldIndexing, TextOptions, Value,
 };
@@ -1348,10 +1348,28 @@ impl SearchService {
         let searcher = self.reader.searcher();
         debug!("Getting file by id: {}", file_id);
 
-        // Use a targeted query to find the document with the matching file_id
+        // The file_id field is indexed as TEXT: the default tokenizer lowercases and
+        // splits the UUID on hyphens, so an exact-term lookup on the full UUID never
+        // matches. Tokenize the UUID the same way and use a phrase query instead.
         let file_id_str = file_id.to_string();
-        let term = tantivy::Term::from_field_text(self.fields.file_id, &file_id_str);
-        let query = TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+        let mut tokenizer = self.index.tokenizer_for_field(self.fields.file_id)?;
+        let mut token_stream = tokenizer.token_stream(&file_id_str);
+        let mut terms = Vec::new();
+        while token_stream.advance() {
+            terms.push(tantivy::Term::from_field_text(
+                self.fields.file_id,
+                &token_stream.token().text,
+            ));
+        }
+
+        let query: Box<dyn Query> = match terms.len() {
+            0 => return Ok(None),
+            1 => Box::new(TermQuery::new(
+                terms.remove(0),
+                tantivy::schema::IndexRecordOption::Basic,
+            )),
+            _ => Box::new(PhraseQuery::new(terms)),
+        };
 
         // Search for the specific document
         let top_docs = searcher.search(&query, &TopDocs::with_limit(1))?;
