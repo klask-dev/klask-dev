@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1](https://github.com/klask-dev/klask-dev/compare/2.1.0...2.1.1) (2026-06-10)
+
+### 🐛 Bug Fixes
+
+* add password_changed_at column to SQLite test schema ([2612ec9](https://github.com/klask-dev/klask-dev/commit/2612ec96302c38852e5e805dec4a0294aaec5490))
+* update test fixtures for User and TokenClaims new required fields ([000221c](https://github.com/klask-dev/klask-dev/commit/000221ce38ec253aa6b185a5c694da64565c1160))
+* update test helpers for new AppState/AppConfig fields from security fixes ([0f0a761](https://github.com/klask-dev/klask-dev/commit/0f0a761d94cfb68d0f79038b0ca33b9f9f8de941))
+
+### 📚 Documentation
+
+* add audit logging configuration placeholder to Helm values (KLASK-INFRA-016) ([a5a999d](https://github.com/klask-dev/klask-dev/commit/a5a999d45177f179899eaa77d8bd406896e04516))
+* document Pod Security Standards namespace requirements (KLASK-INFRA-020) ([b0937e9](https://github.com/klask-dev/klask-dev/commit/b0937e90831b5bb787cef5f6180fce12968129bc))
+* document validation sync requirement between frontend and backend (KLASK-FE-013) ([4c61ca1](https://github.com/klask-dev/klask-dev/commit/4c61ca104809745a995578cc2981d7367d32ee8d))
+* expand SECURITY.md with responsible disclosure policy (KLASK-INFRA-017) ([77abee7](https://github.com/klask-dev/klask-dev/commit/77abee75907ae21fd2f0c6c98275dc4e3a43e982))
+* fully update security audit status — correct all stale findings ([2f6e899](https://github.com/klask-dev/klask-dev/commit/2f6e899fd1d5435091e523bc77a4aa12afdd48cb))
+* mark FE-001 and FE-002 as fixed in security audit ([1d04ff1](https://github.com/klask-dev/klask-dev/commit/1d04ff16c7f0dfccf30e42d1186e66f0548af3f4))
+* update INFRA-002 finding — .env.example already existed in repo ([5d439d2](https://github.com/klask-dev/klask-dev/commit/5d439d2c9c67575262ea9841fe8952d3518e5d03))
+* update security audit — mark FE-004, BE-008, INFRA-011, INFRA-012 as fixed ([9c42055](https://github.com/klask-dev/klask-dev/commit/9c4205539a86825d3f202b845045d0b37082b5c5))
+* update security audit report with fix status and commit references ([bd68dfa](https://github.com/klask-dev/klask-dev/commit/bd68dfac2618f47884bf7f392841f758156382d0))
+* Update TODO.txt ([80a21d8](https://github.com/klask-dev/klask-dev/commit/80a21d8df6885266440336cfb07ad62295e20b13))
+
 ## [2.1.0](https://github.com/klask-dev/klask-dev/compare/2.0.0...2.1.0) (2026-04-08)
 
 ### ✨ Features
