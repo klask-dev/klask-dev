@@ -40,12 +40,18 @@ impl CrawlerService {
         progress_tracker: Arc<ProgressTracker>,
         encryption_service: Arc<EncryptionService>,
         temp_dir: String,
+        git_clone_timeout_secs: u64,
+        git_fetch_timeout_secs: u64,
     ) -> Result<Self> {
         let temp_dir = std::path::PathBuf::from(temp_dir);
         std::fs::create_dir_all(&temp_dir).map_err(|e| anyhow!("Failed to create temp directory: {}", e))?;
 
         // Create specialized crawlers
-        let git_operations = GitOperations::new(encryption_service.clone());
+        let git_operations = GitOperations::new(
+            encryption_service.clone(),
+            git_clone_timeout_secs,
+            git_fetch_timeout_secs,
+        );
         let branch_processor = BranchProcessor::new(search_service.clone(), progress_tracker.clone());
         let gitlab_crawler = GitLabCrawler::new(
             database.clone(),
@@ -751,7 +757,7 @@ impl Clone for CrawlerService {
             encryption_service: self.encryption_service.clone(),
             temp_dir: self.temp_dir.clone(),
             cancellation_tokens: self.cancellation_tokens.clone(),
-            git_operations: GitOperations::new(self.encryption_service.clone()),
+            git_operations: self.git_operations.clone(),
             branch_processor: BranchProcessor::new(self.search_service.clone(), self.progress_tracker.clone()),
             gitlab_crawler: GitLabCrawler::new(
                 self.database.clone(),

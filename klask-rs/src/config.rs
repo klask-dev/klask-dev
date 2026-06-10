@@ -31,6 +31,8 @@ pub struct SearchConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrawlerConfig {
     pub temp_dir: String,
+    pub git_clone_timeout_secs: u64,
+    pub git_fetch_timeout_secs: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +77,14 @@ impl AppConfig {
             crawler: CrawlerConfig {
                 temp_dir: std::env::var("CRAWLER_TEMP_DIR")
                     .unwrap_or_else(|_| std::env::temp_dir().join("klask-crawler").to_string_lossy().to_string()),
+                git_clone_timeout_secs: std::env::var("GIT_CLONE_TIMEOUT_SECS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(600),
+                git_fetch_timeout_secs: std::env::var("GIT_FETCH_TIMEOUT_SECS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(300),
             },
             auth: AuthConfig {
                 jwt_secret: {

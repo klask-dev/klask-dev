@@ -10,11 +10,17 @@ use tracing::{debug, info, warn};
 #[derive(Clone)]
 pub struct GitOperations {
     encryption_service: Arc<EncryptionService>,
+    clone_timeout: std::time::Duration,
+    fetch_timeout: std::time::Duration,
 }
 
 impl GitOperations {
-    pub fn new(encryption_service: Arc<EncryptionService>) -> Self {
-        Self { encryption_service }
+    pub fn new(encryption_service: Arc<EncryptionService>, clone_timeout_secs: u64, fetch_timeout_secs: u64) -> Self {
+        Self {
+            encryption_service,
+            clone_timeout: std::time::Duration::from_secs(clone_timeout_secs),
+            fetch_timeout: std::time::Duration::from_secs(fetch_timeout_secs),
+        }
     }
 
     pub async fn clone_or_update_repository(
@@ -28,7 +34,7 @@ impl GitOperations {
             info!("Updating existing repository at: {:?}", repo_path);
 
             let result = tokio::time::timeout(
-                std::time::Duration::from_secs(180),
+                self.fetch_timeout,
                 tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
                     // Disable ALL interactive prompts for server-mode operation
                     let opts = Options::isolated().config_overrides(["gitoxide.credentials.terminalPrompt=0"]);
@@ -89,7 +95,7 @@ impl GitOperations {
         let repo_path_owned = repo_path.to_owned();
 
         tokio::time::timeout(
-            std::time::Duration::from_secs(300),
+            self.clone_timeout,
             tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
                 // Bare clone: no working tree needed, avoids packed-refs conflicts on fetch
                 let mut prep = gix::prepare_clone_bare(clone_url, &repo_path_owned)
@@ -141,8 +147,13 @@ impl GitOperations {
                     });
                 }
 
-                // Configure shallow clone (depth=1) to speed up large repositories
                 prep = prep.configure_remote(|remote| Ok(remote.with_fetch_tags(gix::remote::fetch::Tags::None)));
+
+                // Shallow clone depth=1: fetch only the latest commit per branch.
+                // Safe for indexing since we only need HEAD content, not history.
+                prep = prep.with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(
+                    std::num::NonZeroU32::new(1).unwrap(),
+                ));
 
                 // Perform the fetch
                 let (_prepared_clone, _outcome) = prep

@@ -138,6 +138,8 @@ async fn main() -> Result<()> {
         progress_tracker.clone(),
         encryption_service.clone(),
         config.crawler.temp_dir.clone(),
+        config.crawler.git_clone_timeout_secs,
+        config.crawler.git_fetch_timeout_secs,
     ) {
         Ok(service) => {
             info!("Crawler service initialized successfully");
