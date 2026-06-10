@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub crawler: CrawlerConfig,
     pub auth: AuthConfig,
     pub cors: CorsConfig,
+    pub semantic: SemanticSearchConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +45,26 @@ pub struct AuthConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorsConfig {
     pub allowed_origins: Vec<String>,
+}
+
+/// Hybrid semantic search settings (see docs/SEMANTIC_SEARCH_PLAN.md).
+/// Disabled by default; also requires a binary built with the
+/// `semantic-search` cargo feature.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticSearchConfig {
+    pub enabled: bool,
+    /// Embedding model code, e.g. "jinaai/jina-embeddings-v2-base-code"
+    /// or "Xenova/bge-small-en-v1.5" (smaller/faster).
+    pub model: String,
+    /// Directory where the ONNX model is cached. Pre-provision it for
+    /// air-gapped deployments.
+    pub cache_dir: String,
+    /// Maximum number of file lines per embedding chunk.
+    pub chunk_max_lines: usize,
+    /// Lines of overlap between consecutive chunks.
+    pub chunk_overlap_lines: usize,
+    /// Inference batch size.
+    pub batch_size: usize,
 }
 
 impl AppConfig {
@@ -111,6 +132,27 @@ impl AppConfig {
                     .split(',')
                     .map(|s| s.trim().to_string())
                     .collect(),
+            },
+            semantic: SemanticSearchConfig {
+                enabled: std::env::var("SEMANTIC_SEARCH_ENABLED")
+                    .unwrap_or_else(|_| "false".to_string())
+                    .parse()
+                    .unwrap_or(false),
+                model: std::env::var("SEMANTIC_SEARCH_MODEL")
+                    .unwrap_or_else(|_| "jinaai/jina-embeddings-v2-base-code".to_string()),
+                cache_dir: std::env::var("SEMANTIC_SEARCH_CACHE_DIR").unwrap_or_else(|_| "./models".to_string()),
+                chunk_max_lines: std::env::var("SEMANTIC_SEARCH_CHUNK_MAX_LINES")
+                    .unwrap_or_else(|_| "60".to_string())
+                    .parse()
+                    .unwrap_or(60),
+                chunk_overlap_lines: std::env::var("SEMANTIC_SEARCH_CHUNK_OVERLAP_LINES")
+                    .unwrap_or_else(|_| "15".to_string())
+                    .parse()
+                    .unwrap_or(15),
+                batch_size: std::env::var("SEMANTIC_SEARCH_BATCH_SIZE")
+                    .unwrap_or_else(|_| "32".to_string())
+                    .parse()
+                    .unwrap_or(32),
             },
         };
 

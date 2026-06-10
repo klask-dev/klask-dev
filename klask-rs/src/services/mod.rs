@@ -7,6 +7,7 @@ pub mod scheduler;
 pub mod search;
 pub mod search_metrics;
 pub mod seeding;
+pub mod semantic;
 pub mod tantivy_config;
 pub mod tokenizer;
 

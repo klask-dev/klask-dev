@@ -43,6 +43,14 @@ async fn create_test_app_state() -> AppState {
             allow_registration: true,
         },
         cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
+        semantic: klask_rs::config::SemanticSearchConfig {
+            enabled: false,
+            model: "jinaai/jina-embeddings-v2-base-code".to_string(),
+            cache_dir: "./models".to_string(),
+            chunk_max_lines: 60,
+            chunk_overlap_lines: 15,
+            batch_size: 32,
+        },
     };
 
     // Create JWT service
@@ -75,6 +83,7 @@ async fn create_test_app_state() -> AppState {
         crawler_service,
         progress_tracker,
         scheduler_service: None,
+        semantic_embedder: None,
         jwt_service,
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
@@ -272,6 +281,14 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
             allow_registration,
         },
         cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
+        semantic: klask_rs::config::SemanticSearchConfig {
+            enabled: false,
+            model: "jinaai/jina-embeddings-v2-base-code".to_string(),
+            cache_dir: "./models".to_string(),
+            chunk_max_lines: 60,
+            chunk_overlap_lines: 15,
+            batch_size: 32,
+        },
     };
 
     // Create JWT service
@@ -304,6 +321,7 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
         crawler_service,
         progress_tracker,
         scheduler_service: None,
+        semantic_embedder: None,
         jwt_service,
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),

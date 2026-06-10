@@ -131,6 +131,10 @@ async fn main() -> Result<()> {
     let progress_tracker = Arc::new(ProgressTracker::new());
     info!("Progress tracker initialized successfully");
 
+    // Initialize the semantic-search embedding provider (optional; loads the
+    // local ONNX model when enabled, degrades to keyword-only search on error)
+    let semantic_embedder = services::semantic::init_embedding_provider(&config.semantic);
+
     // Initialize crawler service
     let search_service_arc = Arc::new(search_service);
     let crawler_service = match CrawlerService::new(
@@ -203,6 +207,7 @@ async fn main() -> Result<()> {
         crawler_service: crawler_service_arc,
         progress_tracker,
         scheduler_service: Some(Arc::new(scheduler_service)),
+        semantic_embedder,
         jwt_service,
         encryption_service,
         config: config.clone(),
