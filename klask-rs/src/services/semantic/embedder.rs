@@ -54,18 +54,18 @@ mod fastembed_provider {
     /// Resolve a model code (e.g. "jinaai/jina-embeddings-v2-base-code") to a
     /// model supported by fastembed.
     pub(crate) fn resolve_model(model_code: &str) -> Result<ModelInfo<EmbeddingModel>> {
-        TextEmbedding::list_supported_models()
-            .into_iter()
-            .find(|info| info.model_code.eq_ignore_ascii_case(model_code))
-            .ok_or_else(|| {
-                let supported =
-                    TextEmbedding::list_supported_models().into_iter().map(|m| m.model_code).collect::<Vec<_>>();
-                anyhow!(
+        let mut supported = TextEmbedding::list_supported_models();
+        match supported.iter().position(|info| info.model_code.eq_ignore_ascii_case(model_code)) {
+            Some(index) => Ok(supported.swap_remove(index)),
+            None => {
+                let codes = supported.into_iter().map(|m| m.model_code).collect::<Vec<_>>();
+                Err(anyhow!(
                     "Unsupported embedding model '{}'. Supported models: {}",
                     model_code,
-                    supported.join(", ")
-                )
-            })
+                    codes.join(", ")
+                ))
+            }
+        }
     }
 
     impl FastEmbedProvider {
@@ -84,7 +84,8 @@ mod fastembed_provider {
                 model: Mutex::new(model),
                 dimension: info.dim,
                 model_code: info.model_code,
-                batch_size: config.batch_size.max(1),
+                // Bounded to keep a misconfigured value from ballooning ONNX batch buffers
+                batch_size: config.batch_size.clamp(1, 512),
             })
         }
     }
