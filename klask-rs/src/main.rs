@@ -10,7 +10,7 @@ mod version;
 
 use anyhow::Result;
 use auth::{extractors::AppState, jwt::JwtService};
-use axum::{Json, Router, routing::get};
+use axum::{Json, Router, http, routing::get};
 use config::AppConfig;
 use database::Database;
 use serde::Serialize;
@@ -74,6 +74,7 @@ async fn main() -> Result<()> {
     let bind_address = format!("{}:{}", config.server.host, config.server.port);
 
     info!("Starting Klask-RS server on {}", bind_address);
+    info!("CORS allowed origins: {:?}", config.cors.allowed_origins);
 
     // Initialize database
     let database = match Database::new(&config.database.url, config.database.max_connections).await {
@@ -208,10 +209,11 @@ async fn main() -> Result<()> {
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time,
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     };
 
     // Build application router
-    let app = create_app(app_state).await?;
+    let app = create_app(app_state, config).await?;
 
     // Create TCP listener
     let listener = tokio::net::TcpListener::bind(&bind_address).await?;
@@ -255,7 +257,34 @@ async fn shutdown_signal() {
     }
 }
 
-async fn create_app(app_state: AppState) -> Result<Router> {
+async fn create_app(app_state: AppState, config: AppConfig) -> Result<Router> {
+    // Build CORS layer with configured allowed origins
+    let allowed_origins: Vec<_> =
+        config.cors.allowed_origins.iter().filter_map(|origin| origin.parse::<http::HeaderValue>().ok()).collect();
+
+    let cors = CorsLayer::new()
+        .allow_origin(if allowed_origins.is_empty() {
+            // Fallback: create a list with localhost if none configured
+            vec!["http://localhost:5173".parse().unwrap(), "http://localhost:8080".parse().unwrap()]
+        } else {
+            allowed_origins
+        })
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+            axum::http::Method::PATCH,
+        ])
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::COOKIE,
+        ])
+        // Required for browser clients to send HttpOnly cookies cross-origin.
+        // Works because we use explicit origins (not Any).
+        .allow_credentials(true);
+
     let app = Router::new()
         .route("/", get(root_handler))
         .route("/version", get(version_handler))
@@ -267,7 +296,7 @@ async fn create_app(app_state: AppState) -> Result<Router> {
             }),
         )
         .nest("/api", api::create_router().await?)
-        .layer(CorsLayer::permissive())
+        .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);
 

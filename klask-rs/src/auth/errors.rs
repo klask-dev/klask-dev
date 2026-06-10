@@ -36,37 +36,62 @@ pub enum AuthError {
     InvalidInput(String),
     #[error("Registration is currently disabled")]
     RegistrationDisabled,
+    #[error("Too many attempts: {0}")]
+    TooManyAttempts(String, u32), // message, retry_after_seconds
 }
 
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match &self {
+        let (status, error_message, retry_after) = match &self {
             AuthError::MissingAuthHeader | AuthError::InvalidAuthHeader => (
                 StatusCode::UNAUTHORIZED,
                 "Missing or invalid authorization header".to_string(),
+                None,
             ),
             AuthError::InvalidToken(_) | AuthError::TokenExpired => {
-                (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string())
+                (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string(), None)
             }
-            AuthError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "Invalid username or password".to_string()),
-            AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "User not found".to_string()),
-            AuthError::UserInactive => (StatusCode::UNAUTHORIZED, "User account is inactive".to_string()),
-            AuthError::InsufficientPermissions => (StatusCode::FORBIDDEN, "Insufficient permissions".to_string()),
-            AuthError::UsernameExists => (StatusCode::CONFLICT, "Username already exists".to_string()),
-            AuthError::EmailExists => (StatusCode::CONFLICT, "Email already exists".to_string()),
-            AuthError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
-            AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
-            AuthError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
-            AuthError::RegistrationDisabled => {
-                (StatusCode::FORBIDDEN, "Registration is currently disabled".to_string())
+            AuthError::InvalidCredentials => (
+                StatusCode::UNAUTHORIZED,
+                "Invalid username or password".to_string(),
+                None,
+            ),
+            AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "User not found".to_string(), None),
+            AuthError::UserInactive => (StatusCode::UNAUTHORIZED, "User account is inactive".to_string(), None),
+            AuthError::InsufficientPermissions => (StatusCode::FORBIDDEN, "Insufficient permissions".to_string(), None),
+            AuthError::UsernameExists => (StatusCode::CONFLICT, "Username already exists".to_string(), None),
+            AuthError::EmailExists => (StatusCode::CONFLICT, "Email already exists".to_string(), None),
+            AuthError::DatabaseError(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+                None,
+            ),
+            AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone(), None),
+            AuthError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone(), None),
+            AuthError::RegistrationDisabled => (
+                StatusCode::FORBIDDEN,
+                "Registration is currently disabled".to_string(),
+                None,
+            ),
+            AuthError::TooManyAttempts(msg, retry_after_secs) => {
+                (StatusCode::TOO_MANY_REQUESTS, msg.clone(), Some(*retry_after_secs))
             }
         };
 
-        let body = Json(json!({
+        let body = json!({
             "error": error_message,
             "status": status.as_u16()
-        }));
+        });
 
-        (status, body).into_response()
+        let mut response = (status, Json(body)).into_response();
+
+        // Add Retry-After header if rate limited
+        if let Some(retry_after_secs) = retry_after
+            && let Ok(header_value) = retry_after_secs.to_string().parse()
+        {
+            response.headers_mut().insert("Retry-After", header_value);
+        }
+
+        response
     }
 }

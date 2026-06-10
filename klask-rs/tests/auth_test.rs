@@ -42,6 +42,7 @@ async fn create_test_app_state() -> AppState {
             jwt_expires_in: "1h".to_string(),
             allow_registration: true,
         },
+        cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
     };
 
     // Create JWT service
@@ -80,6 +81,7 @@ async fn create_test_app_state() -> AppState {
         startup_time: Instant::now(),
         encryption_service: Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap()),
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     }
 }
 
@@ -269,6 +271,7 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
             jwt_expires_in: "1h".to_string(),
             allow_registration,
         },
+        cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
     };
 
     // Create JWT service
@@ -307,6 +310,7 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
         startup_time: Instant::now(),
         encryption_service,
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
     }
 }
 

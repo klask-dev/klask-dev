@@ -73,6 +73,11 @@ impl GitHubService {
             tracing::warn!(
                 "GitHub client configured to accept invalid certificates (KLASK_GITHUB_ACCEPT_INVALID_CERTS=true)"
             );
+            eprintln!(
+                "SECURITY WARNING: GitHub TLS certificate validation is DISABLED. \
+                This should only be used for testing with self-signed certificates. \
+                For production, provide a custom CA via KLASK_GITHUB_CUSTOM_CA_PATH environment variable."
+            );
             builder = builder.danger_accept_invalid_certs(true);
         }
 

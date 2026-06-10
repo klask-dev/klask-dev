@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiClient, ApiError, api } from '../api';
+import { apiClient, ApiClient, ApiError, api } from '../api';
 import type { RegistrationStatus } from '../../types';
 
 // Mock fetch globally
@@ -22,14 +22,14 @@ describe('API Client - checkRegistrationStatus', () => {
       if (key === 'authToken') return 'mock-token';
       return null;
     });
-    (apiClient as any).setToken('mock-token');
+    (apiClient as ApiClient).setToken('mock-token');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  const createMockResponse = (data: any, status = 200, ok = true) => ({
+  const createMockResponse = (data: unknown, status = 200, ok = true) => ({
     ok,
     status,
     headers: new Headers({ 'Content-Type': 'application/json' }),
@@ -48,6 +48,7 @@ describe('API Client - checkRegistrationStatus', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/auth/registration/status',
         {
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer mock-token',
@@ -137,7 +138,7 @@ describe('API Client - checkRegistrationStatus', () => {
       const token = 'valid-auth-token';
       localStorageMock.getItem.mockReturnValue(token);
 
-      const apiInstance = new (apiClient.constructor as any)('http://localhost:3000');
+      const apiInstance = new ApiClient('http://localhost:3000');
       apiInstance.setToken(token);
 
       mockFetch.mockResolvedValueOnce(createMockResponse({ registration_allowed: true }));
@@ -157,7 +158,7 @@ describe('API Client - checkRegistrationStatus', () => {
     it('should work without authentication token', async () => {
       localStorageMock.getItem.mockReturnValue(null);
 
-      const clientWithoutToken = new (apiClient.constructor as any)('http://localhost:3000');
+      const clientWithoutToken = new ApiClient('http://localhost:3000');
       const mockResponse: RegistrationStatus = { registration_allowed: true };
 
       mockFetch.mockResolvedValueOnce(createMockResponse(mockResponse));
@@ -254,6 +255,7 @@ describe('API Client - checkRegistrationStatus', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/auth/registration/status',
         {
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer mock-token',

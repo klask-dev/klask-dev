@@ -3,6 +3,7 @@ use crate::models::{Repository, RepositoryType};
 use crate::repositories::RepositoryRepository;
 use crate::services::github::{GitHubRepository, GitHubService};
 use crate::services::gitlab::{GitLabProject, GitLabService};
+use crate::utils::url_validator::validate_external_url;
 use anyhow::Result;
 use axum::{
     Router,
@@ -169,6 +170,36 @@ fn validate_github_namespace(namespace: &str) -> Result<(), String> {
                 .to_string(),
         );
     }
+    Ok(())
+}
+
+/// Validates FileSystem repository paths against path traversal attacks
+fn validate_filesystem_path(path: &str) -> Result<(), String> {
+    use std::path::{Component, Path};
+
+    let pb = Path::new(path);
+
+    // Must be an absolute path
+    if !pb.is_absolute() {
+        return Err("FileSystem path must be absolute".to_string());
+    }
+
+    // Check for ".." components (parent directory traversal)
+    if pb.components().any(|c| c == Component::ParentDir) {
+        return Err("FileSystem path must not contain '..'".to_string());
+    }
+
+    // Reject access to dangerous system directories
+    let forbidden_dirs =
+        ["/etc", "/proc", "/sys", "/root", "/boot", "/dev", "/sbin", "/bin", "/lib", "/usr/bin", "/usr/sbin"];
+    let path_str = path;
+
+    for forbidden in &forbidden_dirs {
+        if path_str == *forbidden || path_str.starts_with(&format!("{}/", forbidden)) {
+            return Err("FileSystem path points to a restricted directory".to_string());
+        }
+    }
+
     Ok(())
 }
 
@@ -505,20 +536,30 @@ async fn create_repository(
     State(app_state): State<AppState>,
     body: Bytes,
 ) -> Result<Json<Repository>, StatusCode> {
-    debug!("Received raw JSON body: {:?}", String::from_utf8_lossy(&body));
+    debug!("Received create repository request");
 
-    let request: CreateRepositoryRequest = match serde_json::from_slice(&body) {
+    let request: CreateRepositoryRequest = match serde_json::from_slice::<CreateRepositoryRequest>(&body) {
         Ok(req) => {
-            debug!("Successfully parsed create repository request: {:?}", req);
+            debug!(
+                "Successfully parsed create repository request: name={}, type={:?}",
+                req.name, req.repository_type
+            );
             req
         }
         Err(e) => {
             error!("Failed to parse JSON request: {}", e);
-            error!("Raw body: {}", String::from_utf8_lossy(&body));
             return Err(StatusCode::UNPROCESSABLE_ENTITY);
         }
     };
     let repo_repository = RepositoryRepository::new(app_state.database.pool().clone());
+
+    // Validate FileSystem path if it's a FileSystem repository
+    if request.repository_type == RepositoryType::FileSystem
+        && let Err(e) = validate_filesystem_path(&request.url)
+    {
+        error!("Invalid FileSystem path '{}': {}", request.url, e);
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     // Validate GitHub namespace if provided
     if let Some(ref github_namespace) = request.github_namespace
@@ -650,9 +691,26 @@ async fn update_repository(
         repository.name = name;
     }
     if let Some(url) = request.url {
+        // Validate FileSystem path if it's a FileSystem repository (either existing or being changed to)
+        let is_filesystem = request
+            .repository_type
+            .as_ref()
+            .map(|t| t == &RepositoryType::FileSystem)
+            .unwrap_or_else(|| repository.repository_type == RepositoryType::FileSystem);
+        if is_filesystem && let Err(e) = validate_filesystem_path(&url) {
+            error!("Invalid FileSystem path '{}': {}", url, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
         repository.url = url;
     }
     if let Some(repository_type) = request.repository_type {
+        // If changing to FileSystem, validate the URL
+        if repository_type == RepositoryType::FileSystem
+            && let Err(e) = validate_filesystem_path(&repository.url)
+        {
+            error!("Invalid FileSystem path '{}': {}", repository.url, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
         repository.repository_type = repository_type;
     }
     if let Some(branch) = request.branch {
@@ -1096,6 +1154,12 @@ async fn discover_gitlab_repositories(
     State(_app_state): State<AppState>,
     Json(request): Json<DiscoverGitLabRequest>,
 ) -> Result<Json<DiscoverGitLabResponse>, StatusCode> {
+    // Validate GitLab URL against SSRF
+    if let Err(e) = validate_external_url(&request.gitlab_url) {
+        warn!("SSRF validation failed for GitLab URL: {}", e);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     info!(
         "Discovering GitLab projects from {} with namespace: {:?}",
         request.gitlab_url, request.namespace
@@ -1124,6 +1188,15 @@ async fn test_gitlab_token(
     State(_app_state): State<AppState>,
     Json(request): Json<TestGitLabTokenRequest>,
 ) -> Result<Json<TestTokenResponse>, StatusCode> {
+    // Validate GitLab URL against SSRF
+    if let Err(e) = validate_external_url(&request.gitlab_url) {
+        warn!("SSRF validation failed for GitLab URL: {}", e);
+        return Ok(Json(TestTokenResponse {
+            valid: false,
+            message: format!("Invalid GitLab URL: {}", e),
+        }));
+    }
+
     info!("Testing GitLab token for URL: {}", request.gitlab_url);
 
     let gitlab_service = GitLabService::new();

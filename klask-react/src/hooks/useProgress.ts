@@ -44,7 +44,9 @@ export function useProgress({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch progress';
       setError(errorMessage);
-      console.error('Error fetching repository progress:', err);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching repository progress:', err);
+      }
     } finally {
       setIsRepositoryLoading(false);
     }
@@ -64,7 +66,9 @@ export function useProgress({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch active progress';
       setError(errorMessage);
-      console.error('Error fetching active progress:', err);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching active progress:', err);
+      }
     } finally {
       setIsActiveLoading(false);
     }
@@ -128,7 +132,9 @@ export function useProgress({
 
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch active progress';
         setError(errorMessage);
+        if (import.meta.env.DEV) {
         console.error('Error fetching active progress:', err);
+      }
       } finally {
         if (isMounted) {
           setIsActiveLoading(false);

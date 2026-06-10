@@ -1,15 +1,16 @@
+use crate::api::auth::validate_password_strength;
 use crate::auth::AuthError;
 use crate::auth::extractors::{AdminUser, AppState};
 use crate::models::{User, UserRole};
 use crate::repositories::{UserRepository, user_repository::UserStats};
-use crate::utils::password::{hash_password, verify_password};
+use crate::utils::password::hash_password;
 use anyhow::Result;
 use axum::{
     Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
-    routing::{get, post, put},
+    routing::{get, put},
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -38,12 +39,6 @@ pub struct UserListQuery {
     pub offset: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct VerifyPasswordRequest {
-    pub password: String,
-    pub hash: String,
-}
-
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
     pub id: Uuid,
@@ -57,12 +52,6 @@ pub struct UserResponse {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub last_login: Option<chrono::DateTime<chrono::Utc>>,
     pub last_activity: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct VerifyPasswordResponse {
-    pub matches: bool,
-    pub message: String,
 }
 
 impl From<User> for UserResponse {
@@ -89,8 +78,7 @@ pub async fn create_router() -> Result<Router<AppState>> {
         .route("/{id}", get(get_user).put(update_user).delete(delete_user))
         .route("/{id}/role", put(update_user_role))
         .route("/{id}/status", put(update_user_status))
-        .route("/stats", get(get_user_stats))
-        .route("/verify-password", post(verify_password_endpoint));
+        .route("/stats", get(get_user_stats));
 
     Ok(router)
 }
@@ -147,6 +135,7 @@ async fn create_user(
         Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),
     };
 
+    let now = chrono::Utc::now();
     let new_user = User {
         id: Uuid::new_v4(),
         username: payload.username,
@@ -154,8 +143,8 @@ async fn create_user(
         password_hash,
         role: payload.role.unwrap_or(UserRole::User),
         active: payload.active.unwrap_or(true),
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        created_at: now,
+        updated_at: now,
         last_login: None,
         last_activity: None,
         avatar_url: None,
@@ -165,6 +154,7 @@ async fn create_user(
         timezone: Some("UTC".to_string()),
         preferences: None,
         login_count: 0,
+        password_changed_at: now,
     };
 
     match user_repository.create_user(&new_user).await {
@@ -219,6 +209,8 @@ async fn update_user(
 
     // Update password if provided
     if let Some(password) = payload.password {
+        // Validate password strength
+        validate_password_strength(&password)?;
         let password_hash = match hash_password(&password) {
             Ok(hash) => hash,
             Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),
@@ -310,25 +302,5 @@ async fn get_user_stats(
     match user_repository.get_user_stats().await {
         Ok(stats) => Ok(Json(stats)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
-}
-
-async fn verify_password_endpoint(
-    _admin_user: AdminUser, // Require admin authentication
-    axum::Json(payload): axum::Json<VerifyPasswordRequest>,
-) -> Result<Json<VerifyPasswordResponse>, StatusCode> {
-    match verify_password(&payload.password, &payload.hash) {
-        Ok(true) => Ok(Json(VerifyPasswordResponse {
-            matches: true,
-            message: "Password matches the stored hash".to_string(),
-        })),
-        Ok(false) => Ok(Json(VerifyPasswordResponse {
-            matches: false,
-            message: "Password does NOT match the stored hash".to_string(),
-        })),
-        Err(e) => {
-            eprintln!("Error verifying password: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
     }
 }

@@ -333,11 +333,11 @@ export const useSearchSuggestions = (
   });
 };
 
-// Search history hook (local storage based)
+// Search history hook (session storage based - cleared when browser closes)
 export const useSearchHistory = () => {
   const [history, setHistory] = React.useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem('klask-search-history');
+      const stored = sessionStorage.getItem('klask-search-history');
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -346,17 +346,17 @@ export const useSearchHistory = () => {
 
   const addToHistory = React.useCallback((query: string) => {
     if (!query.trim()) return;
-    
+
     setHistory(prev => {
       const filtered = prev.filter(item => item !== query);
       const newHistory = [query, ...filtered].slice(0, 10); // Keep last 10
-      
+
       try {
-        localStorage.setItem('klask-search-history', JSON.stringify(newHistory));
+        sessionStorage.setItem('klask-search-history', JSON.stringify(newHistory));
       } catch {
-        // Ignore localStorage errors
+        // Ignore sessionStorage errors
       }
-      
+
       return newHistory;
     });
   }, []);
@@ -364,9 +364,9 @@ export const useSearchHistory = () => {
   const clearHistory = React.useCallback(() => {
     setHistory([]);
     try {
-      localStorage.removeItem('klask-search-history');
+      sessionStorage.removeItem('klask-search-history');
     } catch {
-      // Ignore localStorage errors
+      // Ignore sessionStorage errors
     }
   }, []);
 

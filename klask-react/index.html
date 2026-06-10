@@ -17,6 +17,13 @@
 
     <!-- Runtime configuration must load BEFORE any modules -->
     <script src="/runtime-config.js"></script>
+    <!-- Set up nonce for goober CSS-in-JS (react-hot-toast) -->
+    <script>
+      const nonce = document.currentScript.getAttribute('nonce');
+      if (nonce) {
+        window.__nonce__ = nonce;
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

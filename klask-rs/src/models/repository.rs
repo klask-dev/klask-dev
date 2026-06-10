@@ -81,7 +81,7 @@ pub struct Repository {
     pub included_projects_patterns: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type, PartialEq)]
 #[sqlx(type_name = "varchar")]
 #[sqlx(rename_all = "PascalCase")]
 pub enum RepositoryType {

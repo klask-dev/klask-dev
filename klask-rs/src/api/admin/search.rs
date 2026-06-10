@@ -6,7 +6,7 @@
 //! - Optimizing the index for better performance
 //! - Generating tuning recommendations
 
-use crate::auth::extractors::{AdminUser, AppState};
+use crate::auth::extractors::{AdminUser, AppState, AuthenticatedUser};
 use crate::models::{
     HealthStatus, IndexHealthResponse, IndexStatsResponse, OptimizeIndexResponse, SearchStatusResponse,
     TuningRecommendationsResponse,
@@ -40,9 +40,11 @@ pub async fn create_router() -> Result<Router<AppState>> {
 /// - Whether the index is available for searching
 /// - Status message with details
 ///
-/// This endpoint does not require admin authentication to allow the frontend
-/// to check status frequently for displaying warnings.
-async fn get_search_status(State(app_state): State<AppState>) -> Result<Json<SearchStatusResponse>, StatusCode> {
+/// Requires authentication to check search service status.
+async fn get_search_status(
+    _user: AuthenticatedUser,
+    State(app_state): State<AppState>,
+) -> Result<Json<SearchStatusResponse>, StatusCode> {
     debug!("Checking search service status");
 
     let has_mismatch = app_state.search_service.has_schema_mismatch();

@@ -1,7 +1,13 @@
 /// Regex pattern validation module
 ///
-/// Provides strict validation of regex patterns to prevent ReDoS (Regular Expression Denial of Service)
-/// and other security issues before patterns reach Tantivy.
+/// Provides structural validation of regex patterns before they reach Tantivy.
+///
+/// # ReDoS safety
+/// Tantivy 0.25+ uses the Rust `regex` crate (NFA/DFA engine) which is provably immune to
+/// catastrophic backtracking — ReDoS is not possible regardless of what pattern is submitted.
+/// The blocklist and nesting checks below are defence-in-depth: they reject obviously malformed
+/// or overly complex patterns early, reducing CPU usage on the query path, but they are NOT the
+/// primary ReDoS protection (the engine itself is).
 const MAX_REGEX_LENGTH: usize = 500;
 const MAX_NESTING_DEPTH: usize = 3;
 const DANGEROUS_PATTERNS: &[&str] = &[

@@ -1,5 +1,23 @@
 import { z } from 'zod';
 
+/**
+ * NOTE: Frontend validation schemas MUST remain synchronized with backend validators.
+ * The backend enforces these same validation rules in Rust.
+ *
+ * When modifying these schemas:
+ * 1. Update the corresponding backend validator in klask-rs/src/api/auth.rs
+ * 2. Update the corresponding backend validator in klask-rs/src/api/users.rs
+ * 3. Run tests on both frontend and backend to ensure consistency
+ *
+ * Key validation requirements (must match backend):
+ * - Password: minimum 8 characters, at least one uppercase, one lowercase, one digit
+ * - Username: 3+ characters, only alphanumeric, hyphens, underscores
+ * - Email: valid email format
+ * - Bio: maximum 2000 characters (optional)
+ * - Phone: E.164 format (optional)
+ * - Full name: maximum 255 characters, letters/spaces/hyphens/apostrophes (optional)
+ */
+
 export const loginSchema = z.object({
   username: z
     .string()

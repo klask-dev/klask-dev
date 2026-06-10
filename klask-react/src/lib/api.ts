@@ -1,5 +1,4 @@
 import type {
-  ApiResponse,
   User,
   Repository,
   RepositoryWithStats,
@@ -31,9 +30,9 @@ import type {
 // API Error class
 export class ApiError extends Error {
   public status: number;
-  public details?: Record<string, any>;
+  public details?: Record<string, unknown>;
 
-  constructor(message: string, status: number, details?: Record<string, any>) {
+  constructor(message: string, status: number, details?: Record<string, unknown>) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -45,7 +44,7 @@ export class ApiError extends Error {
 export function extractFieldErrors(error: unknown): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
 
-  if (error instanceof ApiError && error.details?.error) {
+  if (error instanceof ApiError && typeof error.details?.error === 'string') {
     const errorMsg = error.details.error;
 
     // Map specific error messages to form fields
@@ -65,53 +64,10 @@ import { getApiBaseUrl } from './config';
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
-  private csrfToken: string | null = null;
 
   constructor(baseURL?: string) {
     this.baseURL = baseURL || getApiBaseUrl();
-    this.token = localStorage.getItem('authToken');
-    this.csrfToken = this.getCsrfToken();
-  }
-
-  /**
-   * Get CSRF token from meta tag or generate a new one
-   */
-  private getCsrfToken(): string | null {
-    try {
-      // First, try to get from meta tag
-      const metaTag = document.querySelector('meta[name="csrf-token"]');
-      if (metaTag) {
-        return metaTag.getAttribute('content');
-      }
-
-      // If not available, check localStorage
-      let token = localStorage.getItem('csrfToken');
-      if (!token) {
-        // Generate a new token (should be validated by backend)
-        token = this.generateToken();
-        localStorage.setItem('csrfToken', token);
-      }
-      return token;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Generate a random token for CSRF protection
-   */
-  private generateToken(): string {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  /**
-   * Refresh CSRF token for security
-   */
-  private refreshCsrfToken(): void {
-    this.csrfToken = this.generateToken();
-    localStorage.setItem('csrfToken', this.csrfToken);
+    // Token is now managed via HttpOnly cookie; keep in-memory fallback for API clients.
   }
 
   private async request<T>(
@@ -119,25 +75,22 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    const method = (options.method || 'GET').toUpperCase();
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
 
+    // Fallback: send Bearer token for non-browser API clients.
+    // Browser clients rely on the HttpOnly cookie sent automatically.
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
-    // Add CSRF token for state-changing requests (POST, PUT, DELETE, PATCH)
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && this.csrfToken) {
-      headers['X-CSRF-Token'] = this.csrfToken;
     }
 
     const config: RequestInit = {
       ...options,
       headers,
+      credentials: 'include', // Send HttpOnly auth cookie with every request
     };
 
     try {
@@ -173,12 +126,9 @@ class ApiClient {
 
   // Authentication Methods
   setToken(token: string | null) {
+    // Keep in-memory for non-browser API clients only.
+    // Browser clients use the HttpOnly cookie set by the backend.
     this.token = token;
-    if (token) {
-      localStorage.setItem('authToken', token);
-    } else {
-      localStorage.removeItem('authToken');
-    }
   }
 
   getToken(): string | null {
@@ -188,23 +138,20 @@ class ApiClient {
   // Auth API object
   auth = {
     login: async (credentials: LoginRequest): Promise<AuthResponse> => {
-      const response = await this.request<AuthResponse>('/api/auth/login', {
+      // The backend sets the HttpOnly auth_token cookie on successful login.
+      // We do not store the token in localStorage.
+      return this.request<AuthResponse>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(credentials),
       });
-
-      this.setToken(response.token);
-      return response;
     },
 
     register: async (data: RegisterRequest): Promise<AuthResponse> => {
-      const response = await this.request<AuthResponse>('/api/auth/register', {
+      // The backend sets the HttpOnly auth_token cookie on successful registration.
+      return this.request<AuthResponse>('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
       });
-
-      this.setToken(response.token);
-      return response;
     },
 
     getProfile: async (): Promise<User> => {
@@ -225,6 +172,7 @@ class ApiClient {
       const url = `${this.baseURL}/api/auth/avatar`;
       const headers: Record<string, string> = {};
 
+      // Fallback for non-browser API clients
       if (this.token) {
         headers['Authorization'] = `Bearer ${this.token}`;
       }
@@ -233,6 +181,7 @@ class ApiClient {
         method: 'POST',
         headers,
         body: formData,
+        credentials: 'include', // Send HttpOnly auth cookie
       });
 
       if (!response.ok) {
@@ -265,8 +214,17 @@ class ApiClient {
       });
     },
 
-    logout: () => {
-      this.setToken(null);
+    logout: async () => {
+      // Ask the backend to clear the HttpOnly auth_token cookie.
+      try {
+        await fetch(`${this.baseURL}/api/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch {
+        // Ignore network errors during logout; clear local state regardless.
+      }
+      this.token = null;
     },
 
     checkRegistrationStatus: async (): Promise<RegistrationStatus> => {
@@ -510,7 +468,7 @@ class ApiClient {
     return this.request<T>(endpoint);
   }
 
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
@@ -533,7 +491,7 @@ function getApiClient(): ApiClient {
 export const apiClient = new Proxy({} as ApiClient, {
   get(target, prop) {
     const client = getApiClient();
-    const value = (client as any)[prop];
+    const value = (client as unknown as Record<string, unknown>)[prop as string];
     return typeof value === 'function' ? value.bind(client) : value;
   }
 });
@@ -583,7 +541,7 @@ export const api = {
 
   // Generic methods
   get: <T>(endpoint: string) => apiClient.get<T>(endpoint),
-  post: <T>(endpoint: string, data?: any) => apiClient.post<T>(endpoint, data),
+  post: <T>(endpoint: string, data?: unknown) => apiClient.post<T>(endpoint, data),
 
   // User Management
   getUsers: () => apiClient.getUsers(),
@@ -631,7 +589,7 @@ export function getErrorMessage(error: unknown): string {
     
     // Handle response error objects
     if ('response' in error && error.response && typeof error.response === 'object') {
-      const response = error.response as any;
+      const response = error.response as { data?: { message?: string }; statusText?: string };
       if (response.data && typeof response.data === 'object' && response.data.message) {
         return response.data.message;
       }
@@ -652,7 +610,7 @@ export function getErrorMessage(error: unknown): string {
 }
 
 // Token utility functions
-export function decodeToken(token: string): any {
+export function decodeToken(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split('.')[1];
     const decoded = atob(payload);
@@ -664,14 +622,14 @@ export function decodeToken(token: string): any {
 
 export function isTokenExpired(token: string): boolean {
   const decoded = decodeToken(token);
-  if (!decoded || !decoded.exp) return true;
-  
+  if (!decoded || typeof decoded.exp !== 'number') return true;
+
   return Date.now() >= decoded.exp * 1000;
 }
 
 export function getTokenExpirationDate(token: string): Date | null {
   const decoded = decodeToken(token);
-  if (!decoded || !decoded.exp) return null;
-  
+  if (!decoded || typeof decoded.exp !== 'number') return null;
+
   return new Date(decoded.exp * 1000);
 }

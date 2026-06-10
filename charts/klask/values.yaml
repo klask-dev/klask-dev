@@ -28,7 +28,7 @@ serviceAccount:
   ## @param serviceAccount.create Specifies whether a ServiceAccount should be created
   create: true
   ## @param serviceAccount.automount Automatically mount a ServiceAccount's API credentials?
-  automount: true
+  automount: false
   ## @param serviceAccount.annotations Annotations to add to the service account
   annotations: {}
   ## @param serviceAccount.name The name of the ServiceAccount to use.
@@ -75,17 +75,23 @@ ingress:
   ## This is supported in Kubernetes 1.18+ and required if you have more than one IngressClass marked as the default for your cluster.
   className: "nginx"
   ## @param ingress.annotations Additional annotations for the Ingress resource
-  ## For cert-manager with Let's Encrypt:
-  ## cert-manager.io/cluster-issuer: "letsencrypt-prod"
-  ## For nginx ingress with TLS redirect:
+  ## SECURITY: TLS is required for production deployments!
+  ##
+  ## Example TLS configuration with cert-manager and Let's Encrypt:
+  ## annotations:
+  ##   cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  ##   nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  ##
+  ## For nginx ingress with force HTTPS redirect:
   ## nginx.ingress.kubernetes.io/ssl-redirect: "true"
   ## nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  ##
   ## For CORS:
   ## nginx.ingress.kubernetes.io/enable-cors: "true"
   ## nginx.ingress.kubernetes.io/cors-allow-origin: "https://klask.example.com"
-  annotations: {}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
   ## @param ingress.hosts An array of host configurations for the Ingress
   hosts:
     - host: klask.local
@@ -93,10 +99,34 @@ ingress:
         - path: /
           pathType: Prefix
   ## @param ingress.tls TLS configuration for the Ingress
+  ## SECURITY: Configure TLS when ingress is enabled. Example:
+  ## tls:
+  ##   - secretName: klask-tls
+  ##     hosts:
+  ##       - klask.example.com
+  ##
+  ## With cert-manager, create a ClusterIssuer first:
+  ## apiVersion: cert-manager.io/v1
+  ## kind: ClusterIssuer
+  ## metadata:
+  ##   name: letsencrypt-prod
+  ## spec:
+  ##   acme:
+  ##     server: https://acme-v02.api.letsencrypt.org/directory
+  ##     email: your-email@example.com
+  ##     privateKeySecretRef:
+  ##       name: letsencrypt-prod
+  ##     solvers:
+  ##     - http01:
+  ##         ingress:
+  ##           class: nginx
+  ##
+  ## Then reference the issuer in annotations:
+  ##   cert-manager.io/cluster-issuer: "letsencrypt-prod"
   tls: []
   #  - secretName: klask-tls
   #    hosts:
-  #      - klask.local
+  #      - klask.example.com
 
 ## @section High Availability parameters
 
@@ -212,17 +242,21 @@ backend:
   ## @param backend.auth Authentication and encryption secrets configuration
   auth:
     ## @param backend.auth.encryptionKey Encryption key for sensitive data at rest (e.g., OAuth tokens)
-    ## If not provided, a random 32-character value will be auto-generated on first install
-    ## WARNING: Auto-generated values are preserved across upgrades via lookup()
-    ## To regenerate: kubectl delete secret klask-backend-auth -n <namespace>
-    ## Generate custom key with: openssl rand -hex 32
+    ## REQUIRED FOR PRODUCTION: Must be set using cryptographically secure random data (e.g., openssl rand -hex 32)
+    ## If left empty, a WEAK auto-generated value will be used on first install (NOT recommended for production)
+    ## Auto-generated values are preserved across upgrades via lookup()
+    ## WARNING: Values generated with randAlphaNum are NOT cryptographically secure (INFRA-012)
+    ## To regenerate after deployment: kubectl delete secret klask-backend-auth -n <namespace>
+    ## Secure generation: openssl rand -hex 32
     encryptionKey: ""
 
     ## @param backend.auth.jwtSecret Secret key for JWT token signing and validation
-    ## If not provided, a random 32-character value will be auto-generated on first install
-    ## WARNING: Auto-generated values are preserved across upgrades via lookup()
-    ## To regenerate: kubectl delete secret klask-backend-auth -n <namespace>
-    ## Generate custom key with: openssl rand -hex 32
+    ## REQUIRED FOR PRODUCTION: Must be set using cryptographically secure random data (e.g., openssl rand -hex 32)
+    ## If left empty, a WEAK auto-generated value will be used on first install (NOT recommended for production)
+    ## Auto-generated values are preserved across upgrades via lookup()
+    ## WARNING: Values generated with randAlphaNum are NOT cryptographically secure (INFRA-012)
+    ## To regenerate after deployment: kubectl delete secret klask-backend-auth -n <namespace>
+    ## Secure generation: openssl rand -hex 32
     jwtSecret: ""
 
   ## @param backend.config Backend configuration (non-sensitive)
@@ -233,6 +267,12 @@ backend:
     logFormat: "json"
     ## @param backend.config.gitlabAcceptInvalidCerts Accept invalid SSL certificates for GitLab (useful for self-signed certificates)
     gitlabAcceptInvalidCerts: "false"
+    ## @param backend.config.auditLog Audit logging configuration for security events
+    auditLog:
+      ## @param backend.config.auditLog.enabled Enable structured audit logging for production
+      ## When enabled, the backend logs authentication events, admin actions,
+      ## and repository modifications to stdout in JSON format
+      enabled: false
     ## @param backend.config.extra Additional configuration variables
     extra: {}
 
@@ -343,7 +383,7 @@ backend:
   busybox:
     image:
       repository: busybox
-      tag: latest
+      tag: "1.36.1-glibc"
 
 
 ## @section Frontend parameters
@@ -446,8 +486,10 @@ postgresql:
     existingSecret: ""
 
     ## @param postgresql.auth.postgresPassword PostgreSQL admin (postgres user) password
-    ## If empty, a random 32-character password is generated
-    ## WARNING: Auto-generated passwords are preserved across upgrades via lookup()
+    ## RECOMMENDED FOR PRODUCTION: Set this explicitly using a secure random value
+    ## If empty, a WEAK auto-generated password is used (NOT cryptographically secure, INFRA-012)
+    ## Auto-generated passwords are preserved across upgrades via lookup()
+    ## Secure generation: openssl rand -hex 32
     postgresPassword: ""
 
     ## @param postgresql.auth.username PostgreSQL application username
@@ -456,8 +498,10 @@ postgresql:
     username: "klask"
 
     ## @param postgresql.auth.password PostgreSQL application user password
-    ## If empty, a random 32-character password is generated
-    ## WARNING: Auto-generated passwords are preserved across upgrades via lookup()
+    ## RECOMMENDED FOR PRODUCTION: Set this explicitly using a secure random value
+    ## If empty, a WEAK auto-generated password is used (NOT cryptographically secure, INFRA-012)
+    ## Auto-generated passwords are preserved across upgrades via lookup()
+    ## Secure generation: openssl rand -hex 32
     password: ""
 
     ## @param postgresql.auth.database PostgreSQL database name
@@ -549,13 +593,29 @@ postgresql:
     ## @param postgresql.external.url External database full URL
     ## If provided, overrides host/port/database/username/password
     ## Format: postgresql://user:password@host:port/database
+    ## SECURITY (INFRA-011): Always include TLS configuration in production
+    ##
+    ## For embedded PostgreSQL (postgresql.enabled=true): In-cluster communication does not use TLS by default.
+    ## For external PostgreSQL: Include TLS parameters in your URL:
+    ##
+    ## Recommended TLS modes:
+    ##   ?sslmode=require     - Require TLS, fail if unavailable (strongly recommended for production)
+    ##   ?sslmode=verify-ca   - Require TLS with CA certificate verification
+    ##   ?sslmode=verify-full - Require TLS with full certificate validation (strictest)
+    ##
+    ## Other TLS modes (not recommended):
+    ##   ?sslmode=prefer      - Use TLS if available (default if not specified)
+    ##   ?sslmode=disable     - No TLS connection (only for non-sensitive local development)
+    ##
+    ## Example production URL with TLS required:
+    ##   postgresql://user:password@db.example.com:5432/klask?sslmode=require
     url: ""
 
 ## @section Network Policy parameters
 
 networkPolicy:
   ## @param networkPolicy.enabled Enable NetworkPolicy
-  enabled: false
+  enabled: true
 
   ## @param networkPolicy.ingress Ingress controller configuration for NetworkPolicy
   ingress:

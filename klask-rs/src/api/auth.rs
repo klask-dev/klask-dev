@@ -2,10 +2,13 @@ use anyhow::Result;
 use axum::{
     Router,
     extract::State,
-    response::Json,
+    http::HeaderValue,
+    http::header::SET_COOKIE,
+    response::{IntoResponse, Json},
     routing::{delete, get, post, put},
 };
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -15,6 +18,30 @@ use crate::models::user::{
 };
 use crate::repositories::user_repository::{UpdateProfileData, UserRepository};
 use crate::utils::password::{hash_password, verify_password};
+
+/// Build a Set-Cookie header value for the auth_token HttpOnly cookie.
+/// max_age_secs should match the JWT expiry duration.
+fn build_auth_cookie(token: &str, max_age_secs: i64) -> String {
+    format!(
+        "auth_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
+        token, max_age_secs
+    )
+}
+
+/// Parse `JWT_EXPIRES_IN` string (e.g. "24h", "7d", "30m") into seconds.
+fn parse_expires_in_secs(expires_in: &str) -> i64 {
+    if expires_in.ends_with('h') {
+        expires_in.trim_end_matches('h').parse::<i64>().unwrap_or(24) * 3600
+    } else if expires_in.ends_with('d') {
+        expires_in.trim_end_matches('d').parse::<i64>().unwrap_or(1) * 86400
+    } else if expires_in.ends_with('m') {
+        expires_in.trim_end_matches('m').parse::<i64>().unwrap_or(60) * 60
+    } else if expires_in.ends_with('s') {
+        expires_in.trim_end_matches('s').parse::<i64>().unwrap_or(86400)
+    } else {
+        expires_in.parse::<i64>().unwrap_or(24) * 3600
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginRequest {
@@ -78,6 +105,7 @@ impl From<User> for UserInfo {
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/login", post(login))
+        .route("/logout", post(logout))
         .route("/register", post(register))
         .route("/registration/status", get(get_registration_status))
         .route("/profile", get(get_profile).put(update_profile))
@@ -91,21 +119,74 @@ pub async fn create_router() -> Result<Router<AppState>> {
     Ok(router)
 }
 
+/// Attach an HttpOnly auth cookie to an AuthResponse and return it as a full response.
+fn auth_response_with_cookie(auth_response: AuthResponse, expires_in: String) -> impl IntoResponse {
+    let max_age = parse_expires_in_secs(&expires_in);
+    let cookie_value = build_auth_cookie(&auth_response.token, max_age);
+    let mut response = Json(auth_response).into_response();
+    if let Ok(hv) = HeaderValue::from_str(&cookie_value) {
+        response.headers_mut().insert(SET_COOKIE, hv);
+    }
+    response
+}
+
 async fn login(
     State(app_state): State<AppState>,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<AuthResponse>, AuthError> {
+) -> Result<impl IntoResponse, AuthError> {
+    const MAX_LOGIN_ATTEMPTS: u32 = 10;
+    const LOGIN_RATE_LIMIT_WINDOW_SECS: u64 = 900; // 15 minutes
+
     // Validate request
     req.validate().map_err(|_| AuthError::InvalidCredentials)?;
+
+    let username = req.username.clone();
+    let now = std::time::SystemTime::now();
+
+    // Check rate limiting for login attempts
+    {
+        let mut limiter = app_state.login_rate_limiter.write().await;
+
+        if let Some((attempts, last_reset)) = limiter.get_mut(&username) {
+            // Check if we need to reset the counter
+            if let Ok(elapsed) = now.duration_since(*last_reset) {
+                if elapsed.as_secs() > LOGIN_RATE_LIMIT_WINDOW_SECS {
+                    // Reset the counter
+                    *attempts = 0;
+                    *last_reset = now;
+                } else if *attempts >= MAX_LOGIN_ATTEMPTS {
+                    // Too many login attempts
+                    let remaining_time = LOGIN_RATE_LIMIT_WINDOW_SECS - elapsed.as_secs();
+                    warn!("Login rate limit exceeded for user: {}", username);
+                    return Err(AuthError::TooManyAttempts(
+                        format!(
+                            "Too many login attempts. Please try again in {} seconds",
+                            remaining_time
+                        ),
+                        remaining_time as u32,
+                    ));
+                }
+            }
+            // Increment attempt counter
+            *attempts += 1;
+        } else {
+            // First attempt for this username
+            limiter.insert(username.clone(), (1, now));
+        }
+    }
 
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
     // Find user by username
-    let user = user_repo
-        .find_by_username(&req.username)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
-        .ok_or(AuthError::InvalidCredentials)?;
+    let user = match user_repo.find_by_username(&username).await.map_err(|e| AuthError::DatabaseError(e.to_string()))? {
+        Some(user) => user,
+        None => {
+            // Perform a dummy password verification to mitigate timing attacks
+            // This equalizes the response time between "user not found" and "wrong password"
+            let _ = verify_password(&req.password, crate::utils::password::get_dummy_hash());
+            return Err(AuthError::InvalidCredentials);
+        }
+    };
 
     // Verify user is active
     if !user.active {
@@ -119,6 +200,9 @@ async fn login(
         return Err(AuthError::InvalidCredentials);
     }
 
+    // Clear rate limit on successful login
+    app_state.login_rate_limiter.write().await.remove(&username);
+
     // Update last_login and last_activity timestamps
     let user = user_repo.update_last_login(user.id).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 
@@ -128,13 +212,25 @@ async fn login(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
+    Ok(auth_response_with_cookie(
+        AuthResponse { token, user: UserInfo::from(user) },
+        app_state.config.auth.jwt_expires_in.clone(),
+    ))
+}
+
+/// Logout: clear the auth_token cookie by setting Max-Age=0.
+async fn logout() -> impl IntoResponse {
+    let cookie = "auth_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0";
+    (
+        [(SET_COOKIE, cookie)],
+        Json(serde_json::json!({"message": "Logged out successfully"})),
+    )
 }
 
 async fn register(
     State(app_state): State<AppState>,
     Json(req): Json<RegisterRequest>,
-) -> Result<Json<AuthResponse>, AuthError> {
+) -> Result<impl IntoResponse, AuthError> {
     // Check if registration is allowed
     if !app_state.config.auth.allow_registration {
         return Err(AuthError::RegistrationDisabled);
@@ -159,6 +255,7 @@ async fn register(
     let password_hash = hash_password(&req.password).map_err(|_| AuthError::InvalidCredentials)?;
 
     // Create new user
+    let now = chrono::Utc::now();
     let new_user = User {
         id: Uuid::new_v4(),
         username: req.username.clone(),
@@ -166,8 +263,8 @@ async fn register(
         password_hash,
         role: UserRole::User, // Default role
         active: true,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        created_at: now,
+        updated_at: now,
         last_login: None,
         last_activity: None,
         avatar_url: None,
@@ -177,6 +274,7 @@ async fn register(
         timezone: Some("UTC".to_string()),
         preferences: None,
         login_count: 0,
+        password_changed_at: now,
     };
 
     let user = user_repo.create_user(&new_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
@@ -187,7 +285,10 @@ async fn register(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
+    Ok(auth_response_with_cookie(
+        AuthResponse { token, user: UserInfo::from(user) },
+        app_state.config.auth.jwt_expires_in.clone(),
+    ))
 }
 
 async fn get_profile(auth_user: AuthenticatedUser) -> Result<Json<UserProfile>, AuthError> {
@@ -213,23 +314,17 @@ async fn get_registration_status(
 async fn initial_setup(
     State(app_state): State<AppState>,
     Json(req): Json<SetupRequest>,
-) -> Result<Json<AuthResponse>, AuthError> {
+) -> Result<impl IntoResponse, AuthError> {
     // Validate request
     req.validate().map_err(|_| AuthError::InvalidCredentials)?;
 
     let user_repo = UserRepository::new(app_state.database.pool().clone());
 
-    // Check if any users exist
-    let user_count = user_repo.count_users().await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
-
-    if user_count > 0 {
-        return Err(AuthError::Forbidden("Setup already completed".to_string()));
-    }
-
     // Hash password
     let password_hash = hash_password(&req.password).map_err(|_| AuthError::InvalidCredentials)?;
 
-    // Create the first admin user
+    // Create the first admin user atomically
+    let now = chrono::Utc::now();
     let admin_user = User {
         id: Uuid::new_v4(),
         username: req.username.clone(),
@@ -237,8 +332,8 @@ async fn initial_setup(
         password_hash,
         role: UserRole::Admin, // First user is always admin
         active: true,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
+        created_at: now,
+        updated_at: now,
         last_login: None,
         last_activity: None,
         avatar_url: None,
@@ -248,9 +343,15 @@ async fn initial_setup(
         timezone: Some("UTC".to_string()),
         preferences: None,
         login_count: 0,
+        password_changed_at: now,
     };
 
-    let user = user_repo.create_user(&admin_user).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+    // Use atomic insert: only succeeds if no users exist
+    let user = user_repo
+        .create_first_admin_if_not_exists(&admin_user)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?
+        .ok_or_else(|| AuthError::Forbidden("Setup already completed".to_string()))?;
 
     // Generate JWT token
     let token = app_state
@@ -258,7 +359,10 @@ async fn initial_setup(
         .create_token_for_user(user.id, user.username.clone(), user.role.to_string())
         .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
-    Ok(Json(AuthResponse { token, user: UserInfo::from(user) }))
+    Ok(auth_response_with_cookie(
+        AuthResponse { token, user: UserInfo::from(user) },
+        app_state.config.auth.jwt_expires_in.clone(),
+    ))
 }
 
 /// Update user profile with new information
@@ -285,10 +389,10 @@ async fn update_profile(
     }
 
     if let Some(ref avatar_url) = payload.avatar_url {
-        // Allow large base64 data URIs (typical avatar ~100KB base64 = ~133KB string)
         if avatar_url.len() > 1_000_000 {
             return Err(AuthError::InvalidInput("Avatar URL must be 1MB or less".to_string()));
         }
+        validate_avatar_url(avatar_url)?;
     }
 
     if let Some(ref phone) = payload.phone
@@ -460,8 +564,33 @@ async fn delete_account(
     })))
 }
 
+/// Validate avatar_url is a safe https:// URL or an allowed data URI (jpeg/png/gif/webp only).
+/// Rejects SVG and any other MIME type to prevent stored XSS via malicious SVG payloads.
+fn validate_avatar_url(url: &str) -> Result<(), AuthError> {
+    // Allow plain https:// external image URLs
+    if url.starts_with("https://") {
+        return Ok(());
+    }
+
+    // Allow only safe raster image data URIs
+    const ALLOWED_PREFIXES: &[&str] = &[
+        "data:image/jpeg;base64,",
+        "data:image/jpg;base64,",
+        "data:image/png;base64,",
+        "data:image/gif;base64,",
+        "data:image/webp;base64,",
+    ];
+    if ALLOWED_PREFIXES.iter().any(|p| url.starts_with(p)) {
+        return Ok(());
+    }
+
+    Err(AuthError::InvalidInput(
+        "avatar_url must be an https:// URL or a data URI with MIME type image/jpeg, image/png, image/gif, or image/webp".to_string(),
+    ))
+}
+
 /// Validate password meets minimum security requirements
-fn validate_password_strength(password: &str) -> Result<(), AuthError> {
+pub fn validate_password_strength(password: &str) -> Result<(), AuthError> {
     if password.len() < 8 {
         return Err(AuthError::InvalidInput(
             "Password must be at least 8 characters".to_string(),

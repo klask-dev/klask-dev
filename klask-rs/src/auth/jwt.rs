@@ -19,10 +19,14 @@ impl JwtService {
         // Parse expires_in from config (e.g., "24h", "1d", "60m")
         let expires_in = Self::parse_duration(&config.jwt_expires_in)?;
 
+        let mut validation = Validation::default();
+        validation.set_issuer(&["klask"]);
+        validation.set_audience(&["klask"]);
+
         Ok(Self {
             encoding_key: EncodingKey::from_secret(secret),
             decoding_key: DecodingKey::from_secret(secret),
-            validation: Validation::default(),
+            validation,
             expires_in,
         })
     }

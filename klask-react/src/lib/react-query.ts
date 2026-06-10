@@ -116,10 +116,12 @@ export function handleQueryError(error: unknown) {
       queryClient.clear();
       window.location.href = '/login';
     }
-    
-    // Log other API errors
-    console.error('API Error:', error.message, error.details);
-  } else {
+
+    // Log other API errors only in development
+    if (import.meta.env.DEV) {
+      console.error('API Error:', error.message, error.details);
+    }
+  } else if (import.meta.env.DEV) {
     console.error('Query Error:', error);
   }
 }

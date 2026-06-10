@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -6,7 +6,6 @@ import {
   useSearch,
   useAdvancedSearch,
   useSearchHistory,
-  useSearchFilters,
   useInfiniteSearch,
   useSearchSuggestions,
   useFacetsWithFilters,
@@ -25,7 +24,7 @@ vi.mock('../../lib/api', () => ({
   },
 }));
 
-const mockApiClient = apiClient as any;
+const mockApiClient = apiClient as typeof apiClient & Record<string, ReturnType<typeof vi.fn>>;
 
 describe('useSearch', () => {
   let queryClient: QueryClient;
@@ -291,7 +290,7 @@ describe('useSearch', () => {
 });
 
 describe('useSearchHistory hook', () => {
-  let localStorageMock: {
+  let sessionStorageMock: {
     getItem: ReturnType<typeof vi.fn>,
     setItem: ReturnType<typeof vi.fn>,
     removeItem: ReturnType<typeof vi.fn>,
@@ -299,13 +298,13 @@ describe('useSearchHistory hook', () => {
   };
 
   beforeEach(() => {
-    localStorageMock = {
+    sessionStorageMock = {
       getItem: vi.fn(),
       setItem: vi.fn(),
       removeItem: vi.fn(),
       clear: vi.fn(),
     };
-    vi.stubGlobal('localStorage', localStorageMock);
+    vi.stubGlobal('sessionStorage', sessionStorageMock);
     vi.clearAllMocks();
   });
 
@@ -314,16 +313,16 @@ describe('useSearchHistory hook', () => {
     expect(result.current.history).toEqual([]);
   });
 
-  it('should load history from localStorage', () => {
+  it('should load history from sessionStorage', () => {
     const mockHistory = ['query1', 'query2'];
-    localStorageMock.getItem.mockReturnValue(JSON.stringify(mockHistory));
+    sessionStorageMock.getItem.mockReturnValue(JSON.stringify(mockHistory));
 
     const { result } = renderHook(() => useSearchHistory());
     expect(result.current.history).toEqual(mockHistory);
   });
 
-  it('should handle localStorage parse errors', () => {
-    localStorageMock.getItem.mockReturnValue('invalid json');
+  it('should handle sessionStorage parse errors', () => {
+    sessionStorageMock.getItem.mockReturnValue('invalid json');
 
     const { result } = renderHook(() => useSearchHistory());
     expect(result.current.history).toEqual([]);
@@ -337,7 +336,7 @@ describe('useSearchHistory hook', () => {
     });
 
     expect(result.current.history).toEqual(['new query']);
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+    expect(sessionStorageMock.setItem).toHaveBeenCalledWith(
       'klask-search-history',
       JSON.stringify(['new query'])
     );
@@ -395,11 +394,11 @@ describe('useSearchHistory hook', () => {
     });
 
     expect(result.current.history).toEqual([]);
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('klask-search-history');
+    expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('klask-search-history');
   });
 
-  it('should handle localStorage errors gracefully', () => {
-    localStorageMock.setItem.mockImplementation(() => {
+  it('should handle sessionStorage errors gracefully', () => {
+    sessionStorageMock.setItem.mockImplementation(() => {
       throw new Error('Storage error');
     });
 
@@ -409,12 +408,12 @@ describe('useSearchHistory hook', () => {
       result.current.addToHistory('test query');
     });
 
-    // Should still update state even if localStorage fails
+    // Should still update state even if sessionStorage fails
     expect(result.current.history).toEqual(['test query']);
   });
 
-  it('should handle localStorage clear errors gracefully', () => {
-    localStorageMock.removeItem.mockImplementation(() => {
+  it('should handle sessionStorage clear errors gracefully', () => {
+    sessionStorageMock.removeItem.mockImplementation(() => {
       throw new Error('Storage error');
     });
 
@@ -425,7 +424,7 @@ describe('useSearchHistory hook', () => {
       result.current.clearHistory();
     });
 
-    // Should still clear state even if localStorage fails
+    // Should still clear state even if sessionStorage fails
     expect(result.current.history).toEqual([]);
   });
 });
@@ -594,7 +593,7 @@ describe('useFacetsWithFilters hook', () => {
     });
 
     const { rerender } = renderHook(
-      ({ filters }: { filters: any }) =>
+      ({ filters }: { filters: Parameters<typeof useFacetsWithFilters>[0] }) =>
         useFacetsWithFilters(filters),
       {
         wrapper,

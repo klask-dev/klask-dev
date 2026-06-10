@@ -227,7 +227,7 @@ jobs:
         fi
 
     - name: Run Trivy vulnerability scanner (frontend)
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.28.0
       with:
         image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
         format: 'sarif'

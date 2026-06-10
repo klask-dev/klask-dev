@@ -8,6 +8,7 @@ pub struct AppConfig {
     pub search: SearchConfig,
     pub crawler: CrawlerConfig,
     pub auth: AuthConfig,
+    pub cors: CorsConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +39,11 @@ pub struct AuthConfig {
     pub jwt_secret: String,
     pub jwt_expires_in: String,
     pub allow_registration: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorsConfig {
+    pub allowed_origins: Vec<String>,
 }
 
 impl AppConfig {
@@ -83,6 +89,14 @@ impl AppConfig {
                     if secret.is_empty() {
                         return Err(anyhow::anyhow!("JWT_SECRET environment variable cannot be empty"));
                     }
+                    if secret.len() < 32 {
+                        return Err(anyhow::anyhow!(
+                            "JWT_SECRET must be at least 32 characters long for adequate security. \
+                            Current length: {}. Generate a strong secret with: \
+                            openssl rand -hex 32",
+                            secret.len()
+                        ));
+                    }
                     secret
                 },
                 jwt_expires_in: std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "24h".to_string()),
@@ -90,6 +104,13 @@ impl AppConfig {
                     .unwrap_or_else(|_| "true".to_string())
                     .parse()
                     .unwrap_or(true),
+            },
+            cors: CorsConfig {
+                allowed_origins: std::env::var("ALLOWED_ORIGINS")
+                    .unwrap_or_else(|_| "http://localhost:5173,http://localhost:8080".to_string())
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect(),
             },
         };
 

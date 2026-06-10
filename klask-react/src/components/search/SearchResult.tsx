@@ -1,4 +1,5 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 import {
   DocumentTextIcon,
   FolderIcon,
@@ -62,7 +63,7 @@ export const SearchResult: React.FC<SearchResultProps> = ({
           )}
         </>
       );
-    } catch (e) {
+    } catch {
       // If regex is invalid, just return the text without highlighting
       // This can happen with incomplete regex patterns from user input
       return <>{text}</>;
@@ -82,7 +83,6 @@ export const SearchResult: React.FC<SearchResultProps> = ({
   // Try name first, then extract from path
   const extractedPath = formatPath(result.path || '');
   const filename = result.name || extractedPath.filename;
-  const directory = extractedPath.directory;
 
   return (
     <div
@@ -167,28 +167,23 @@ export const SearchResult: React.FC<SearchResultProps> = ({
               dangerouslySetInnerHTML={{
                 __html: (() => {
                   // Tantivy sends HTML with entities encoded and <b> tags for highlighting
-                  // We need to:
-                  // 1. Decode HTML entities (safe because Tantivy already escaped them)
-                  // 2. Convert <b> tags to safe <mark> tags for highlighting
+                  // 1. Replace <b> tags with <mark> tags (safe text replacement)
+                  // 2. Sanitize with DOMPurify to allow only <mark> tags
                   const snippet = result.content_snippet || 'No content preview available';
 
-                  // Decode HTML entities
-                  const textarea = document.createElement('textarea');
-                  textarea.innerHTML = snippet;
-                  const decoded = textarea.value;
+                  // Convert <b> to <mark> for highlighting (safe string operation)
+                  const withMarkTags = snippet
+                    .replace(/<b>/g, '<mark>')
+                    .replace(/<\/b>/g, '</mark>');
 
-                  // Now re-encode for safe insertion, except for our <b> tags
-                  let html = decoded
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
+                  // Sanitize HTML: allow only <mark> tags, strip all attributes
+                  const sanitized = DOMPurify.sanitize(withMarkTags, {
+                    ALLOWED_TAGS: ['mark'],
+                    ALLOWED_ATTR: [],
+                    KEEP_CONTENT: true,
+                  });
 
-                  // Finally, convert <b> tags to safe highlight marks
-                  html = html
-                    .replace(/&lt;b&gt;/g, '<mark class="bg-yellow-200 font-semibold">')
-                    .replace(/&lt;\/b&gt;/g, '</mark>');
-
-                  return html;
+                  return sanitized;
                 })()
               }}
             />

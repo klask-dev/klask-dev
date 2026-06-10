@@ -84,9 +84,10 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@v1
       with:
         components: rustfmt, clippy
+        toolchain: stable
 
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
