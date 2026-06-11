@@ -18,6 +18,10 @@ const DEFAULT_SEARCH_LIMIT: u32 = 20;
 /// Maximum number of lines returned by `get_file` in a single call.
 const MAX_FILE_LINES: usize = 2000;
 
+/// Maximum number of repositories a single `list_repositories` call can return.
+const MAX_REPOSITORY_LIMIT: u32 = 500;
+const DEFAULT_REPOSITORY_LIMIT: u32 = 100;
+
 /// Protocol-level tool call failures (mapped to JSON-RPC errors by the caller).
 #[derive(Debug)]
 pub enum ToolCallError {
@@ -108,10 +112,27 @@ pub fn tool_definitions() -> Value {
         {
             "name": "list_repositories",
             "description": "List the repositories indexed by Klask with their type (Git, GitLab, \
-                GitHub, FileSystem), URL and last crawl time.",
+                GitHub, FileSystem), URL and last crawl time. Only enabled repositories are \
+                returned unless include_disabled is true; results are paginated.",
             "inputSchema": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                    "include_disabled": {
+                        "type": "boolean",
+                        "description": "Also return repositories disabled for crawling (default false)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": MAX_REPOSITORY_LIMIT,
+                        "description": "Maximum repositories to return (default 100, max 500)"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Result page, 1-based (default 1)"
+                    }
+                }
             }
         },
         {
@@ -141,7 +162,7 @@ pub async fn call_tool(state: &AppState, name: &str, arguments: &Value) -> Resul
     match name {
         "search_code" => search_code(state, arguments).await,
         "get_file" => get_file(state, arguments).await,
-        "list_repositories" => list_repositories(state).await,
+        "list_repositories" => list_repositories(state, arguments).await,
         "get_search_facets" => get_search_facets(state, arguments).await,
         other => Err(ToolCallError::UnknownTool(other.to_string())),
     }
@@ -336,14 +357,32 @@ fn slice_lines(content: &str, start_line: Option<usize>, end_line: Option<usize>
     }
 }
 
-async fn list_repositories(state: &AppState) -> Result<Value, ToolCallError> {
+#[derive(Debug, Deserialize)]
+struct ListRepositoriesArgs {
+    #[serde(default)]
+    include_disabled: bool,
+    limit: Option<u32>,
+    page: Option<u32>,
+}
+
+async fn list_repositories(state: &AppState, arguments: &Value) -> Result<Value, ToolCallError> {
+    let args: ListRepositoriesArgs = parse_args(arguments)?;
+    let limit = args.limit.unwrap_or(DEFAULT_REPOSITORY_LIMIT).clamp(1, MAX_REPOSITORY_LIMIT) as usize;
+    let page = args.page.unwrap_or(1).max(1);
+    let offset = ((page as u64 - 1) * limit as u64) as usize;
+
     let repo_repository = RepositoryRepository::new(state.database.pool().clone());
 
     match repo_repository.list_repositories().await {
         Ok(repositories) => {
+            let visible: Vec<_> = repositories.into_iter().filter(|r| args.include_disabled || r.enabled).collect();
+            let total = visible.len();
+
             // Explicit read-only projection: never expose tokens or crawl configuration
-            let repositories: Vec<Value> = repositories
+            let repositories: Vec<Value> = visible
                 .into_iter()
+                .skip(offset)
+                .take(limit)
                 .map(|r| {
                     json!({
                         "name": r.name,
@@ -357,7 +396,9 @@ async fn list_repositories(state: &AppState) -> Result<Value, ToolCallError> {
                 .collect();
 
             Ok(crate::mcp::protocol::tool_result(&json!({
-                "total": repositories.len(),
+                "total": total,
+                "page": page,
+                "limit": limit,
                 "repositories": repositories,
             })))
         }
@@ -509,6 +550,20 @@ mod tests {
         assert_eq!(args.extensions, Some(vec!["rs".to_string()]));
         assert_eq!(args.limit, Some(5));
         assert!(!args.case_sensitive);
+    }
+
+    #[test]
+    fn test_list_repositories_args_defaults() {
+        let args: ListRepositoriesArgs = parse_args(&Value::Null).expect("null arguments are valid");
+        assert!(!args.include_disabled);
+        assert!(args.limit.is_none());
+        assert!(args.page.is_none());
+
+        let args: ListRepositoriesArgs =
+            parse_args(&serde_json::json!({ "include_disabled": true, "limit": 5, "page": 2 })).expect("valid args");
+        assert!(args.include_disabled);
+        assert_eq!(args.limit, Some(5));
+        assert_eq!(args.page, Some(2));
     }
 
     #[test]

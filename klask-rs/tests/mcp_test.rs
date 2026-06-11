@@ -333,11 +333,16 @@ async fn test_mcp_list_repositories_empty() -> Result<()> {
     .await;
 
     let payload = tool_payload(&response.json());
-    assert!(payload["repositories"].is_array());
-    assert_eq!(
-        payload["total"].as_u64().unwrap() as usize,
-        payload["repositories"].as_array().unwrap().len()
-    );
+    let page_len = payload["repositories"].as_array().expect("repositories array").len();
+    let limit = payload["limit"].as_u64().unwrap() as usize;
+    assert_eq!(payload["page"], 1);
+    assert!(page_len <= limit);
+    assert!(payload["total"].as_u64().unwrap() as usize >= page_len);
+
+    // Disabled repositories are excluded by default, so every returned repo is enabled
+    for repo in payload["repositories"].as_array().unwrap() {
+        assert_eq!(repo["enabled"], true, "unexpected disabled repo: {repo}");
+    }
 
     Ok(())
 }
