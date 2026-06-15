@@ -103,7 +103,6 @@ impl ApiTokenRepository {
         Ok(token)
     }
 
-
     /// Update the last_used_at timestamp for a token (called after successful authentication)
     pub async fn update_last_used(&self, id: Uuid) -> Result<()> {
         sqlx::query(

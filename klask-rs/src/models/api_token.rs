@@ -5,7 +5,7 @@
 //! The plaintext token is shown to the user only once during creation.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use sqlx::FromRow;
 use uuid::Uuid;
 
