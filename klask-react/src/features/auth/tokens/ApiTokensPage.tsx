@@ -91,3 +91,4 @@ const ApiTokensPage: React.FC = () => {
 };
 
 export default ApiTokensPage;
+export { ApiTokensPage };
