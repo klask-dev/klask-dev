@@ -8,14 +8,14 @@ use serde_json::json;
 async fn test_crawler_service_initialization() -> Result<()> {
     // Test crawler service initialization parameters
     let initialization_params = json!({
-        "search_index_path": "/tmp/test_search",
+        "search_index_dir": "/tmp/test_search",
         "max_file_size_mb": 100,
         "supported_extensions": [".rs", ".md", ".txt", ".toml", ".json"],
         "concurrent_workers": 4,
         "progress_reporting_interval_ms": 1000
     });
 
-    assert!(initialization_params["search_index_path"].is_string());
+    assert!(initialization_params["search_index_dir"].is_string());
     assert_eq!(initialization_params["max_file_size_mb"].as_u64().unwrap(), 100);
     assert!(initialization_params["supported_extensions"].is_array());
     assert_eq!(initialization_params["concurrent_workers"].as_u64().unwrap(), 4);

@@ -54,7 +54,7 @@ pub fn tool_definitions() -> Value {
                         "description": "Search terms, a \"quoted phrase\", or a regex pattern when regex is true"
                     },
                     "repositories": string_array("Restrict to these repository names"),
-                    "projects": string_array("Restrict to these project names (GitLab/GitHub sub-projects)"),
+                    "projects": string_array("Restrict to these project names using full path (e.g., 'klask-dev/klask-dev'). Use get_search_facets to discover available projects."),
                     "versions": string_array("Restrict to these branches or tags (e.g. [\"main\"])"),
                     "extensions": string_array("Restrict to these file extensions, without dot (e.g. [\"rs\", \"ts\"])"),
                     "regex": {
