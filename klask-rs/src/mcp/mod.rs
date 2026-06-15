@@ -38,8 +38,10 @@ async fn handle_unsupported_method() -> Response {
 }
 
 async fn handle_post(_auth: AuthenticatedUser, State(state): State<AppState>, body: String) -> Response {
-    let request: JsonRpcRequest = match serde_json::from_str(&body) {
-        Ok(request) => request,
+    // -32700 is reserved for malformed JSON; a well-formed body that is not a
+    // valid Request object (missing method/jsonrpc, wrong types) is -32600.
+    let value: Value = match serde_json::from_str(&body) {
+        Ok(value) => value,
         Err(e) => {
             return json_response(JsonRpcResponse::error(
                 Value::Null,
@@ -49,8 +51,23 @@ async fn handle_post(_auth: AuthenticatedUser, State(state): State<AppState>, bo
         }
     };
 
+    let request: JsonRpcRequest = match serde::Deserialize::deserialize(&value) {
+        Ok(request) => request,
+        Err(e) => {
+            let id = value.get("id").cloned().unwrap_or(Value::Null);
+            return json_response(JsonRpcResponse::error(
+                id,
+                INVALID_REQUEST,
+                format!("Invalid request: {e}"),
+            ));
+        }
+    };
+
     if request.jsonrpc != protocol::JSONRPC_VERSION {
-        let id = request.id.unwrap_or(Value::Null);
+        // Never answer an id-less message, even an invalid one
+        let Some(id) = request.id.clone() else {
+            return StatusCode::ACCEPTED.into_response();
+        };
         return json_response(JsonRpcResponse::error(
             id,
             INVALID_REQUEST,

@@ -333,11 +333,16 @@ async fn test_mcp_list_repositories_empty() -> Result<()> {
     .await;
 
     let payload = tool_payload(&response.json());
-    assert!(payload["repositories"].is_array());
-    assert_eq!(
-        payload["total"].as_u64().unwrap() as usize,
-        payload["repositories"].as_array().unwrap().len()
-    );
+    let page_len = payload["repositories"].as_array().expect("repositories array").len();
+    let limit = payload["limit"].as_u64().unwrap() as usize;
+    assert_eq!(payload["page"], 1);
+    assert!(page_len <= limit);
+    assert!(payload["total"].as_u64().unwrap() as usize >= page_len);
+
+    // Disabled repositories are excluded by default, so every returned repo is enabled
+    for repo in payload["repositories"].as_array().unwrap() {
+        assert_eq!(repo["enabled"], true, "unexpected disabled repo: {repo}");
+    }
 
     Ok(())
 }
@@ -378,6 +383,12 @@ async fn test_mcp_protocol_errors() -> Result<()> {
         .await;
     let body: Value = response.json();
     assert_eq!(body["error"]["code"], -32700);
+
+    // Well-formed JSON that is not a valid Request object -> -32600, echoing the id
+    let response = rpc(&server, &token, &json!({"jsonrpc": "2.0", "id": 9})).await;
+    let body: Value = response.json();
+    assert_eq!(body["error"]["code"], -32600);
+    assert_eq!(body["id"], 9);
 
     // Unknown tool -> -32602
     let response = rpc(

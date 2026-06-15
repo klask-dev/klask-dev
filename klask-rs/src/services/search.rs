@@ -416,7 +416,9 @@ impl SearchService {
         // full UUID would silently match nothing.
         let file_id_str = file_data.file_id.to_string();
         if let Some(query) = self.file_id_query(file_data.file_id)? {
-            let _ = writer.delete_query(query);
+            // Propagate failures: indexing the new document without having deleted
+            // the old ones would silently accumulate duplicates.
+            writer.delete_query(query)?;
         }
 
         // Check for oversized content that might cause token length issues
