@@ -82,18 +82,23 @@ impl ApiTokenRepository {
 
     /// Find an API token by its plaintext token
     /// This method handles Argon2 hash comparison for authentication
+    /// Optimized: Uses prefix-based index for O(1) lookup before verifying hash
     pub async fn find_by_token(&self, plaintext_token: &str) -> Result<Option<ApiToken>> {
-        // Get all tokens (we'll compare hashes in-memory to avoid timing attacks)
-        // In practice, with many tokens, this could be optimized with a prefix index
+        if plaintext_token.len() < 12 {
+            return Ok(None);
+        }
+
+        let token_prefix = &plaintext_token[0..12];
+
         let tokens = sqlx::query_as::<_, ApiToken>(
             "SELECT id, user_id, token_hash, token_prefix, name, scope, active, created_at, last_used_at, expires_at
              FROM api_tokens
-             LIMIT 10000",
+             WHERE token_prefix = $1 AND active = true",
         )
+        .bind(token_prefix)
         .fetch_all(&self.pool)
         .await?;
 
-        // Use argon2 to verify the plaintext token against each stored hash
         use crate::utils::password::verify_password;
 
         for token in tokens {

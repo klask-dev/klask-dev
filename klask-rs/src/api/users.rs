@@ -325,7 +325,10 @@ async fn list_tokens(
             let token_infos: Vec<ApiTokenInfo> = tokens.into_iter().map(|t| t.into()).collect();
             Ok(Json(token_infos))
         }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(e) => {
+            tracing::error!("Failed to list API tokens for user {}: {:?}", auth_user.user.id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
@@ -373,7 +376,10 @@ async fn create_token(
         .await
     {
         Ok(token) => token,
-        Err(_) => return Err(AuthError::InvalidInput("Failed to create token".to_string())),
+        Err(e) => {
+            tracing::error!("Failed to create API token for user {}: {:?}", auth_user.user.id, e);
+            return Err(AuthError::InvalidInput("Failed to create token".to_string()));
+        }
     };
 
     Ok(Json(CreateApiTokenResponse {
@@ -405,10 +411,23 @@ async fn revoke_token(
             // Revoke the token
             match api_token_repo.revoke_token(token_id).await {
                 Ok(()) => Ok(StatusCode::NO_CONTENT),
-                Err(_) => Err(AuthError::InvalidInput("Failed to revoke token".to_string())),
+                Err(e) => {
+                    tracing::error!("Failed to revoke API token {}: {:?}", token_id, e);
+                    Err(AuthError::InvalidInput("Failed to revoke token".to_string()))
+                }
             }
         }
-        Ok(None) => Err(AuthError::InvalidInput("Token not found".to_string())),
-        Err(_) => Err(AuthError::InvalidInput("Database error".to_string())),
+        Ok(None) => {
+            tracing::warn!(
+                "User {} attempted to revoke non-existent token {}",
+                auth_user.user.id,
+                token_id
+            );
+            Err(AuthError::InvalidInput("Token not found".to_string()))
+        }
+        Err(e) => {
+            tracing::error!("Database error while fetching token {}: {:?}", token_id, e);
+            Err(AuthError::InvalidInput("Database error".to_string()))
+        }
     }
 }

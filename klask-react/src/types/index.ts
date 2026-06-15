@@ -626,9 +626,10 @@ export interface ApiTokenInfo {
   name: string;
   token_prefix: string;
   scope: string;
+  active: boolean;
   created_at: string;
   last_used_at: string | null;
-  revoked_at: string | null;
+  expires_at: string | null;
 }
 
 export interface CreateTokenResponse {

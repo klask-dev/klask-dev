@@ -111,7 +111,7 @@ const TokensList: React.FC = () => {
               >
                 <td className="px-4 py-3 text-sm text-gray-900 dark:text-white font-medium">
                   {token.name}
-                  {token.revoked_at && (
+                  {!token.active && (
                     <span className="ml-2 inline-block px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded font-medium">
                       Revoked
                     </span>
@@ -138,7 +138,7 @@ const TokensList: React.FC = () => {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {!token.revoked_at && (
+                  {!!token.active && (
                     <button
                       onClick={() => handleRevokeClick(token.id, token.name)}
                       className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium text-sm transition"
@@ -160,13 +160,13 @@ const TokensList: React.FC = () => {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white">{token.name}</h3>
-                {token.revoked_at && (
+                {!token.active && (
                   <span className="inline-block mt-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded font-medium">
                     Revoked
                   </span>
                 )}
               </div>
-              {!token.revoked_at && (
+              {!!token.active && (
                 <button
                   onClick={() => handleRevokeClick(token.id, token.name)}
                   className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium text-sm transition"
