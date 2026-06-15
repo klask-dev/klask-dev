@@ -619,3 +619,22 @@ export interface UseRepositoriesReturn {
   crawl: (id: string) => Promise<void>;
   refresh: () => void;
 }
+
+// API Tokens Types
+export interface ApiTokenInfo {
+  id: string;
+  name: string;
+  token_prefix: string;
+  scope: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface CreateTokenResponse {
+  id: string;
+  token: string;
+  token_prefix: string;
+  name: string;
+  created_at: string;
+}
