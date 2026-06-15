@@ -26,9 +26,17 @@ function validateApiTokenInfo(data: unknown): ApiTokenInfo {
 
 function validateApiTokenInfoArray(data: unknown): ApiTokenInfo[] {
   if (!Array.isArray(data)) {
+    console.error('Expected array but got:', typeof data, data);
     throw new Error('Expected array of tokens');
   }
-  return data.map(validateApiTokenInfo);
+  return data.map((item, index) => {
+    try {
+      return validateApiTokenInfo(item);
+    } catch (e) {
+      console.error(`Failed to validate token at index ${index}:`, item, e);
+      throw e;
+    }
+  });
 }
 
 function validateCreateTokenResponse(data: unknown): CreateTokenResponse {
@@ -47,17 +55,17 @@ function validateCreateTokenResponse(data: unknown): CreateTokenResponse {
 
 // Fetch Functions
 async function fetchApiTokens(): Promise<ApiTokenInfo[]> {
-  const response = await api.get<ApiTokenInfo[]>('/api/user/tokens');
+  const response = await api.get<ApiTokenInfo[]>('/api/users/tokens');
   return validateApiTokenInfoArray(response);
 }
 
 async function createApiToken(name: string): Promise<CreateTokenResponse> {
-  const response = await api.post<CreateTokenResponse>('/api/user/tokens', { name });
+  const response = await api.post<CreateTokenResponse>('/api/users/tokens', { name });
   return validateCreateTokenResponse(response);
 }
 
 async function revokeApiToken(tokenId: string): Promise<void> {
-  await api.delete(`/api/user/tokens/${tokenId}`);
+  await api.delete(`/api/users/tokens/${tokenId}`);
 }
 
 /**
