@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useApiTokens, useCreateApiToken, useRevokeApiToken } from '../apiTokens';
 import * as apiTokensModule from '../apiTokens';
 
 // Mock react-query

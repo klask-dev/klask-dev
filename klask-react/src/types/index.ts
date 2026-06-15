@@ -491,7 +491,7 @@ export interface FormState<T> {
 export interface NavItem {
   label: string;
   href: string;
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<Record<string, unknown>>;
   children?: NavItem[];
   requiresAuth?: boolean;
   requiredRole?: UserRole;
@@ -509,7 +509,7 @@ export type RequireField<T, K extends keyof T> = T & Required<Pick<T, K>>;
 // Event Types
 export interface SearchEvent {
   type: 'search' | 'filter' | 'sort' | 'paginate';
-  payload: any;
+  payload: Record<string, unknown>;
   timestamp: number;
 }
 
