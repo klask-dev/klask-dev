@@ -1,3 +1,4 @@
+import React from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types';
@@ -74,11 +75,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
           const user = await apiClient.auth.getProfile();
-          set({ user, isAuthenticated: true });
+          set({ user, isAuthenticated: true, isLoading: false });
         } catch (error) {
           console.error('Failed to refresh user:', error);
-          get().logout();
-        } finally {
+          await get().logout();
           set({ isLoading: false });
         }
       },
@@ -107,8 +107,8 @@ export const useAuthStore = create<AuthState>()(
       name: 'klask-auth',
       // Do NOT persist the token: the browser stores the HttpOnly cookie.
       // Only persist user info for instant UI rendering on load.
-      partialize: (state) => ({ 
-        user: state.user 
+      partialize: (state) => ({
+        user: state.user
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.user) {
@@ -120,6 +120,17 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Hook to wait for rehydration to complete
+export const useIsHydrated = () => {
+  const [isHydrated, setIsHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  return isHydrated;
+};
 
 // Selectors for convenient access to auth state (use getState() — safe outside React components)
 export const authSelectors = {
