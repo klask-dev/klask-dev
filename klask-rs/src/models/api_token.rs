@@ -1,10 +1,11 @@
 //! Personal API tokens for programmatic access to Klask
 //!
 //! Tokens follow the format: `klask_pat_` (10 chars) + 32 random alphanumeric characters.
-//! Tokens are hashed using Argon2 before being stored in the database.
+//! Tokens are hashed using SHA-256 before being stored in the database.
 //! The plaintext token is shown to the user only once during creation.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -102,6 +103,14 @@ pub fn generate_api_token() -> String {
 pub fn extract_token_prefix(token: &str) -> String {
     // klask_pat_ = 10 chars, + 2 chars from the random part = 12 total
     token[0..12].to_string()
+}
+
+/// Hash an API token using SHA-256
+/// This is fast and suitable for short-lived, revocable tokens
+pub fn hash_api_token(token: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(token.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 #[cfg(test)]

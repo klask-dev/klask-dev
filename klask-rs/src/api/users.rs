@@ -3,7 +3,7 @@ use crate::auth::AuthError;
 use crate::auth::extractors::{AdminUser, AppState, AuthenticatedUser};
 use crate::models::{
     ApiTokenInfo, CreateApiTokenRequest, CreateApiTokenResponse, User, UserRole, extract_token_prefix,
-    generate_api_token,
+    generate_api_token, hash_api_token,
 };
 use crate::repositories::{ApiTokenRepository, UserRepository, user_repository::UserStats};
 use crate::utils::password::hash_password;
@@ -78,13 +78,14 @@ impl From<User> for UserResponse {
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/", get(list_users).post(create_user))
+        // Specific routes before generic {id} routes
+        .route("/stats", get(get_user_stats))
+        .route("/tokens", get(list_tokens).post(create_token))
+        .route("/tokens/{id}", delete(revoke_token))
+        // Generic {id} routes last
         .route("/{id}", get(get_user).put(update_user).delete(delete_user))
         .route("/{id}/role", put(update_user_role))
-        .route("/{id}/status", put(update_user_status))
-        .route("/stats", get(get_user_stats))
-        // API token routes (authenticated users only)
-        .route("/tokens", get(list_tokens).post(create_token))
-        .route("/tokens/{id}", delete(revoke_token));
+        .route("/{id}/status", put(update_user_status));
 
     Ok(router)
 }
@@ -352,11 +353,8 @@ async fn create_token(
     // Generate the plaintext token
     let plaintext_token = generate_api_token();
 
-    // Hash the token using the same method as passwords
-    let token_hash = match hash_password(&plaintext_token) {
-        Ok(hash) => hash,
-        Err(_) => return Err(AuthError::InvalidInput("Failed to hash token".to_string())),
-    };
+    // Hash the token using SHA-256 (fast, suitable for short-lived revocable tokens)
+    let token_hash = hash_api_token(&plaintext_token);
 
     // Extract the prefix for display
     let token_prefix = extract_token_prefix(&plaintext_token);

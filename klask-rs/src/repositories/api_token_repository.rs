@@ -81,50 +81,28 @@ impl ApiTokenRepository {
     }
 
     /// Find an API token by its plaintext token
-    /// This method handles Argon2 hash comparison for authentication
+    /// Uses SHA-256 hash comparison for fast lookup
     /// Optimized: Uses prefix-based index for O(1) lookup before verifying hash
     pub async fn find_by_token(&self, plaintext_token: &str) -> Result<Option<ApiToken>> {
-        if plaintext_token.len() < 12 {
+        if plaintext_token.len() != 42 || !plaintext_token.starts_with("klask_pat_") {
             return Ok(None);
         }
 
-        let token_prefix = &plaintext_token[0..12];
+        use crate::models::hash_api_token;
+        let token_hash = hash_api_token(plaintext_token);
 
-        let tokens = sqlx::query_as::<_, ApiToken>(
-            "SELECT id, user_id, token_hash, token_prefix, name, scope, active, created_at, last_used_at, expires_at
-             FROM api_tokens
-             WHERE token_prefix = $1 AND active = true",
-        )
-        .bind(token_prefix)
-        .fetch_all(&self.pool)
-        .await?;
-
-        use crate::utils::password::verify_password;
-
-        for token in tokens {
-            if let Ok(true) = verify_password(plaintext_token, &token.token_hash) {
-                return Ok(Some(token));
-            }
-        }
-
-        Ok(None)
-    }
-
-    /// Find an API token by its hash (used during authentication)
-    /// Deprecated: Use find_by_token instead for proper Argon2 verification
-    #[allow(dead_code)]
-    pub async fn find_by_hash(&self, token_hash: &str) -> Result<Option<ApiToken>> {
         let token = sqlx::query_as::<_, ApiToken>(
             "SELECT id, user_id, token_hash, token_prefix, name, scope, active, created_at, last_used_at, expires_at
              FROM api_tokens
-             WHERE token_hash = $1",
+             WHERE token_hash = $1 AND active = true",
         )
-        .bind(token_hash)
+        .bind(&token_hash)
         .fetch_optional(&self.pool)
         .await?;
 
         Ok(token)
     }
+
 
     /// Update the last_used_at timestamp for a token (called after successful authentication)
     pub async fn update_last_used(&self, id: Uuid) -> Result<()> {
