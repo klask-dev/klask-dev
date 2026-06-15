@@ -16,6 +16,7 @@ function validateApiTokenInfo(data: unknown): ApiTokenInfo {
     typeof obj?.name !== 'string' ||
     typeof obj?.token_prefix !== 'string' ||
     typeof obj?.scope !== 'string' ||
+    typeof obj?.active !== 'boolean' ||
     typeof obj?.created_at !== 'string'
   ) {
     throw new Error('Invalid ApiTokenInfo structure from backend');
