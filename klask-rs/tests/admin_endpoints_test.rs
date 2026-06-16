@@ -55,6 +55,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
         scheduler_service: None,
         semantic_embedder: None,
         semantic_indexer: None,
+        semantic_backfill: None,
         jwt_service,
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),

@@ -128,7 +128,7 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 |---|---|---|
 | **1** | `EmbeddingProvider` (fastembed behind the `semantic-search` cargo feature) + chunker + RRF fusion utility + unit tests + model benchmark; config/startup plumbing | ✅ done (PR #120) |
 | **2** | LanceDB store + embedding worker + crawl integration + delete/update lifecycle | ✅ done (this PR) |
-| **3** | Backfill admin job + progress UI | planned |
+| **3** | Backfill admin job + progress UI | ✅ done (this PR) |
 | **4** | Query path: `mode` param, RRF fusion wiring, API + tests | planned |
 | **5** | Frontend toggle + result badges + admin card | planned |
 | **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | planned |
@@ -156,6 +156,32 @@ Reproduce with:
   be added to the Dockerfile / CI when the feature is enabled in deployment.
 - Verify the full write path against a real model + real LanceDB index with:
   `cargo test --features semantic-search --test semantic_indexing_test -- --ignored --nocapture`
+
+**Phase 3 notes:**
+- **Backfill source is Tantivy, not the git clones.** `SearchService::iter_documents`
+  streams every live stored document (content is `STORED`) back into the Phase 2
+  `VectorIndexer`. This is the source of truth for *what is searchable* (the
+  crawler already applied its extension/size/branch filtering), so the rebuilt
+  vector index stays consistent with the keyword index — and it needs no
+  re-crawl, no network, and survives pod restarts (unlike the ephemeral
+  `CRAWLER_TEMP_DIR` clones).
+- **Single-flight + cancellable.** `BackfillController` runs one rebuild at a
+  time; a concurrent request is rejected so the API returns **409 Conflict**.
+  The job clears the vector store first (so a rebuild drops chunks of files that
+  no longer exist), then streams documents through the bounded indexer queue
+  (strict backpressure — the backfill can't outrun the embedding worker). A
+  blocking Tantivy reader bridges to the async enqueue loop via a small bounded
+  channel; cancellation stops at the next document boundary.
+- **Admin API (admin-only):** `POST /api/admin/semantic/backfill` (202 / 409 /
+  503-when-disabled), `GET /api/admin/semantic/status`
+  (`{enabled, running, processed, total, chunks_indexed, model, dimension,
+  error, cancelled, started_at, finished_at}`), `POST /api/admin/semantic/cancel`.
+  All compile in both feature modes; without the feature they report
+  `enabled: false` / 503.
+- **UI:** a "Semantic Index" card on the admin Index Management page shows the
+  model/dimension and chunk count, with a Build/Rebuild button and a
+  poll-driven progress bar (polls `status` every ~1.5 s while running). The card
+  renders nothing when semantic search is disabled on the server.
 
 ## 9. Risks & Mitigations
 

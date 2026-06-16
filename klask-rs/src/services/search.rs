@@ -104,6 +104,25 @@ pub struct SearchResultsWithTotal {
     pub facets: Option<SearchFacets>,
 }
 
+/// A stored document read back from the Tantivy index, used to re-feed the
+/// semantic backfill (Phase 3) without re-crawling: Tantivy is the source of
+/// truth for *what is searchable* (already filtered by the crawler), so the
+/// vector index it produces stays consistent with the keyword index.
+///
+/// Only consumed when the `semantic-search` feature is built; allow it to be
+/// unused otherwise so the default build stays warning-free.
+#[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+#[derive(Debug, Clone)]
+pub struct IndexedDocument {
+    pub file_id: Uuid,
+    pub repository: String,
+    pub project: String,
+    pub version: String,
+    pub path: String,
+    pub extension: String,
+    pub content: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchFacets {
     pub repositories: Vec<(String, u64)>,
@@ -1410,6 +1429,59 @@ impl SearchService {
         self.reader.reload()?;
         let searcher = self.reader.searcher();
         Ok(searcher.num_docs())
+    }
+
+    /// Iterate every live document in the index, invoking `visit` for each.
+    ///
+    /// Used by the semantic backfill (Phase 3) to re-embed everything that is
+    /// currently searchable. Streams one document at a time (per segment) rather
+    /// than collecting into a `Vec`, so memory stays flat on large indexes; the
+    /// callback decides what to do with each (enqueue for embedding, count,
+    /// stop early). Returning `Err` from `visit` aborts the iteration and the
+    /// error is propagated — the backfill uses this to honour cancellation.
+    ///
+    /// Deleted documents are skipped (only `alive` doc ids are visited), so the
+    /// counts match `get_document_count`.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub fn iter_documents<F>(&self, mut visit: F) -> Result<u64>
+    where
+        F: FnMut(IndexedDocument) -> Result<()>,
+    {
+        self.reader.reload()?;
+        let searcher = self.reader.searcher();
+        let mut visited: u64 = 0;
+
+        for segment_reader in searcher.segment_readers() {
+            let store_reader = segment_reader.get_store_reader(1)?;
+            // `doc_ids_alive` yields only non-deleted docs in this segment.
+            for doc_id in segment_reader.doc_ids_alive() {
+                let doc: tantivy::TantivyDocument = store_reader.get(doc_id)?;
+
+                let file_id_str = doc
+                    .get_first(self.fields.file_id)
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow!("Missing file_id in stored document"))?;
+                let file_id = Uuid::parse_str(file_id_str)
+                    .map_err(|_| anyhow!("Invalid UUID in stored file_id: {}", file_id_str))?;
+
+                // Metadata fields default to "" if absent (older docs may lack a
+                // stored field); the indexer treats empty strings as empty facets.
+                let get = |field: Field| doc.get_first(field).and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+                visit(IndexedDocument {
+                    file_id,
+                    repository: get(self.fields.repository),
+                    project: get(self.fields.project),
+                    version: get(self.fields.version),
+                    path: get(self.fields.file_path),
+                    extension: get(self.fields.extension),
+                    content: get(self.fields.content),
+                })?;
+                visited += 1;
+            }
+        }
+
+        Ok(visited)
     }
 
     /// Calculate the total size of a directory recursively in bytes
@@ -2750,6 +2822,64 @@ mod regex_term_extraction_tests {
     fn test_extract_simple_terms_from_regex_empty_pattern() {
         let result = extract_simple_terms_from_regex("");
         assert!(result.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod iter_documents_tests {
+    use super::*;
+
+    async fn put(search: &SearchService, path: &str, content: &str) {
+        search
+            .upsert_file(FileData {
+                file_id: Uuid::new_v4(),
+                file_name: path,
+                file_path: path,
+                content,
+                repository: "repo",
+                project: "repo",
+                version: "main",
+                extension: "rs",
+                size: content.len() as u64,
+            })
+            .await
+            .unwrap();
+        search.commit().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_iter_documents_visits_every_live_doc() {
+        let dir = tempfile::tempdir().unwrap();
+        let search = SearchService::new(dir.path()).unwrap();
+        put(&search, "a.rs", "fn a() {}").await;
+        put(&search, "b.rs", "fn b() {}").await;
+
+        let mut paths = Vec::new();
+        let visited = search
+            .iter_documents(|doc| {
+                assert_eq!(doc.repository, "repo");
+                assert!(!doc.content.is_empty());
+                paths.push(doc.path);
+                Ok(())
+            })
+            .unwrap();
+
+        assert_eq!(visited, 2);
+        paths.sort();
+        assert_eq!(paths, vec!["a.rs".to_string(), "b.rs".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_iter_documents_propagates_callback_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let search = SearchService::new(dir.path()).unwrap();
+        put(&search, "a.rs", "fn a() {}").await;
+        put(&search, "b.rs", "fn b() {}").await;
+
+        // A callback that aborts (as the backfill does on cancel) must stop the
+        // iteration and surface the error.
+        let result = search.iter_documents(|_doc| Err(anyhow!("stop")));
+        assert!(result.is_err());
     }
 }
 
