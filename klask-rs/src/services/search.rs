@@ -132,6 +132,30 @@ pub struct SearchFacets {
     pub size_ranges: Vec<(String, u64)>,
 }
 
+/// Which engine(s) a search runs against (plan §3.4 / §5).
+///
+/// `Keyword` is the default and the only mode without the semantic backend, so
+/// behaviour is unchanged when semantic search is off. `Semantic` queries the
+/// vector index only; `Hybrid` fuses keyword + vector with RRF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchMode {
+    #[default]
+    Keyword,
+    Semantic,
+    Hybrid,
+}
+
+impl SearchMode {
+    /// Whether this mode needs the semantic (vector) backend. `Keyword` never
+    /// does, so it always works; the others degrade to keyword when the backend
+    /// is unavailable. Only consulted by the feature-gated query path.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub fn needs_semantic(self) -> bool {
+        matches!(self, SearchMode::Semantic | SearchMode::Hybrid)
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SearchQuery {
     pub query: String,
@@ -148,6 +172,10 @@ pub struct SearchQuery {
     pub regex_search: bool,          // Enable regex search (pattern matching) - default: false
     pub regex_flags: Option<String>, // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
     pub case_sensitive: bool,        // Enable case-sensitive search - default: false
+    // keyword (default) | semantic | hybrid. Acted on only by the feature-gated
+    // query path; without the feature it is parsed and stored but unused.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub mode: SearchMode,
 }
 
 impl SearchQuery {
@@ -169,6 +197,7 @@ impl SearchQuery {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: SearchMode::Keyword,
         }
     }
 
@@ -1363,14 +1392,37 @@ impl SearchService {
         }
     }
 
+    /// Build a query that matches the document for `file_id`.
+    ///
+    /// The `file_id` field is indexed as tokenized `TEXT` (the default tokenizer
+    /// splits the UUID on its hyphens into 5 terms), so a single `TermQuery`
+    /// against the full UUID string silently matches nothing. Re-tokenizing the
+    /// UUID and matching all parts as a `PhraseQuery` reproduces the indexed
+    /// form and matches exactly that document. (A future schema migration could
+    /// re-declare `file_id` as raw `STRING` and simplify this back to a
+    /// `TermQuery`.)
+    fn file_id_query(&self, file_id: Uuid) -> Box<dyn tantivy::query::Query> {
+        let file_id_str = file_id.to_string();
+        // The UUID hyphen-split is stable, so build the phrase terms directly
+        // rather than running a tokenizer.
+        let terms: Vec<tantivy::Term> =
+            file_id_str.split('-').map(|part| tantivy::Term::from_field_text(self.fields.file_id, part)).collect();
+
+        match terms.len() {
+            0 => Box::new(tantivy::query::EmptyQuery),
+            1 => Box::new(TermQuery::new(terms.into_iter().next().unwrap(), tantivy::schema::IndexRecordOption::Basic)),
+            _ => Box::new(tantivy::query::PhraseQuery::new(terms)),
+        }
+    }
+
     pub async fn get_file_by_id(&self, file_id: Uuid) -> Result<Option<SearchResult>> {
         let searcher = self.reader.searcher();
         debug!("Getting file by id: {}", file_id);
 
-        // Use a targeted query to find the document with the matching file_id
-        let file_id_str = file_id.to_string();
-        let term = tantivy::Term::from_field_text(self.fields.file_id, &file_id_str);
-        let query = TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+        // The file_id field is tokenized TEXT (the default tokenizer splits a
+        // UUID on its hyphens), so a single full-UUID TermQuery matches nothing.
+        // Build a query that respects that tokenization instead.
+        let query = self.file_id_query(file_id);
 
         // Search for the specific document
         let top_docs = searcher.search(&query, &TopDocs::with_limit(1))?;
@@ -1422,6 +1474,33 @@ impl SearchService {
         // If no matching document found
         debug!("No document found with file_id: {}", file_id);
         Ok(None)
+    }
+
+    /// Hydrate a list of file_ids into full `SearchResult`s from Tantivy,
+    /// preserving the input order and silently dropping ids no longer in the
+    /// index (the vector store can briefly lag a deletion). Used by the
+    /// semantic/hybrid query path (Phase 4) to turn a fused ranking of file_ids
+    /// back into displayable results. Lookups run concurrently but bounded.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub async fn fetch_results_by_file_ids(&self, file_ids: &[Uuid]) -> Result<Vec<SearchResult>> {
+        use futures::stream::{self, StreamExt};
+        const MAX_CONCURRENT_LOOKUPS: usize = 16;
+
+        let fetched: Vec<(usize, SearchResult)> = stream::iter(file_ids.iter().copied().enumerate())
+            .map(|(idx, id)| async move { self.get_file_by_id(id).await.map(|opt| opt.map(|r| (idx, r))) })
+            .buffer_unordered(MAX_CONCURRENT_LOOKUPS)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        // Restore the requested order (buffer_unordered loses it).
+        let mut ordered = fetched;
+        ordered.sort_by_key(|(idx, _)| *idx);
+        Ok(ordered.into_iter().map(|(_, r)| r).collect())
     }
 
     pub fn get_document_count(&self) -> Result<u64> {

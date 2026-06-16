@@ -61,6 +61,7 @@ async fn test_concurrent_queries_run_in_parallel() {
         regex_search: false,
         regex_flags: None,
         case_sensitive: false,
+        mode: Default::default(),
     };
     let simple_result = search_service.search(simple_query).await;
     let simple_duration = start.elapsed();
@@ -91,6 +92,7 @@ async fn test_concurrent_queries_run_in_parallel() {
         regex_search: true,
         regex_flags: None,
         case_sensitive: false,
+        mode: Default::default(),
     };
 
     let simple_query2 = SearchQuery {
@@ -108,6 +110,7 @@ async fn test_concurrent_queries_run_in_parallel() {
         regex_search: false,
         regex_flags: None,
         case_sensitive: false,
+        mode: Default::default(),
     };
 
     let start = Instant::now();
@@ -174,6 +177,7 @@ async fn test_inefficient_regex_pattern_warning() {
         regex_search: true,
         regex_flags: None,
         case_sensitive: false,
+        mode: Default::default(),
     };
 
     let result = search_service.search(query).await;
@@ -223,6 +227,7 @@ async fn test_search_timeout() {
         regex_search: false,
         regex_flags: None,
         case_sensitive: false,
+        mode: Default::default(),
     };
 
     let start = Instant::now();

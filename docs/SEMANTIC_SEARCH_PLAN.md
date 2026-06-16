@@ -129,7 +129,7 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 | **1** | `EmbeddingProvider` (fastembed behind the `semantic-search` cargo feature) + chunker + RRF fusion utility + unit tests + model benchmark; config/startup plumbing | ✅ done (PR #120) |
 | **2** | LanceDB store + embedding worker + crawl integration + delete/update lifecycle | ✅ done (this PR) |
 | **3** | Backfill admin job + progress UI | ✅ done (this PR) |
-| **4** | Query path: `mode` param, RRF fusion wiring, API + tests | planned |
+| **4** | Query path: `mode` param, RRF fusion wiring, API + tests | ✅ done (this PR) |
 | **5** | Frontend toggle + result badges + admin card | planned |
 | **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | planned |
 
@@ -182,6 +182,37 @@ Reproduce with:
   model/dimension and chunk count, with a Build/Rebuild button and a
   poll-driven progress bar (polls `status` every ~1.5 s while running). The card
   renders nothing when semantic search is disabled on the server.
+
+**Phase 4 notes:**
+- **`mode` param, backward compatible.** `GET /api/search?mode=keyword|semantic|hybrid`;
+  absent ⇒ `keyword`, so existing clients are unchanged. `SearchMode` lives on
+  `SearchQuery`; the keyword path (`SearchService::search`) is untouched.
+- **Degrade, never break.** When `semantic`/`hybrid` is requested but the
+  backend is unavailable (feature off, `SEMANTIC_SEARCH_ENABLED=false`, or the
+  model failed to load) the API silently falls back to keyword search. The
+  decision is centralized in the API layer (`run_search`); the semantic query
+  module is only reached when the backend is present.
+- **Vector search.** `VectorStore::search(query_vec, k, filters)` does cosine KNN
+  over LanceDB (`vector_search().distance_type(Cosine).only_if(predicate)`).
+  Facet filters (repo/project/version/extension) are applied as escaped `IN(...)`
+  predicates so both engines see the same universe (same `sql_quote` injection
+  guard as the delete path). **Brute-force KNN** for now — an IVF_PQ ANN index is
+  deferred to Phase 6 with the eval/tuning pass (correct results need no index).
+- **Fusion.** Hybrid runs keyword + vector, fuses by `file_id` with the Phase 1
+  RRF utility (rank-based, so incomparable BM25/cosine scores never need
+  normalizing). Both engines over-fetch a bounded candidate set
+  (`5×page_end`, capped at 500) before paging. Results are hydrated back to full
+  `SearchResult`s from Tantivy; semantic hits anchor their snippet on the
+  matched chunk's `start_line`.
+- **Facets** in hybrid/semantic come from the keyword path only (they describe
+  the keyword universe; consistent with current behaviour).
+- **Latent bug fixed.** `SearchService::get_file_by_id` matched nothing for real
+  UUIDs because `file_id` is tokenized `TEXT` (split on hyphens); the new query
+  path is its first full-UUID consumer. Added `file_id_query()` (hyphen-aware
+  `PhraseQuery`) so hydration matches the indexed form.
+- **Frontend:** API plumbing only (optional `mode` in `SearchQuery` /
+  `useMultiSelectSearch`, sent only when non-default). The mode **toggle UI**,
+  result badges and snippet-range rendering are Phase 5.
 
 ## 9. Risks & Mitigations
 
