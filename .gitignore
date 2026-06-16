@@ -151,3 +151,5 @@ test_index*
 .env.*.local
 klask-rs/.env
 klask-react/.env
+klask-rs/vector-index/
+klask-rs/models/models--jinaai--jina-embeddings-v2-base-code/
