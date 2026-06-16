@@ -8,6 +8,8 @@
 //! Roadmap and design decisions: docs/SEMANTIC_SEARCH_PLAN.md. The vector
 //! store, indexing worker and query path land in later phases.
 
+#[cfg(feature = "semantic-search")]
+pub mod backfill;
 pub mod chunker;
 pub mod embedder;
 pub mod fusion;
@@ -16,6 +18,8 @@ pub mod indexer;
 #[cfg(feature = "semantic-search")]
 pub mod store;
 
+#[cfg(feature = "semantic-search")]
+pub use backfill::BackfillController;
 pub use embedder::EmbeddingProvider;
 #[cfg(feature = "semantic-search")]
 pub use embedder::FastEmbedProvider;
@@ -42,6 +46,15 @@ pub struct DisabledIndexer;
 pub type MaybeIndexer = Option<Arc<VectorIndexer>>;
 #[cfg(not(feature = "semantic-search"))]
 pub type MaybeIndexer = Option<DisabledIndexer>;
+
+/// Optional handle to the semantic backfill controller, carried by `AppState`
+/// so the admin endpoints can start/cancel/poll a rebuild. Resolves to the
+/// real controller with the feature and to an always-`None` zero-sized type
+/// without it (same pattern as [`MaybeIndexer`]).
+#[cfg(feature = "semantic-search")]
+pub type MaybeBackfill = Option<BackfillController>;
+#[cfg(not(feature = "semantic-search"))]
+pub type MaybeBackfill = Option<DisabledIndexer>;
 
 /// Initialize the embedding provider from configuration.
 ///
@@ -150,6 +163,28 @@ pub async fn init_vector_indexer(
     }
 
     Some(Arc::new(indexer))
+}
+
+/// Build the semantic backfill controller from a running indexer.
+///
+/// Returns `None` when there is no indexer (semantic search disabled or failed
+/// to start). The controller lets admins rebuild the vector index from the
+/// existing Tantivy documents (Phase 3); it carries clones of the search
+/// service and indexer to drive the rebuild.
+#[cfg(feature = "semantic-search")]
+pub fn init_backfill_controller(
+    indexer: &MaybeIndexer,
+    search_service: Arc<crate::services::SearchService>,
+    provider: &Arc<dyn EmbeddingProvider>,
+) -> MaybeBackfill {
+    indexer.as_ref().map(|indexer| {
+        BackfillController::new(
+            search_service,
+            indexer.clone(),
+            provider.model_id().to_string(),
+            provider.dimension(),
+        )
+    })
 }
 
 #[cfg(test)]
