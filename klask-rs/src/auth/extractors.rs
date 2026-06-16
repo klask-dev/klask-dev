@@ -29,6 +29,10 @@ pub struct AppState {
     /// store. None when semantic search is disabled or not compiled in.
     #[allow(dead_code)]
     pub semantic_indexer: crate::services::semantic::MaybeIndexer,
+    /// Controller for the admin "rebuild semantic index" backfill job (Phase 3).
+    /// None when semantic search is disabled or not compiled in.
+    #[allow(dead_code)]
+    pub semantic_backfill: crate::services::semantic::MaybeBackfill,
     pub jwt_service: JwtService,
     pub encryption_service: Arc<EncryptionService>,
     #[allow(dead_code)]

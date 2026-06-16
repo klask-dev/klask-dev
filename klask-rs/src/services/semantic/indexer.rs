@@ -87,6 +87,13 @@ impl VectorIndexer {
     pub async fn count(&self) -> Result<u64> {
         self.store.count().await
     }
+
+    /// Delete every stored chunk. Runs directly against the store (not via the
+    /// queue) so the semantic backfill (Phase 3) can wipe the index before a
+    /// full rebuild without racing queued inserts. Returns rows removed.
+    pub async fn clear(&self) -> Result<u64> {
+        self.store.clear().await
+    }
 }
 
 struct Worker {

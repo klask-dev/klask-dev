@@ -63,6 +63,11 @@ pub trait VectorStore: Send + Sync {
     /// Returns the number of rows removed.
     async fn delete_project_chunks(&self, repository: &str) -> Result<u64>;
 
+    /// Delete every chunk in the store. Returns the number of rows removed.
+    /// Used by the semantic backfill (Phase 3) to start a full rebuild from a
+    /// clean slate so re-running it never leaves stale or duplicated rows.
+    async fn clear(&self) -> Result<u64>;
+
     /// Total number of stored chunks (for the admin index card, phases 3/5).
     async fn count(&self) -> Result<u64>;
 
@@ -277,6 +282,12 @@ mod lance_store {
             self.delete_where(&format!("repository = {}", sql_quote(repository))).await
         }
 
+        async fn clear(&self) -> Result<u64> {
+            // `true` is a constant predicate matching every row — no
+            // user-controlled input, so no injection surface.
+            self.delete_where("true").await
+        }
+
         async fn count(&self) -> Result<u64> {
             let n = self.table.count_rows(None).await.context("Failed to count LanceDB rows")?;
             Ok(n as u64)
@@ -371,6 +382,19 @@ mod lance_store {
             store.upsert_file_chunks(b, vec![record(b, "repo-b", 1, 8)]).await.unwrap();
             assert_eq!(store.delete_project_chunks("repo-a").await.unwrap(), 1);
             assert_eq!(store.count().await.unwrap(), 1);
+        }
+
+        #[tokio::test]
+        async fn test_clear_removes_everything() {
+            let (_dir, store) = temp_store(8).await;
+            let a = Uuid::new_v4();
+            let b = Uuid::new_v4();
+            store.upsert_file_chunks(a, vec![record(a, "repo-a", 1, 8)]).await.unwrap();
+            store.upsert_file_chunks(b, vec![record(b, "repo-b", 1, 8)]).await.unwrap();
+            assert_eq!(store.clear().await.unwrap(), 2);
+            assert_eq!(store.count().await.unwrap(), 0);
+            // Clearing an empty store removes nothing and does not error.
+            assert_eq!(store.clear().await.unwrap(), 0);
         }
 
         #[tokio::test]

@@ -148,6 +148,20 @@ async fn main() -> Result<()> {
 
     // Initialize crawler service
     let search_service_arc = Arc::new(search_service);
+
+    // Build the semantic backfill controller so admins can rebuild the vector
+    // index from the existing Tantivy documents (Phase 3). None unless both the
+    // embedder and the indexer are available.
+    #[cfg(feature = "semantic-search")]
+    let semantic_backfill: services::semantic::MaybeBackfill = match &semantic_embedder {
+        Some(provider) => {
+            services::semantic::init_backfill_controller(&semantic_indexer, search_service_arc.clone(), provider)
+        }
+        None => None,
+    };
+    #[cfg(not(feature = "semantic-search"))]
+    let semantic_backfill: services::semantic::MaybeBackfill = None;
+
     let crawler_service = match CrawlerService::new(
         database.pool().clone(),
         search_service_arc.clone(),
@@ -221,6 +235,7 @@ async fn main() -> Result<()> {
         scheduler_service: Some(Arc::new(scheduler_service)),
         semantic_embedder,
         semantic_indexer,
+        semantic_backfill,
         jwt_service,
         encryption_service,
         config: config.clone(),
