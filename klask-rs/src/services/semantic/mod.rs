@@ -11,13 +11,37 @@
 pub mod chunker;
 pub mod embedder;
 pub mod fusion;
+#[cfg(feature = "semantic-search")]
+pub mod indexer;
+#[cfg(feature = "semantic-search")]
+pub mod store;
 
 pub use embedder::EmbeddingProvider;
 #[cfg(feature = "semantic-search")]
 pub use embedder::FastEmbedProvider;
+#[cfg(feature = "semantic-search")]
+pub use indexer::{IndexJob, VectorIndexer};
 
 use crate::config::SemanticSearchConfig;
 use std::sync::Arc;
+
+/// Zero-sized indexer placeholder for builds without the `semantic-search`
+/// feature. Deliberately `Clone` but **not** `Copy` so that the `.clone()`
+/// calls threading [`MaybeIndexer`] through the crawler compile identically in
+/// both build modes (a `Copy` type would make those clones a clippy warning).
+#[cfg(not(feature = "semantic-search"))]
+#[derive(Clone)]
+pub struct DisabledIndexer;
+
+/// Optional handle to the embedding worker, carried by `AppState` and the
+/// crawler. Resolves to `Option<Arc<VectorIndexer>>` with the feature and to a
+/// zero-sized always-`None` type without it, so call sites stay feature-agnostic
+/// (no `#[cfg]` at every struct field / constructor) and the no-feature build
+/// pays nothing.
+#[cfg(feature = "semantic-search")]
+pub type MaybeIndexer = Option<Arc<VectorIndexer>>;
+#[cfg(not(feature = "semantic-search"))]
+pub type MaybeIndexer = Option<DisabledIndexer>;
 
 /// Initialize the embedding provider from configuration.
 ///
@@ -75,6 +99,59 @@ pub fn init_embedding_provider(config: &SemanticSearchConfig) -> Option<Arc<dyn 
     }
 }
 
+/// Open the vector store and start the background embedding worker.
+///
+/// Returns `None` (degrading to keyword-only indexing) when semantic search is
+/// off, the feature is not compiled in, or the store fails to open — the server
+/// keeps crawling and serving keyword search instead of refusing to start.
+/// Requires the embedding `provider` produced by [`init_embedding_provider`].
+#[cfg(feature = "semantic-search")]
+pub async fn init_vector_indexer(
+    config: &SemanticSearchConfig,
+    provider: Arc<dyn EmbeddingProvider>,
+) -> Option<Arc<VectorIndexer>> {
+    use chunker::ChunkOptions;
+    use store::LanceVectorStore;
+
+    // These are clamped to >=1 by VectorIndexer::start, but a zero value almost
+    // certainly means a misconfiguration — surface it rather than silently
+    // running inference one chunk at a time / with a length-1 queue.
+    if config.batch_size == 0 {
+        tracing::warn!("SEMANTIC_SEARCH_BATCH_SIZE is 0; using 1 (this cripples embedding throughput)");
+    }
+    if config.queue_capacity == 0 {
+        tracing::warn!("SEMANTIC_SEARCH_QUEUE_CAPACITY is 0; using 1");
+    }
+
+    let dimension = provider.dimension();
+    let store = match LanceVectorStore::open(&config.vector_store_dir, dimension).await {
+        Ok(store) => Arc::new(store),
+        Err(e) => {
+            tracing::error!(
+                "Failed to open vector store at '{}', semantic indexing disabled: {e}",
+                config.vector_store_dir
+            );
+            return None;
+        }
+    };
+
+    let chunk_options = ChunkOptions { max_lines: config.chunk_max_lines, overlap_lines: config.chunk_overlap_lines };
+
+    let indexer = VectorIndexer::start(provider, store, chunk_options, config.batch_size, config.queue_capacity);
+
+    match indexer.count().await {
+        Ok(n) => tracing::info!(
+            "Vector store ready at '{}' ({} chunks, dimension {})",
+            config.vector_store_dir,
+            n,
+            dimension
+        ),
+        Err(e) => tracing::warn!("Vector store opened but count() failed: {e}"),
+    }
+
+    Some(Arc::new(indexer))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,9 +161,11 @@ mod tests {
             enabled: false,
             model: "jinaai/jina-embeddings-v2-base-code".to_string(),
             cache_dir: "./models".to_string(),
+            vector_store_dir: "./vector-index".to_string(),
             chunk_max_lines: 60,
             chunk_overlap_lines: 15,
             batch_size: 32,
+            queue_capacity: 1000,
         }
     }
 
