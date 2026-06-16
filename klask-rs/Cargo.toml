@@ -70,10 +70,16 @@ sha2 = "0.10"
 # Lazy initialization
 once_cell = "1.21"
 
+# Local embedding generation for semantic search (optional, see semantic-search feature)
+fastembed = { version = "5", optional = true }
+
 [features]
 test-utils = []
 pdf-parser = []
 docx-parser = []
+# Hybrid semantic search: local ONNX embedding generation (no cloud API).
+# Opt-in because it pulls the ONNX runtime and downloads a model at startup.
+semantic-search = ["dep:fastembed"]
 
 [dev-dependencies]
 # Testing

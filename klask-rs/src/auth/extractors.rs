@@ -22,6 +22,11 @@ pub struct AppState {
     pub crawler_service: Arc<crate::services::crawler::CrawlerService>,
     pub progress_tracker: Arc<ProgressTracker>,
     pub scheduler_service: Option<Arc<crate::services::scheduler::SchedulerService>>,
+    /// Embedding provider for semantic search; None when disabled or not
+    /// compiled in. Consumed by the indexing pipeline and query path coming
+    /// in the next phases of docs/SEMANTIC_SEARCH_PLAN.md.
+    #[allow(dead_code)]
+    pub semantic_embedder: Option<Arc<dyn crate::services::semantic::EmbeddingProvider>>,
     pub jwt_service: JwtService,
     pub encryption_service: Arc<EncryptionService>,
     #[allow(dead_code)]
