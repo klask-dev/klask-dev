@@ -42,6 +42,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
             progress_tracker.clone(),
             encryption_service,
             std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
+            None,
         )
         .expect("Failed to create crawler service"),
     );
@@ -53,6 +54,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState)> {
         progress_tracker,
         scheduler_service: None,
         semantic_embedder: None,
+        semantic_indexer: None,
         jwt_service,
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),

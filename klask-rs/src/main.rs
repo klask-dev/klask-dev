@@ -136,6 +136,17 @@ async fn main() -> Result<()> {
     // local ONNX model when enabled, degrades to keyword-only search on error)
     let semantic_embedder = services::semantic::init_embedding_provider(&config.semantic);
 
+    // Open the vector store and start the embedding worker (optional; degrades
+    // to keyword-only indexing if the store can't be opened). Only when the
+    // provider loaded successfully — the indexer needs it to embed chunks.
+    #[cfg(feature = "semantic-search")]
+    let semantic_indexer: services::semantic::MaybeIndexer = match &semantic_embedder {
+        Some(provider) => services::semantic::init_vector_indexer(&config.semantic, provider.clone()).await,
+        None => None,
+    };
+    #[cfg(not(feature = "semantic-search"))]
+    let semantic_indexer: services::semantic::MaybeIndexer = None;
+
     // Initialize crawler service
     let search_service_arc = Arc::new(search_service);
     let crawler_service = match CrawlerService::new(
@@ -144,6 +155,7 @@ async fn main() -> Result<()> {
         progress_tracker.clone(),
         encryption_service.clone(),
         config.crawler.temp_dir.clone(),
+        semantic_indexer.clone(),
     ) {
         Ok(service) => {
             info!("Crawler service initialized successfully");
@@ -209,6 +221,7 @@ async fn main() -> Result<()> {
         progress_tracker,
         scheduler_service: Some(Arc::new(scheduler_service)),
         semantic_embedder,
+        semantic_indexer,
         jwt_service,
         encryption_service,
         config: config.clone(),

@@ -5,6 +5,8 @@ use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+#[cfg(feature = "semantic-search")]
+use tracing::warn;
 use tracing::{debug, error};
 use uuid::Uuid;
 
@@ -12,11 +14,16 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct FileProcessor {
     search_service: Arc<SearchService>,
+    /// Optional semantic indexer: mirrors each indexed file into the vector
+    /// store. None when semantic search is disabled / not compiled in. Read only
+    /// in the `semantic-search` build.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    semantic_indexer: crate::services::semantic::MaybeIndexer,
 }
 
 impl FileProcessor {
-    pub fn new(search_service: Arc<SearchService>) -> Self {
-        Self { search_service }
+    pub fn new(search_service: Arc<SearchService>, semantic_indexer: crate::services::semantic::MaybeIndexer) -> Self {
+        Self { search_service, semantic_indexer }
     }
 
     /// Generate a deterministic UUID for a file based on repository, specific branch, and path
@@ -170,6 +177,26 @@ impl FileProcessor {
                     relative_path, branch_name, e
                 );
                 return Err(e);
+            }
+        }
+
+        // Mirror the file into the semantic vector store (best-effort). Tantivy
+        // is the source of truth; a failed/blocked embed must not fail the
+        // crawl — Phase 3 backfill reconciles any gap. With strict backpressure
+        // this `await` may pause the crawl until the embedding queue drains.
+        #[cfg(feature = "semantic-search")]
+        if let Some(indexer) = &self.semantic_indexer {
+            let job = crate::services::semantic::IndexJob {
+                file_id,
+                repository: repository_field.to_string(),
+                project: repository.name.clone(),
+                version: version.clone(),
+                path: relative_path.to_string(),
+                extension: extension.clone(),
+                content: content.clone(),
+            };
+            if let Err(e) = indexer.index_file(job).await {
+                warn!("Failed to enqueue {} for semantic indexing: {}", relative_path, e);
             }
         }
 

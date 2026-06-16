@@ -126,8 +126,8 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 
 | Phase | Content | Status |
 |---|---|---|
-| **1** | `EmbeddingProvider` (fastembed behind the `semantic-search` cargo feature) + chunker + RRF fusion utility + unit tests + model benchmark; config/startup plumbing | 🚧 this PR |
-| **2** | LanceDB store + embedding worker + crawl integration + delete/update lifecycle | planned |
+| **1** | `EmbeddingProvider` (fastembed behind the `semantic-search` cargo feature) + chunker + RRF fusion utility + unit tests + model benchmark; config/startup plumbing | ✅ done (PR #120) |
+| **2** | LanceDB store + embedding worker + crawl integration + delete/update lifecycle | ✅ done (this PR) |
 | **3** | Backfill admin job + progress UI | planned |
 | **4** | Query path: `mode` param, RRF fusion wiring, API + tests | planned |
 | **5** | Frontend toggle + result badges + admin card | planned |
@@ -138,6 +138,24 @@ embedding throughput ≈ 7.6 chunks/s on ~6-line-function chunks; semantically
 related code snippets score cosine ≈ 0.82 vs ≈ 0.35–0.45 for unrelated ones.
 Reproduce with:
 `cargo test --features semantic-search --test semantic_embedding_test -- --ignored --nocapture`
+
+**Phase 2 notes:**
+- Vector store is **LanceDB** (`lancedb` 0.30, embedded), table `chunks` with the
+  metadata columns from §3.2 + a `FixedSizeList<Float32, dim>` vector column.
+  Persists under `SEMANTIC_SEARCH_VECTOR_DIR` (default `./vector-index`).
+- The embedding worker is a single `tokio` task fed by a **bounded** queue;
+  **the crawl blocks when the queue is full** (strict backpressure — chunks are
+  never silently dropped, keeping the vector index consistent with the crawl).
+- Lifecycle mirrors Tantivy: delete-then-insert per `file_id` on upsert,
+  delete-by-`repository` on re-crawl and repository deletion. Re-opening the
+  store with a different embedding dimension (model change) is refused with a
+  clear error to prevent silent corruption.
+- **Build dependency:** lancedb→lance pulls `prost`, which needs `protoc`
+  (Protocol Buffers compiler) at build time. Building with
+  `--features semantic-search` requires `protobuf-compiler` installed; this must
+  be added to the Dockerfile / CI when the feature is enabled in deployment.
+- Verify the full write path against a real model + real LanceDB index with:
+  `cargo test --features semantic-search --test semantic_indexing_test -- --ignored --nocapture`
 
 ## 9. Risks & Mitigations
 

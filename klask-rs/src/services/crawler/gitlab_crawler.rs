@@ -21,6 +21,8 @@ pub struct GitLabCrawler {
     progress_tracker: Arc<ProgressTracker>,
     encryption_service: Arc<EncryptionService>,
     temp_dir: PathBuf,
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    semantic_indexer: crate::services::semantic::MaybeIndexer,
 }
 
 impl GitLabCrawler {
@@ -30,8 +32,9 @@ impl GitLabCrawler {
         progress_tracker: Arc<ProgressTracker>,
         encryption_service: Arc<EncryptionService>,
         temp_dir: PathBuf,
+        semantic_indexer: crate::services::semantic::MaybeIndexer,
     ) -> Self {
-        Self { database, search_service, progress_tracker, encryption_service, temp_dir }
+        Self { database, search_service, progress_tracker, encryption_service, temp_dir, semantic_indexer }
     }
 
     /// Crawl a GitLab repository by discovering all sub-projects and cloning them
@@ -89,6 +92,22 @@ impl GitLabCrawler {
                     repository.name, e
                 );
                 // Continue anyway - the upsert should handle duplicates
+            }
+        }
+
+        // Mirror the deletion in the semantic vector store (best-effort).
+        #[cfg(feature = "semantic-search")]
+        if let Some(indexer) = &self.semantic_indexer {
+            match indexer.delete_project(&repository.name).await {
+                Ok(n) if n > 0 => info!(
+                    "Deleted {} semantic chunks for GitLab repository {}",
+                    n, repository.name
+                ),
+                Ok(_) => {}
+                Err(e) => warn!(
+                    "Failed to delete semantic chunks for GitLab repository {}: {}",
+                    repository.name, e
+                ),
             }
         }
 

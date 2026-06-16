@@ -47,9 +47,11 @@ async fn create_test_app_state() -> AppState {
             enabled: false,
             model: "jinaai/jina-embeddings-v2-base-code".to_string(),
             cache_dir: "./models".to_string(),
+            vector_store_dir: "./vector-index".to_string(),
             chunk_max_lines: 60,
             chunk_overlap_lines: 15,
             batch_size: 32,
+            queue_capacity: 1000,
         },
     };
 
@@ -73,6 +75,7 @@ async fn create_test_app_state() -> AppState {
             progress_tracker.clone(),
             encryption_service,
             std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
+            None,
         )
         .expect("Failed to create crawler service"),
     );
@@ -84,6 +87,7 @@ async fn create_test_app_state() -> AppState {
         progress_tracker,
         scheduler_service: None,
         semantic_embedder: None,
+        semantic_indexer: None,
         jwt_service,
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
@@ -285,9 +289,11 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
             enabled: false,
             model: "jinaai/jina-embeddings-v2-base-code".to_string(),
             cache_dir: "./models".to_string(),
+            vector_store_dir: "./vector-index".to_string(),
             chunk_max_lines: 60,
             chunk_overlap_lines: 15,
             batch_size: 32,
+            queue_capacity: 1000,
         },
     };
 
@@ -311,6 +317,7 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
             progress_tracker.clone(),
             encryption_service.clone(),
             std::env::temp_dir().join("klask-crawler-test").to_string_lossy().to_string(),
+            None,
         )
         .expect("Failed to create crawler service"),
     );
@@ -322,6 +329,7 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
         progress_tracker,
         scheduler_service: None,
         semantic_embedder: None,
+        semantic_indexer: None,
         jwt_service,
         config,
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
