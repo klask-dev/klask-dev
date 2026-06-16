@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useMultiSelectSearch } from '../useSearch';
+import { useAuthStore } from '../../stores/auth-store';
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -10,7 +11,7 @@ global.fetch = mockFetch;
 
 // Setup window.API_BASE_URL
 if (typeof window === 'undefined') {
-  (global as any).window = {
+  (globalThis as typeof globalThis & { window: { API_BASE_URL: string } }).window = {
     API_BASE_URL: 'http://localhost:3000',
   };
 } else if (!window.API_BASE_URL) {
@@ -56,6 +57,9 @@ const mockSearchResponse = {
 describe('useMultiSelectSearch Hook - Regex Toggle Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Search hooks are gated on auth (HttpOnly cookie); mark the store
+    // authenticated so the queries actually run in tests.
+    useAuthStore.setState({ isAuthenticated: true });
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => mockSearchResponse,
