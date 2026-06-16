@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0](https://github.com/klask-dev/klask-dev/compare/2.1.1...2.2.0) (2026-06-16)
+
+### ✨ Features
+
+* add API tokens tab to profile settings page ([e882481](https://github.com/klask-dev/klask-dev/commit/e882481c324b742361e1c1336110eca37f530a80))
+* **frontend:** add personal API tokens management UI ([4480036](https://github.com/klask-dev/klask-dev/commit/44800360e1517093fe14e5a8926181f5e09de9ab))
+* **mcp:** add MCP server exposing code search to AI agents ([2321e04](https://github.com/klask-dev/klask-dev/commit/2321e045ad2bab76ae0ca19e1d57efb4bdf926ae))
+* **mcp:** add personal API tokens (klask_pat_...) for programmatic authentication ([a81802e](https://github.com/klask-dev/klask-dev/commit/a81802e9947667ec40817a5bf616c5b52a4cd60a))
+* **mcp:** paginate list_repositories and hide disabled repositories by default ([33a8adb](https://github.com/klask-dev/klask-dev/commit/33a8adb451350980a5cdf386a9dbb2b0dc862755))
+* **ui:** add API token management UI for personal tokens ([1e0b58a](https://github.com/klask-dev/klask-dev/commit/1e0b58a5ae3c9e9e4a1487a6cd91ccfba7557444))
+
+### 🐛 Bug Fixes
+
+* **api-tokens:** optimize token lookup and improve error logging ([35682ac](https://github.com/klask-dev/klask-dev/commit/35682ac5f0440be09e1fee4a7454806942d016d2))
+* correct API token endpoint URLs in frontend from /api/user/tokens to /api/users/tokens ([46c64ec](https://github.com/klask-dev/klask-dev/commit/46c64ec1c89aea6cbed6b3b705bf217f76234319))
+* handle zustand rehydration properly to prevent infinite loading on F5 ([0338725](https://github.com/klask-dev/klask-dev/commit/0338725339b0721f0fc8778fe497b7613c7dc5a1))
+* **mcp:** compute search_code pagination offset in u64 to avoid overflow ([c1ab9e2](https://github.com/klask-dev/klask-dev/commit/c1ab9e29638d2810ad14b4f25b95cc2671d70248))
+* **mcp:** return -32600 for well-formed JSON that is not a valid request ([4ba04f3](https://github.com/klask-dev/klask-dev/commit/4ba04f37b96d98c76e644f77543a75e7a8445db9))
+* resolve ESLint errors in useSearch hook ([6eb6c33](https://github.com/klask-dev/klask-dev/commit/6eb6c333068be4d6b355052650435a377eff95f8))
+* **search:** delete documents by file_id reliably in upsert_file and delete_file ([14a59ea](https://github.com/klask-dev/klask-dev/commit/14a59ea2abe2f65d39540e4eaa1ddaf2ba3764c6))
+* **search:** make get_file_by_id match tokenized file_id field ([2544e42](https://github.com/klask-dev/klask-dev/commit/2544e4244ad3b723e5f15387ed1429d346f05dbc))
+* **search:** propagate delete_query errors in upsert_file ([62c2605](https://github.com/klask-dev/klask-dev/commit/62c2605e4c8af134e4e53f3c10431c0b715fd519))
+* update token validator to check active field ([ec9c91b](https://github.com/klask-dev/klask-dev/commit/ec9c91b848df901194ce508e071cf3d56932708e))
+
+### ⚡ Performance Improvements
+
+* optimize API token authentication using SHA-256 instead of Argon2 ([2648fcd](https://github.com/klask-dev/klask-dev/commit/2648fcd7455a6754b39328f1dfd3583bf0fbbc40))
+
 ## [2.1.1](https://github.com/klask-dev/klask-dev/compare/2.1.0...2.1.1) (2026-06-10)
 
 ### 🐛 Bug Fixes
