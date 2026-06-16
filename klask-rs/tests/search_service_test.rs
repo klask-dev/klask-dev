@@ -1184,4 +1184,77 @@ mod search_service_tests {
             assert_eq!(results.total, 1, "Should find document in cycle {}", cycle);
         }
     }
+
+    #[tokio::test]
+    async fn test_upsert_same_file_id_does_not_duplicate() {
+        let (service, _temp_dir, _guard) = create_test_search_service().await;
+
+        let file_id = Uuid::new_v4();
+        for revision in 0..3 {
+            let content = format!("fn revision_{}() {{}}", revision);
+            let file_data = klask_rs::services::search::FileData {
+                file_id,
+                file_name: "main.rs",
+                file_path: "src/main.rs",
+                content: &content,
+                repository: "test-project",
+                project: "test-project",
+                version: "main",
+                extension: "rs",
+                size: content.len() as u64,
+            };
+            service.upsert_file(file_data).await.unwrap();
+            service.commit().await.unwrap();
+        }
+
+        // Re-indexing the same file_id must replace the document, not duplicate it.
+        // This regression-tests the delete-by-file_id path: the file_id field is
+        // tokenized, so a naive full-UUID term delete silently matches nothing.
+        assert_eq!(
+            service.get_document_count().unwrap(),
+            1,
+            "Upserting the same file_id three times should leave exactly one document"
+        );
+
+        // The surviving document must be the latest revision
+        let file = service.get_file_by_id(file_id).await.unwrap().expect("file should be found by id");
+        assert!(
+            file.content_snippet.contains("revision_2"),
+            "Surviving document should hold the latest content"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_file_removes_document() {
+        let (service, _temp_dir, _guard) = create_test_search_service().await;
+
+        let file_id = Uuid::new_v4();
+        let file_data = klask_rs::services::search::FileData {
+            file_id,
+            file_name: "to_delete.rs",
+            file_path: "src/to_delete.rs",
+            content: "fn doomed() {}",
+            repository: "test-project",
+            project: "test-project",
+            version: "main",
+            extension: "rs",
+            size: 14,
+        };
+        service.upsert_file(file_data).await.unwrap();
+        service.commit().await.unwrap();
+        assert_eq!(service.get_document_count().unwrap(), 1);
+
+        service.delete_file(file_id).await.unwrap();
+        service.commit().await.unwrap();
+
+        assert_eq!(
+            service.get_document_count().unwrap(),
+            0,
+            "delete_file should remove the document"
+        );
+        assert!(
+            service.get_file_by_id(file_id).await.unwrap().is_none(),
+            "Deleted file should not be found by id"
+        );
+    }
 }

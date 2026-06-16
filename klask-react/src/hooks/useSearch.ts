@@ -25,6 +25,7 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   return fetch(fullUrl, {
     ...options,
     headers,
+    credentials: 'include', // Send HttpOnly auth cookie
   });
 };
 
@@ -54,7 +55,7 @@ export const useSearch = (
     retry: (failureCount, error) => {
       // Don't retry on 4xx errors (client errors)
       if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as any).status;
+        const status = (error as Record<string, unknown>).status as number;
         if (status >= 400 && status < 500) {
           return false;
         }
@@ -96,7 +97,7 @@ export const useInfiniteSearch = (
     initialPageParam: 0,
     retry: (failureCount, error) => {
       if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as any).status;
+        const status = (error as Record<string, unknown>).status as number;
         if (status >= 400 && status < 500) {
           return false;
         }
@@ -144,7 +145,6 @@ export const useMultiSelectSearch = (
   } = options;
 
   const pageSize = 20;
-  const offset = (currentPage - 1) * pageSize;
 
   return useQuery({
     queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, regexFlags, caseSensitive],
@@ -218,7 +218,7 @@ export const useMultiSelectSearch = (
     placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
       if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as any).status;
+        const status = (error as Record<string, unknown>).status as number;
         if (status >= 400 && status < 500) {
           return false;
         }
@@ -234,7 +234,7 @@ export const useAdvancedSearch = (
   filters: Record<string, string | undefined> = {},
   options: UseSearchOptions & { debounceMs?: number } = {}
 ) => {
-  const { debounceMs = 300, ...queryOptions } = options;
+  const { ...queryOptions } = options;
   
   // Create search query object
   const searchQuery: SearchQuery = {
@@ -301,7 +301,7 @@ export const usePaginatedSearch = (
     staleTime: options.staleTime || 30000,
     retry: (failureCount, error) => {
       if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as any).status;
+        const status = (error as Record<string, unknown>).status as number;
         if (status >= 400 && status < 500) {
           return false;
         }
@@ -316,7 +316,7 @@ export const useSearchSuggestions = (
   query: string,
   options: { enabled?: boolean; limit?: number } = {}
 ) => {
-  const { enabled = true, limit = 5 } = options;
+  const { enabled = true } = options;
 
   return useQuery({
     queryKey: ['search', 'suggestions', query],
@@ -525,9 +525,6 @@ export const useFacetsWithFilters = (
     };
   }, [debouncedFilters]);
 
-  // Check if any filters are selected
-  const hasActiveFilters = Object.values(filterKey).some((arr) => arr.length > 0);
-
   return useQuery({
     // Include filter values and query in query key for automatic deduplication by React Query
     queryKey: ['search', 'facets', filterKey, query],
@@ -579,7 +576,7 @@ export const useFacetsWithFilters = (
     retry: (failureCount, error) => {
       // Don't retry on 4xx errors (client errors)
       if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as any).status;
+        const status = (error as Record<string, unknown>).status as number;
         if (status >= 400 && status < 500) {
           return false;
         }

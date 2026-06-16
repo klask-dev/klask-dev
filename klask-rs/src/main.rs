@@ -2,6 +2,7 @@ mod api;
 mod auth;
 mod config;
 mod database;
+mod mcp;
 mod models;
 mod repositories;
 mod services;
@@ -296,6 +297,7 @@ async fn create_app(app_state: AppState, config: AppConfig) -> Result<Router> {
             }),
         )
         .nest("/api", api::create_router().await?)
+        .merge(mcp::create_router())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);

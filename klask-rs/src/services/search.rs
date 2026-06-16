@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{BooleanQuery, QueryParser, RegexQuery, TermQuery};
+use tantivy::query::{BooleanQuery, PhraseQuery, Query, QueryParser, RegexQuery, TermQuery};
 use tantivy::schema::{
     FAST, Field, IndexRecordOption, STORED, STRING, Schema, TEXT, TextFieldIndexing, TextOptions, Value,
 };
@@ -411,13 +411,15 @@ impl SearchService {
 
         let writer = self.writer.write().await;
 
-        // Delete ALL existing documents with the same file_id to ensure no duplicates
+        // Delete ALL existing documents with the same file_id to ensure no duplicates.
+        // file_id_query handles the tokenized file_id field; a plain TermQuery on the
+        // full UUID would silently match nothing.
         let file_id_str = file_data.file_id.to_string();
-        let term = tantivy::Term::from_field_text(self.fields.file_id, &file_id_str);
-
-        // Use a query to delete all matching documents
-        let query = TermQuery::new(term.clone(), tantivy::schema::IndexRecordOption::Basic);
-        let _ = writer.delete_query(Box::new(query));
+        if let Some(query) = self.file_id_query(file_data.file_id)? {
+            // Propagate failures: indexing the new document without having deleted
+            // the old ones would silently accumulate duplicates.
+            writer.delete_query(query)?;
+        }
 
         // Check for oversized content that might cause token length issues
         if file_data.content.len() > tantivy::tokenizer::MAX_TOKEN_LEN {
@@ -1253,8 +1255,11 @@ impl SearchService {
     #[allow(dead_code)]
     pub async fn delete_file(&self, file_id: Uuid) -> Result<()> {
         let writer = self.writer.write().await;
-        let term = tantivy::Term::from_field_text(self.fields.file_id, &file_id.to_string());
-        writer.delete_term(term);
+        // delete_term on the full UUID would silently match nothing because the
+        // file_id field is tokenized; delete through file_id_query instead.
+        if let Some(query) = self.file_id_query(file_id)? {
+            writer.delete_query(query)?;
+        }
         Ok(())
     }
 
@@ -1344,14 +1349,41 @@ impl SearchService {
         }
     }
 
+    /// Build a query matching the document(s) whose file_id equals the given UUID.
+    ///
+    /// The file_id field is indexed as TEXT: the default tokenizer lowercases and
+    /// splits the UUID on hyphens, so an exact-term lookup on the full UUID never
+    /// matches. Tokenize the UUID the same way and match the token sequence as a
+    /// phrase instead. Returns None if tokenization yields nothing.
+    fn file_id_query(&self, file_id: Uuid) -> Result<Option<Box<dyn Query>>> {
+        let file_id_str = file_id.to_string();
+        let mut tokenizer = self.index.tokenizer_for_field(self.fields.file_id)?;
+        let mut token_stream = tokenizer.token_stream(&file_id_str);
+        let mut terms = Vec::new();
+        while token_stream.advance() {
+            terms.push(tantivy::Term::from_field_text(
+                self.fields.file_id,
+                &token_stream.token().text,
+            ));
+        }
+
+        Ok(match terms.len() {
+            0 => None,
+            1 => Some(Box::new(TermQuery::new(
+                terms.remove(0),
+                tantivy::schema::IndexRecordOption::Basic,
+            ))),
+            _ => Some(Box::new(PhraseQuery::new(terms))),
+        })
+    }
+
     pub async fn get_file_by_id(&self, file_id: Uuid) -> Result<Option<SearchResult>> {
         let searcher = self.reader.searcher();
         debug!("Getting file by id: {}", file_id);
 
-        // Use a targeted query to find the document with the matching file_id
-        let file_id_str = file_id.to_string();
-        let term = tantivy::Term::from_field_text(self.fields.file_id, &file_id_str);
-        let query = TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+        let Some(query) = self.file_id_query(file_id)? else {
+            return Ok(None);
+        };
 
         // Search for the specific document
         let top_docs = searcher.search(&query, &TopDocs::with_limit(1))?;

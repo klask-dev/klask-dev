@@ -1,8 +1,11 @@
 use crate::api::auth::validate_password_strength;
 use crate::auth::AuthError;
-use crate::auth::extractors::{AdminUser, AppState};
-use crate::models::{User, UserRole};
-use crate::repositories::{UserRepository, user_repository::UserStats};
+use crate::auth::extractors::{AdminUser, AppState, AuthenticatedUser};
+use crate::models::{
+    ApiTokenInfo, CreateApiTokenRequest, CreateApiTokenResponse, User, UserRole, extract_token_prefix,
+    generate_api_token, hash_api_token,
+};
+use crate::repositories::{ApiTokenRepository, UserRepository, user_repository::UserStats};
 use crate::utils::password::hash_password;
 use anyhow::Result;
 use axum::{
@@ -10,7 +13,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
-    routing::{get, put},
+    routing::{delete, get, put},
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -75,10 +78,14 @@ impl From<User> for UserResponse {
 pub async fn create_router() -> Result<Router<AppState>> {
     let router = Router::new()
         .route("/", get(list_users).post(create_user))
+        // Specific routes before generic {id} routes
+        .route("/stats", get(get_user_stats))
+        .route("/tokens", get(list_tokens).post(create_token))
+        .route("/tokens/{id}", delete(revoke_token))
+        // Generic {id} routes last
         .route("/{id}", get(get_user).put(update_user).delete(delete_user))
         .route("/{id}/role", put(update_user_role))
-        .route("/{id}/status", put(update_user_status))
-        .route("/stats", get(get_user_stats));
+        .route("/{id}/status", put(update_user_status));
 
     Ok(router)
 }
@@ -302,5 +309,123 @@ async fn get_user_stats(
     match user_repository.get_user_stats().await {
         Ok(stats) => Ok(Json(stats)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+// API Token Management Endpoints
+
+/// List all API tokens for the authenticated user
+async fn list_tokens(
+    State(app_state): State<AppState>,
+    auth_user: AuthenticatedUser,
+) -> Result<Json<Vec<ApiTokenInfo>>, StatusCode> {
+    let api_token_repo = ApiTokenRepository::new(app_state.database.pool().clone());
+
+    match api_token_repo.list_tokens(auth_user.user.id).await {
+        Ok(tokens) => {
+            let token_infos: Vec<ApiTokenInfo> = tokens.into_iter().map(|t| t.into()).collect();
+            Ok(Json(token_infos))
+        }
+        Err(e) => {
+            tracing::error!("Failed to list API tokens for user {}: {:?}", auth_user.user.id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// Create a new API token for the authenticated user
+async fn create_token(
+    State(app_state): State<AppState>,
+    auth_user: AuthenticatedUser,
+    Json(payload): Json<CreateApiTokenRequest>,
+) -> Result<Json<CreateApiTokenResponse>, AuthError> {
+    // Validate token name
+    if payload.name.trim().is_empty() {
+        return Err(AuthError::InvalidInput("Token name cannot be empty".to_string()));
+    }
+
+    if payload.name.len() > 255 {
+        return Err(AuthError::InvalidInput(
+            "Token name must be 255 characters or less".to_string(),
+        ));
+    }
+
+    // Generate the plaintext token
+    let plaintext_token = generate_api_token();
+
+    // Hash the token using SHA-256 (fast, suitable for short-lived revocable tokens)
+    let token_hash = hash_api_token(&plaintext_token);
+
+    // Extract the prefix for display
+    let token_prefix = extract_token_prefix(&plaintext_token);
+
+    // Create the token in the database
+    let api_token_repo = ApiTokenRepository::new(app_state.database.pool().clone());
+
+    let created_token = match api_token_repo
+        .create_token(
+            auth_user.user.id,
+            &payload.name,
+            "read-only",
+            &token_hash,
+            &token_prefix,
+            payload.expires_in_days,
+        )
+        .await
+    {
+        Ok(token) => token,
+        Err(e) => {
+            tracing::error!("Failed to create API token for user {}: {:?}", auth_user.user.id, e);
+            return Err(AuthError::InvalidInput("Failed to create token".to_string()));
+        }
+    };
+
+    Ok(Json(CreateApiTokenResponse {
+        id: created_token.id,
+        token: plaintext_token, // Show plaintext only once
+        token_prefix: created_token.token_prefix,
+        name: created_token.name,
+        scope: created_token.scope,
+        created_at: created_token.created_at,
+    }))
+}
+
+/// Revoke an API token (soft delete)
+async fn revoke_token(
+    State(app_state): State<AppState>,
+    Path(token_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+) -> Result<StatusCode, AuthError> {
+    let api_token_repo = ApiTokenRepository::new(app_state.database.pool().clone());
+
+    // Get the token to verify ownership
+    match api_token_repo.get_token(token_id).await {
+        Ok(Some(token)) => {
+            // Check ownership: user can only revoke their own tokens
+            if token.user_id != auth_user.user.id {
+                return Err(AuthError::Forbidden("Cannot revoke tokens of other users".to_string()));
+            }
+
+            // Revoke the token
+            match api_token_repo.revoke_token(token_id).await {
+                Ok(()) => Ok(StatusCode::NO_CONTENT),
+                Err(e) => {
+                    tracing::error!("Failed to revoke API token {}: {:?}", token_id, e);
+                    Err(AuthError::InvalidInput("Failed to revoke token".to_string()))
+                }
+            }
+        }
+        Ok(None) => {
+            tracing::warn!(
+                "User {} attempted to revoke non-existent token {}",
+                auth_user.user.id,
+                token_id
+            );
+            Err(AuthError::InvalidInput("Token not found".to_string()))
+        }
+        Err(e) => {
+            tracing::error!("Database error while fetching token {}: {:?}", token_id, e);
+            Err(AuthError::InvalidInput("Database error".to_string()))
+        }
     }
 }

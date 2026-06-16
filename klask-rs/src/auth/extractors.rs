@@ -1,10 +1,12 @@
 use crate::auth::{claims::TokenClaims, errors::AuthError, jwt::JwtService};
 use crate::database::Database;
 use crate::models::user::{User, UserRole};
+use crate::repositories::api_token_repository::ApiTokenRepository;
 use crate::repositories::user_repository::UserRepository;
 use crate::services::{encryption::EncryptionService, progress::ProgressTracker};
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
+use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -125,6 +127,12 @@ fn extract_token_from_cookie(cookies: &str, name: &str) -> Option<String> {
 async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<AuthenticatedUser, AuthError> {
     trace!("Extracting AuthenticatedUser from request");
 
+    // Check if this is an API token (format: klask_pat_XXXXX)
+    if token.starts_with("klask_pat_") {
+        return extract_authenticated_user_from_api_token(state, token).await;
+    }
+
+    // Otherwise, treat as JWT
     // Decode and validate token
     let claims = state.jwt_service.decode_token(token).map_err(|e| {
         error!("Failed to decode token: {:?}", e);
@@ -167,6 +175,97 @@ async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<Aut
     }
 
     trace!("AuthenticatedUser extracted successfully: {}", user.username);
+    Ok(AuthenticatedUser { user, claims })
+}
+
+/// Extract and validate an authenticated user from a personal API token
+/// API tokens follow the format: klask_pat_XXXXX (42 characters total)
+async fn extract_authenticated_user_from_api_token(
+    state: &AppState,
+    token: &str,
+) -> Result<AuthenticatedUser, AuthError> {
+    trace!("Extracting AuthenticatedUser from API token");
+
+    // Validate token format
+    if !token.starts_with("klask_pat_") || token.len() != 42 {
+        warn!("Invalid API token format");
+        return Err(AuthError::InvalidToken("Invalid token format".to_string()));
+    }
+
+    // Fetch the token repository
+    let api_token_repo = ApiTokenRepository::new(state.database.pool().clone());
+
+    // Find token by plaintext (repository handles Argon2 verification)
+    let api_token = api_token_repo
+        .find_by_token(token)
+        .await
+        .map_err(|e| {
+            error!("Database error while looking up API token: {:?}", e);
+            AuthError::DatabaseError(e.to_string())
+        })?
+        .ok_or_else(|| {
+            trace!("API token not found or invalid");
+            AuthError::InvalidToken("Token not found or invalid".to_string())
+        })?;
+
+    // Check if token is active (not revoked)
+    if !api_token.active {
+        warn!("Revoked API token used for user {}", api_token.user_id);
+        return Err(AuthError::InvalidToken("Token has been revoked".to_string()));
+    }
+
+    // Check if token is expired
+    if let Some(expires_at) = api_token.expires_at
+        && Utc::now() > expires_at
+    {
+        warn!("Expired API token used for user {}", api_token.user_id);
+        return Err(AuthError::TokenExpired);
+    }
+
+    // Fetch user from database
+    let user_repo = UserRepository::new(state.database.pool().clone());
+    let user = user_repo
+        .get_user(api_token.user_id)
+        .await
+        .map_err(|e| {
+            error!("Database error while fetching user {}: {:?}", api_token.user_id, e);
+            AuthError::DatabaseError(e.to_string())
+        })?
+        .ok_or_else(|| {
+            warn!("User not found for API token");
+            AuthError::UserNotFound
+        })?;
+
+    // Verify user is active
+    if !user.active {
+        warn!(
+            "Inactive user attempted to authenticate with API token: {}",
+            user.username
+        );
+        return Err(AuthError::UserInactive);
+    }
+
+    trace!("API token validated successfully for user: {}", user.username);
+
+    // Create synthetic claims for API tokens
+    // API tokens don't expire based on JWT expiration; they use api_tokens.expires_at
+    let claims = TokenClaims::new(
+        user.id,
+        user.username.clone(),
+        "api-token".to_string(),
+        chrono::Duration::days(365 * 10), // Long expiration since we validate separately
+    );
+
+    // Update last_used_at in background (non-blocking)
+    let token_id = api_token.id;
+    let pool = state.database.pool().clone();
+    tokio::spawn(async move {
+        let repo = ApiTokenRepository::new(pool);
+        if let Err(e) = repo.update_last_used(token_id).await {
+            error!("Failed to update last_used_at for API token: {:?}", e);
+        }
+    });
+
     Ok(AuthenticatedUser { user, claims })
 }
 

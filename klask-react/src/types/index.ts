@@ -491,7 +491,7 @@ export interface FormState<T> {
 export interface NavItem {
   label: string;
   href: string;
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<Record<string, unknown>>;
   children?: NavItem[];
   requiresAuth?: boolean;
   requiredRole?: UserRole;
@@ -509,7 +509,7 @@ export type RequireField<T, K extends keyof T> = T & Required<Pick<T, K>>;
 // Event Types
 export interface SearchEvent {
   type: 'search' | 'filter' | 'sort' | 'paginate';
-  payload: any;
+  payload: Record<string, unknown>;
   timestamp: number;
 }
 
@@ -618,4 +618,24 @@ export interface UseRepositoriesReturn {
   delete: (id: string) => Promise<void>;
   crawl: (id: string) => Promise<void>;
   refresh: () => void;
+}
+
+// API Tokens Types
+export interface ApiTokenInfo {
+  id: string;
+  name: string;
+  token_prefix: string;
+  scope: string;
+  active: boolean;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+}
+
+export interface CreateTokenResponse {
+  id: string;
+  token: string;
+  token_prefix: string;
+  name: string;
+  created_at: string;
 }
