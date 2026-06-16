@@ -59,12 +59,19 @@ pub struct SemanticSearchConfig {
     /// Directory where the ONNX model is cached. Pre-provision it for
     /// air-gapped deployments.
     pub cache_dir: String,
+    /// Directory where the embedded vector store (LanceDB) persists, sibling of
+    /// the Tantivy index.
+    pub vector_store_dir: String,
     /// Maximum number of file lines per embedding chunk.
     pub chunk_max_lines: usize,
     /// Lines of overlap between consecutive chunks.
     pub chunk_overlap_lines: usize,
     /// Inference batch size.
     pub batch_size: usize,
+    /// Bounded embedding-queue capacity. The crawl blocks when the queue is
+    /// full (strict backpressure), so this caps in-flight files awaiting
+    /// embedding rather than dropping work.
+    pub queue_capacity: usize,
 }
 
 impl AppConfig {
@@ -141,6 +148,8 @@ impl AppConfig {
                 model: std::env::var("SEMANTIC_SEARCH_MODEL")
                     .unwrap_or_else(|_| "jinaai/jina-embeddings-v2-base-code".to_string()),
                 cache_dir: std::env::var("SEMANTIC_SEARCH_CACHE_DIR").unwrap_or_else(|_| "./models".to_string()),
+                vector_store_dir: std::env::var("SEMANTIC_SEARCH_VECTOR_DIR")
+                    .unwrap_or_else(|_| "./vector-index".to_string()),
                 chunk_max_lines: std::env::var("SEMANTIC_SEARCH_CHUNK_MAX_LINES")
                     .unwrap_or_else(|_| "60".to_string())
                     .parse()
@@ -153,6 +162,10 @@ impl AppConfig {
                     .unwrap_or_else(|_| "32".to_string())
                     .parse()
                     .unwrap_or(32),
+                queue_capacity: std::env::var("SEMANTIC_SEARCH_QUEUE_CAPACITY")
+                    .unwrap_or_else(|_| "1000".to_string())
+                    .parse()
+                    .unwrap_or(1000),
             },
         };
 

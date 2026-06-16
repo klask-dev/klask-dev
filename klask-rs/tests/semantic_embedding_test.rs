@@ -19,9 +19,11 @@ fn test_config() -> SemanticSearchConfig {
         enabled: true,
         model: "Xenova/bge-small-en-v1.5".to_string(),
         cache_dir: "target/fastembed-cache".to_string(),
+        vector_store_dir: "target/vector-index".to_string(),
         chunk_max_lines: 60,
         chunk_overlap_lines: 15,
         batch_size: 32,
+        queue_capacity: 1000,
     }
 }
 

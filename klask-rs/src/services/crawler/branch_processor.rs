@@ -36,8 +36,12 @@ pub struct BranchProcessor {
 }
 
 impl BranchProcessor {
-    pub fn new(search_service: Arc<SearchService>, progress_tracker: Arc<ProgressTracker>) -> Self {
-        let file_processor = FileProcessor::new(search_service.clone());
+    pub fn new(
+        search_service: Arc<SearchService>,
+        progress_tracker: Arc<ProgressTracker>,
+        semantic_indexer: crate::services::semantic::MaybeIndexer,
+    ) -> Self {
+        let file_processor = FileProcessor::new(search_service.clone(), semantic_indexer);
         Self { progress_tracker, file_processor }
     }
 

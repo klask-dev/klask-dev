@@ -73,13 +73,23 @@ once_cell = "1.21"
 # Local embedding generation for semantic search (optional, see semantic-search feature)
 fastembed = { version = "5", optional = true }
 
+# Embedded vector store for semantic search (optional, see semantic-search feature).
+# arrow-array/arrow-schema are pinned to the version lancedb re-exports so the
+# RecordBatch/Schema types we build match the ones lancedb's API expects.
+lancedb = { version = "0.30", optional = true }
+arrow-array = { version = "58", optional = true }
+arrow-schema = { version = "58", optional = true }
+# async fn in object-safe traits (Arc<dyn VectorStore>); native async-fn-in-trait
+# is not yet dyn-compatible.
+async-trait = { version = "0.1", optional = true }
+
 [features]
 test-utils = []
 pdf-parser = []
 docx-parser = []
 # Hybrid semantic search: local ONNX embedding generation (no cloud API).
 # Opt-in because it pulls the ONNX runtime and downloads a model at startup.
-semantic-search = ["dep:fastembed"]
+semantic-search = ["dep:fastembed", "dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:async-trait"]
 
 [dev-dependencies]
 # Testing

@@ -938,6 +938,18 @@ async fn delete_repository(
                 }
             }
 
+            // Mirror the cleanup in the semantic vector store (best-effort).
+            #[cfg(feature = "semantic-search")]
+            if let Some(indexer) = &app_state.semantic_indexer {
+                match indexer.delete_project(&repository.name).await {
+                    Ok(n) => info!("Deleted {} semantic chunks for repository: {}", n, repository.name),
+                    Err(e) => warn!(
+                        "Failed to delete semantic chunks for repository {}: {}",
+                        repository.name, e
+                    ),
+                }
+            }
+
             // Delete the repository from database
             match repo_repository.delete_repository(id).await {
                 Ok(_) => {
@@ -1298,6 +1310,18 @@ async fn bulk_delete_repositories(
                             repository.name, e
                         );
                         index_cleanup_failures += 1;
+                    }
+                }
+
+                // Mirror the cleanup in the semantic vector store (best-effort).
+                #[cfg(feature = "semantic-search")]
+                if let Some(indexer) = &app_state.semantic_indexer {
+                    match indexer.delete_project(&repository.name).await {
+                        Ok(n) => debug!("Deleted {} semantic chunks for repository: {}", n, repository.name),
+                        Err(e) => warn!(
+                            "Failed to delete semantic chunks for repository {}: {}",
+                            repository.name, e
+                        ),
                     }
                 }
 

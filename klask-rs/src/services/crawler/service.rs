@@ -26,6 +26,10 @@ pub struct CrawlerService {
     encryption_service: Arc<EncryptionService>,
     pub temp_dir: PathBuf,
     cancellation_tokens: Arc<RwLock<HashMap<Uuid, CancellationToken>>>,
+    /// Optional semantic indexer, mirrored into the specialized crawlers so they
+    /// can keep the vector store in sync on delete. None when disabled.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    semantic_indexer: crate::services::semantic::MaybeIndexer,
     // Specialized crawlers
     git_operations: GitOperations,
     branch_processor: BranchProcessor,
@@ -40,19 +44,25 @@ impl CrawlerService {
         progress_tracker: Arc<ProgressTracker>,
         encryption_service: Arc<EncryptionService>,
         temp_dir: String,
+        semantic_indexer: crate::services::semantic::MaybeIndexer,
     ) -> Result<Self> {
         let temp_dir = std::path::PathBuf::from(temp_dir);
         std::fs::create_dir_all(&temp_dir).map_err(|e| anyhow!("Failed to create temp directory: {}", e))?;
 
         // Create specialized crawlers
         let git_operations = GitOperations::new(encryption_service.clone());
-        let branch_processor = BranchProcessor::new(search_service.clone(), progress_tracker.clone());
+        let branch_processor = BranchProcessor::new(
+            search_service.clone(),
+            progress_tracker.clone(),
+            semantic_indexer.clone(),
+        );
         let gitlab_crawler = GitLabCrawler::new(
             database.clone(),
             search_service.clone(),
             progress_tracker.clone(),
             encryption_service.clone(),
             temp_dir.clone(),
+            semantic_indexer.clone(),
         );
         let github_crawler = GitHubCrawler::new(
             database.clone(),
@@ -60,6 +70,7 @@ impl CrawlerService {
             progress_tracker.clone(),
             encryption_service.clone(),
             temp_dir.clone(),
+            semantic_indexer.clone(),
         );
 
         Ok(Self {
@@ -69,6 +80,7 @@ impl CrawlerService {
             encryption_service,
             temp_dir,
             cancellation_tokens: Arc::new(RwLock::new(HashMap::new())),
+            semantic_indexer,
             git_operations,
             branch_processor,
             gitlab_crawler,
@@ -143,6 +155,20 @@ impl CrawlerService {
                     repository.name, e
                 );
                 // Continue anyway - the upsert should handle duplicates
+            }
+        }
+
+        // Mirror the deletion in the semantic vector store before re-crawling so
+        // stale chunks don't linger (best-effort; mirrors the Tantivy cleanup).
+        #[cfg(feature = "semantic-search")]
+        if let Some(indexer) = &self.semantic_indexer {
+            match indexer.delete_project(&repository.name).await {
+                Ok(n) if n > 0 => info!("Deleted {} semantic chunks for repository {}", n, repository.name),
+                Ok(_) => {}
+                Err(e) => warn!(
+                    "Failed to delete semantic chunks for repository {}: {}",
+                    repository.name, e
+                ),
             }
         }
 
@@ -751,14 +777,20 @@ impl Clone for CrawlerService {
             encryption_service: self.encryption_service.clone(),
             temp_dir: self.temp_dir.clone(),
             cancellation_tokens: self.cancellation_tokens.clone(),
+            semantic_indexer: self.semantic_indexer.clone(),
             git_operations: GitOperations::new(self.encryption_service.clone()),
-            branch_processor: BranchProcessor::new(self.search_service.clone(), self.progress_tracker.clone()),
+            branch_processor: BranchProcessor::new(
+                self.search_service.clone(),
+                self.progress_tracker.clone(),
+                self.semantic_indexer.clone(),
+            ),
             gitlab_crawler: GitLabCrawler::new(
                 self.database.clone(),
                 self.search_service.clone(),
                 self.progress_tracker.clone(),
                 self.encryption_service.clone(),
                 self.temp_dir.clone(),
+                self.semantic_indexer.clone(),
             ),
             github_crawler: GitHubCrawler::new(
                 self.database.clone(),
@@ -766,6 +798,7 @@ impl Clone for CrawlerService {
                 self.progress_tracker.clone(),
                 self.encryption_service.clone(),
                 self.temp_dir.clone(),
+                self.semantic_indexer.clone(),
             ),
         }
     }
