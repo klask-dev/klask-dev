@@ -95,6 +95,11 @@ pub struct SearchResult {
     pub extension: String,
     pub score: f32,
     pub line_number: Option<u32>,
+    /// Which engine(s) this result matched in (hybrid/semantic only). `None` for
+    /// keyword results — the keyword path never sets it, keeping its output
+    /// unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_source: Option<MatchSource>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,6 +149,20 @@ pub enum SearchMode {
     Keyword,
     Semantic,
     Hybrid,
+}
+
+/// Which engine(s) a *result* matched in, for the hybrid/semantic UI badge
+/// (plan §6). Only meaningful for semantic-aware modes; keyword results leave
+/// `SearchResult::match_source` as `None` so the keyword path and response are
+/// byte-for-byte unchanged. `Both` is set in hybrid mode when a file surfaced
+/// in both the keyword and the vector ranking.
+#[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MatchSource {
+    Keyword,
+    Semantic,
+    Both,
 }
 
 impl SearchMode {
@@ -1217,6 +1236,7 @@ impl SearchService {
                     extension,
                     score,
                     line_number,
+                    match_source: None,
                 });
             }
         }
@@ -1383,6 +1403,7 @@ impl SearchService {
                     extension,
                     score: 1.0,
                     line_number: None,
+                    match_source: None,
                 }))
             }
             Err(_) => {
@@ -1471,6 +1492,7 @@ impl SearchService {
                 extension,
                 score: *score,
                 line_number: None,
+                match_source: None,
             }));
         }
 

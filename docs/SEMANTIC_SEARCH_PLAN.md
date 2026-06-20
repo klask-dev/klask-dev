@@ -130,7 +130,7 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 | **2** | LanceDB store + embedding worker + crawl integration + delete/update lifecycle | ✅ done (this PR) |
 | **3** | Backfill admin job + progress UI | ✅ done (this PR) |
 | **4** | Query path: `mode` param, RRF fusion wiring, API + tests | ✅ done (this PR) |
-| **5** | Frontend toggle + result badges + admin card | planned |
+| **5** | Frontend toggle + result badges + admin card | ✅ done (this PR) |
 | **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | planned |
 
 **Phase 1 measurements** (debug build, CPU, `Xenova/bge-small-en-v1.5`, 384 dims):
@@ -213,6 +213,30 @@ Reproduce with:
 - **Frontend:** API plumbing only (optional `mode` in `SearchQuery` /
   `useMultiSelectSearch`, sent only when non-default). The mode **toggle UI**,
   result badges and snippet-range rendering are Phase 5.
+
+**Phase 5 notes:**
+- **Engine toggle.** `SearchPageV3` gains a Keyword | Hybrid | Semantic segmented
+  control, persisted in the URL as `mode=` (omitted when keyword, so plain
+  keyword URLs stay clean and backward compatible) and wired into the existing
+  `mode` param of `useMultiSelectSearch`. It is **orthogonal** to the keyword-engine
+  toggles (fuzzy/regex/case) — those choose how the keyword engine matches; this
+  chooses which engine answers.
+- **Availability gating.** The admin `status` endpoint is admin-only, so the
+  regular search page can't use it to decide whether to show the toggle. Added a
+  lightweight authenticated **`GET /api/search/capabilities`** → `{ semantic_enabled }`
+  (true only when the feature is built, the model loaded, and the store opened);
+  the toggle renders only when true and degrades to hidden if the endpoint is
+  unreachable. Capabilities are static for the process lifetime, so the hook
+  caches them indefinitely.
+- **Result badges (match provenance).** Phase 4 hydrated results without saying
+  which engine matched. Phase 5 adds `MatchSource` (`keyword`/`semantic`/`both`)
+  on `SearchResult`, populated in the query path — `hydrate_semantic_only` tags
+  every hit `Semantic`; `hybrid_fuse` tags each fused file by membership in the
+  keyword/vector rankings (`Both` when in both). It serializes with
+  `skip_serializing_if = "Option::is_none"` so the keyword response is unchanged,
+  and the UI shows a small badge per result in hybrid/semantic mode.
+- **Admin card** (model/dimension, chunk count, rebuild + progress) already
+  shipped in Phase 3; nothing further needed here.
 
 ## 9. Risks & Mitigations
 

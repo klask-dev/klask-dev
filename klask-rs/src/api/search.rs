@@ -1,5 +1,5 @@
 use crate::auth::extractors::{AppState, AuthenticatedUser};
-use crate::services::{SearchMode, SearchQuery};
+use crate::services::{MatchSource, SearchMode, SearchQuery};
 use anyhow::Result;
 use axum::{
     Router,
@@ -124,12 +124,43 @@ pub struct SearchResult {
     pub extension: String,
     pub score: f32,
     pub line_number: Option<u32>,
+    /// Which engine(s) this result matched in (hybrid/semantic only); omitted for
+    /// keyword results so the keyword response is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_source: Option<MatchSource>,
+}
+
+/// Whether the semantic/hybrid search modes are usable on this server, surfaced
+/// to the regular search UI (non-admin) so it only shows the mode toggle when it
+/// would actually do something. True only when the feature is built in, the
+/// embedding model loaded, and the vector store opened.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchCapabilities {
+    pub semantic_enabled: bool,
 }
 
 pub async fn create_router() -> Result<Router<AppState>> {
-    let router = Router::new().route("/", get(search_files)).route("/facets", get(get_facets_with_filters));
+    let router = Router::new()
+        .route("/", get(search_files))
+        .route("/facets", get(get_facets_with_filters))
+        .route("/capabilities", get(get_capabilities));
 
     Ok(router)
+}
+
+/// Report whether semantic/hybrid search is available (see [`SearchCapabilities`]).
+/// Authenticated but not admin-gated — every user needs it to render the toggle.
+async fn get_capabilities(
+    _auth: AuthenticatedUser,
+    State(app_state): State<AppState>,
+) -> Json<SearchCapabilities> {
+    let _ = &app_state; // used only in the feature build below
+    #[cfg(feature = "semantic-search")]
+    let semantic_enabled = app_state.semantic_embedder.is_some() && app_state.semantic_indexer.is_some();
+    #[cfg(not(feature = "semantic-search"))]
+    let semantic_enabled = false;
+
+    Json(SearchCapabilities { semantic_enabled })
 }
 
 /// Execute a search, dispatching to the semantic/hybrid query path when the
@@ -229,6 +260,7 @@ async fn search_files(
                     extension: r.extension,
                     score: r.score,
                     line_number: r.line_number,
+                    match_source: r.match_source,
                 })
                 .collect();
 

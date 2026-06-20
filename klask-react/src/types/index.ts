@@ -154,6 +154,10 @@ export interface File {
 // built with semantic search enabled — otherwise the API degrades to keyword.
 export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
 
+// Which engine(s) a result matched in, for the hybrid/semantic result badge.
+// Absent on keyword results. Mirrors the backend `MatchSource`.
+export type MatchSource = 'keyword' | 'semantic' | 'both';
+
 export interface SearchQuery {
   query: string;
   project?: string;
@@ -178,6 +182,7 @@ export interface SearchResult {
   score: number;
   line_number?: number;
   repository_name?: string; // Repository name from backend
+  match_source?: MatchSource; // Which engine(s) matched (hybrid/semantic only)
 }
 
 export interface FacetValue {

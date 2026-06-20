@@ -20,7 +20,7 @@ use super::embedder::EmbeddingProvider;
 use super::fusion::{DEFAULT_RRF_K, reciprocal_rank_fusion};
 use super::indexer::VectorIndexer;
 use super::store::VectorSearchFilters;
-use crate::services::search::{SearchMode, SearchQuery, SearchResultsWithTotal, SearchService};
+use crate::services::search::{MatchSource, SearchMode, SearchQuery, SearchResultsWithTotal, SearchService};
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -125,6 +125,8 @@ async fn hydrate_semantic_only(
         if let Some(line) = best_line.get(&result.file_id) {
             result.line_number = Some(*line);
         }
+        // Semantic-only: every result came from the vector engine.
+        result.match_source = Some(MatchSource::Semantic);
     }
 
     let facets = maybe_keyword_facets(search_service, query, page_end).await?;
@@ -150,12 +152,21 @@ async fn hybrid_fuse(
     let keyword_ranking: Vec<Uuid> = dedup_by_file(keyword.results.iter().map(|r| r.file_id));
     let vector_ranking: Vec<Uuid> = dedup_by_file(vector_hits.iter().map(|h| h.file_id));
 
+    // Membership sets for per-result provenance (the UI badge): a file can be a
+    // keyword hit, a vector hit, or both. Built before the rankings are moved
+    // into the fusion call.
+    let in_keyword: std::collections::HashSet<Uuid> = keyword_ranking.iter().copied().collect();
+    let in_vector: std::collections::HashSet<Uuid> = vector_ranking.iter().copied().collect();
+
     let fused = reciprocal_rank_fusion(&[keyword_ranking, vector_ranking], DEFAULT_RRF_K);
     let total = fused.len() as u64;
 
     let page_ids: Vec<Uuid> = fused.iter().skip(query.offset).take(query.limit).map(|(id, _)| *id).collect();
     // fetch_results_by_file_ids preserves input (fused) order.
-    let results = search_service.fetch_results_by_file_ids(&page_ids).await?;
+    let mut results = search_service.fetch_results_by_file_ids(&page_ids).await?;
+    for result in &mut results {
+        result.match_source = Some(match_source(&in_keyword, &in_vector, result.file_id));
+    }
 
     Ok(SearchResultsWithTotal { results, total, facets: keyword.facets })
 }
@@ -175,6 +186,22 @@ async fn maybe_keyword_facets(
     facet_query.offset = 0;
     facet_query.limit = page_end.max(1);
     Ok(search_service.search(facet_query).await?.facets)
+}
+
+/// Classify a fused result by which engine(s) it appeared in, for the UI badge.
+/// A file present in both rankings is `Both`; otherwise it came from whichever
+/// single engine contains it (every fused id is in at least one).
+fn match_source(
+    in_keyword: &std::collections::HashSet<Uuid>,
+    in_vector: &std::collections::HashSet<Uuid>,
+    file_id: Uuid,
+) -> MatchSource {
+    match (in_keyword.contains(&file_id), in_vector.contains(&file_id)) {
+        (true, true) => MatchSource::Both,
+        (false, true) => MatchSource::Semantic,
+        // (true, false) and the impossible (false, false) → keyword.
+        _ => MatchSource::Keyword,
+    }
 }
 
 /// Distinct file_ids in first-seen order (a file can contribute several chunks
@@ -376,6 +403,46 @@ mod tests {
             results.results[0].file_id, auth,
             "doc winning both engines must rank first under RRF"
         );
+        // auth matched lexically ("login") *and* semantically ("authentication").
+        assert_eq!(
+            results.results[0].match_source,
+            Some(MatchSource::Both),
+            "a doc hit by both engines must be tagged Both for the UI badge"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_semantic_mode_tags_results_semantic() {
+        let auth = Uuid::new_v4();
+        let (search, indexer, provider, _dir) =
+            setup(&[Doc { file_id: auth, path: "auth.rs", content: "fn login() { /* authentication */ }" }]).await;
+
+        let results = semantic_search(
+            &search,
+            &provider,
+            &indexer,
+            query("authentication", SearchMode::Semantic),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            results.results[0].match_source,
+            Some(MatchSource::Semantic),
+            "semantic-only results must be tagged Semantic"
+        );
+    }
+
+    #[test]
+    fn test_match_source_classification() {
+        use std::collections::HashSet;
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        let c = Uuid::new_v4();
+        let kw: HashSet<Uuid> = [a, b].into_iter().collect();
+        let vec: HashSet<Uuid> = [b, c].into_iter().collect();
+        assert_eq!(match_source(&kw, &vec, a), MatchSource::Keyword);
+        assert_eq!(match_source(&kw, &vec, b), MatchSource::Both);
+        assert_eq!(match_source(&kw, &vec, c), MatchSource::Semantic);
     }
 
     #[tokio::test]
