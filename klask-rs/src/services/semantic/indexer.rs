@@ -16,7 +16,7 @@
 
 use super::chunker::{ChunkOptions, chunk_file};
 use super::embedder::EmbeddingProvider;
-use super::store::{ChunkRecord, VectorStore};
+use super::store::{ChunkRecord, VectorHit, VectorSearchFilters, VectorStore};
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -86,6 +86,19 @@ impl VectorIndexer {
     /// Current number of stored chunks (for logging / admin card).
     pub async fn count(&self) -> Result<u64> {
         self.store.count().await
+    }
+
+    /// Nearest-neighbour search over the stored chunk vectors (Phase 4 query
+    /// path). A passthrough to the store so the query path reuses the same
+    /// handle the worker writes through, keeping the indexer the sole owner of
+    /// the store. Returns up to `limit` hits closest-first, filtered to match.
+    pub async fn search(
+        &self,
+        query_vector: &[f32],
+        limit: usize,
+        filters: &VectorSearchFilters,
+    ) -> Result<Vec<VectorHit>> {
+        self.store.search(query_vector, limit, filters).await
     }
 
     /// Delete every stored chunk. Runs directly against the store (not via the
@@ -254,12 +267,34 @@ mod tests {
         let mut j = job("fn a() {}");
         indexer.index_file(j.clone()).await.unwrap();
         wait_until(|| store.count(), 1).await;
-        // Same file_id, new content → replaces, not appends.
-        j.content = "fn b() {}\nfn c() {}".to_string();
+        // Same file_id, new content → replaces, not appends. Make the new
+        // content span enough lines to produce a *different* chunk count (2),
+        // so we can deterministically wait for the re-index to land instead of
+        // racing a fixed sleep (the old version asserted count==1 both before
+        // and after, so a too-short sleep under load could pass spuriously or
+        // catch the transient mid-upsert state).
+        let new_content = (0..ChunkOptions::default().max_lines * 2 + 1)
+            .map(|i| format!("let v{i} = {i};"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        j.content = new_content.clone();
         indexer.index_file(j).await.unwrap();
-        // Still a single chunk for a tiny file → count stays 1.
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        assert_eq!(store.count().await.unwrap(), 1);
+        // The new content is deterministically multi-chunk; compute the exact
+        // expected count by re-chunking it.
+        use crate::services::semantic::chunker::chunk_file;
+        let expected = chunk_file("src/lib.rs", &new_content, &ChunkOptions::default()).len() as u64;
+        assert!(expected >= 2, "test setup should produce a multi-chunk file");
+        // The re-index replaces (not appends): wait for the new count to land,
+        // then assert it is exactly the new chunk count — an append bug would
+        // leave 1 (old) + N (new). Polling (not a fixed sleep) avoids racing the
+        // background worker under parallel test load, and waiting for >=2 never
+        // catches the transient mid-upsert state.
+        wait_until(|| store.count(), expected).await;
+        assert_eq!(
+            store.count().await.unwrap(),
+            expected,
+            "replaced count must equal the new content's chunk count (no duplicates)"
+        );
     }
 
     #[tokio::test]

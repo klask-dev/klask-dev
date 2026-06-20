@@ -16,6 +16,8 @@ pub mod fusion;
 #[cfg(feature = "semantic-search")]
 pub mod indexer;
 #[cfg(feature = "semantic-search")]
+pub mod query;
+#[cfg(feature = "semantic-search")]
 pub mod store;
 
 #[cfg(feature = "semantic-search")]
@@ -25,6 +27,8 @@ pub use embedder::EmbeddingProvider;
 pub use embedder::FastEmbedProvider;
 #[cfg(feature = "semantic-search")]
 pub use indexer::{IndexJob, VectorIndexer};
+#[cfg(feature = "semantic-search")]
+pub use store::VectorStore;
 
 use crate::config::SemanticSearchConfig;
 use std::sync::Arc;

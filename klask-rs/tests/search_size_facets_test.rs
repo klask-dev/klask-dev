@@ -68,6 +68,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -146,6 +147,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -247,6 +249,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -314,6 +317,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -381,6 +385,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -447,6 +452,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -516,6 +522,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -580,6 +587,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -644,6 +652,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -702,6 +711,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -770,6 +780,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -846,6 +857,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -914,6 +926,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -978,6 +991,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -1034,6 +1048,7 @@ mod search_size_facets_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();

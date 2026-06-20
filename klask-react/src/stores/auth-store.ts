@@ -74,12 +74,11 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
           const user = await apiClient.auth.getProfile();
-          set({ user, isAuthenticated: true });
+          set({ user, isAuthenticated: true, isLoading: false });
         } catch (error) {
-          console.error('Failed to refresh user:', error);
-          get().logout();
-        } finally {
+          console.error('Failed to refresh user on rehydrate:', error);
           set({ isLoading: false });
+          get().logout();
         }
       },
 
@@ -107,16 +106,9 @@ export const useAuthStore = create<AuthState>()(
       name: 'klask-auth',
       // Do NOT persist the token: the browser stores the HttpOnly cookie.
       // Only persist user info for instant UI rendering on load.
-      partialize: (state) => ({ 
-        user: state.user 
+      partialize: (state) => ({
+        user: state.user
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state?.user) {
-          // Validate the session by refreshing user data from the server.
-          // The HttpOnly cookie is sent automatically by the browser.
-          state.refreshUser();
-        }
-      },
     }
   )
 );

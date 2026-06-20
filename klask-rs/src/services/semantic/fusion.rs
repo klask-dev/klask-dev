@@ -1,7 +1,7 @@
-// The binary target compiles this module tree without consuming the fusion
-// function yet (the hybrid query path lands in plan phase 4); silence the
-// resulting false-positive dead-code warnings until then.
-#![allow(dead_code)]
+// The fusion function is consumed by the hybrid query path, which is gated on
+// the `semantic-search` feature; without that feature the module is unused, so
+// silence the dead-code warning only in that build.
+#![cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
 
 //! Reciprocal Rank Fusion (RRF) for hybrid search.
 //!

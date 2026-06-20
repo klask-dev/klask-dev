@@ -4,6 +4,7 @@ import { apiClient } from '../lib/api';
 import { useAuthStore } from '../stores/auth-store';
 import type {
   SearchQuery,
+  SearchMode,
   FacetResponseItem,
   FacetsApiResponse,
 } from '../types';
@@ -137,7 +138,8 @@ export const useMultiSelectSearch = (
   fuzzySearch: boolean = false,
   regexSearch: boolean = false,
   regexFlags?: string,  // Regex flags: "i", "m", "s", or combinations like "ims"
-  caseSensitive: boolean = false
+  caseSensitive: boolean = false,
+  mode: SearchMode = 'keyword'  // keyword (default) | semantic | hybrid
 ) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -151,7 +153,7 @@ export const useMultiSelectSearch = (
   const offset = (currentPage - 1) * pageSize;
 
   return useQuery({
-    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, regexFlags, caseSensitive],
+    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, regexFlags, caseSensitive, mode],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
 
@@ -206,6 +208,10 @@ export const useMultiSelectSearch = (
       }
       if (caseSensitive) {
         searchParams.set('case_sensitive', 'true');
+      }
+      // Only send a non-default mode; absent means keyword (backward compatible).
+      if (mode && mode !== 'keyword') {
+        searchParams.set('mode', mode);
       }
 
       const response = await fetchWithAuth(`/api/search?${searchParams.toString()}`);
