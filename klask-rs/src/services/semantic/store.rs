@@ -636,7 +636,10 @@ mod lance_store {
             let hits = store.search(&[1.0, 0.0, 0.0], 10, &VectorSearchFilters::default()).await.unwrap();
             assert_eq!(hits.len(), 2);
             assert_eq!(hits[0].file_id, near, "closest vector must rank first");
-            assert!(hits[0].distance <= hits[1].distance, "hits must be ordered by ascending distance");
+            assert!(
+                hits[0].distance <= hits[1].distance,
+                "hits must be ordered by ascending distance"
+            );
         }
 
         #[tokio::test]
@@ -644,10 +647,7 @@ mod lance_store {
             let (_dir, store) = temp_store(3).await;
             for i in 0..5u32 {
                 let fid = Uuid::new_v4();
-                store
-                    .upsert_file_chunks(fid, vec![record_vec(fid, "r", 1, vec![i as f32, 1.0, 0.0])])
-                    .await
-                    .unwrap();
+                store.upsert_file_chunks(fid, vec![record_vec(fid, "r", 1, vec![i as f32, 1.0, 0.0])]).await.unwrap();
             }
             let hits = store.search(&[1.0, 1.0, 0.0], 2, &VectorSearchFilters::default()).await.unwrap();
             assert_eq!(hits.len(), 2);
@@ -726,7 +726,10 @@ mod tests {
     #[test]
     fn test_build_filter_predicate_single_field() {
         let filters = VectorSearchFilters { extensions: vec!["rs".to_string()], ..Default::default() };
-        assert_eq!(build_filter_predicate(&filters), Some("extension IN ('rs')".to_string()));
+        assert_eq!(
+            build_filter_predicate(&filters),
+            Some("extension IN ('rs')".to_string())
+        );
     }
 
     #[test]
@@ -747,6 +750,9 @@ mod tests {
     fn test_build_filter_predicate_escapes_values() {
         let filters = VectorSearchFilters { projects: vec!["x' OR '1'='1".to_string()], ..Default::default() };
         // The single quotes are doubled, so the value cannot break out of IN(...).
-        assert_eq!(build_filter_predicate(&filters), Some("project IN ('x'' OR ''1''=''1')".to_string()));
+        assert_eq!(
+            build_filter_predicate(&filters),
+            Some("project IN ('x'' OR ''1''=''1')".to_string())
+        );
     }
 }

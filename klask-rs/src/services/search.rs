@@ -1410,7 +1410,10 @@ impl SearchService {
 
         match terms.len() {
             0 => Box::new(tantivy::query::EmptyQuery),
-            1 => Box::new(TermQuery::new(terms.into_iter().next().unwrap(), tantivy::schema::IndexRecordOption::Basic)),
+            1 => Box::new(TermQuery::new(
+                terms.into_iter().next().unwrap(),
+                tantivy::schema::IndexRecordOption::Basic,
+            )),
             _ => Box::new(tantivy::query::PhraseQuery::new(terms)),
         }
     }

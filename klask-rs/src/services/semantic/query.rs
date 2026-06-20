@@ -248,8 +248,7 @@ mod tests {
 
         let provider: Arc<dyn EmbeddingProvider> = Arc::new(TopicProvider);
         let store = Arc::new(LanceVectorStore::open(dir.path().join("vectors"), DIM).await.unwrap());
-        let indexer =
-            VectorIndexer::start(provider.clone(), store.clone(), ChunkOptions::default(), 8, 32);
+        let indexer = VectorIndexer::start(provider.clone(), store.clone(), ChunkOptions::default(), 8, 32);
 
         for doc in docs {
             search
@@ -310,28 +309,44 @@ mod tests {
         ])
         .await;
 
-        let results = semantic_search(&search, &provider, &indexer, query("authentication", SearchMode::Semantic))
-            .await
-            .unwrap();
+        let results = semantic_search(
+            &search,
+            &provider,
+            &indexer,
+            query("authentication", SearchMode::Semantic),
+        )
+        .await
+        .unwrap();
 
-        assert!(!results.results.is_empty(), "semantic search should return the topic match");
-        assert_eq!(results.results[0].file_id, auth, "the authentication doc must rank first");
+        assert!(
+            !results.results.is_empty(),
+            "semantic search should return the topic match"
+        );
+        assert_eq!(
+            results.results[0].file_id, auth,
+            "the authentication doc must rank first"
+        );
     }
 
     #[tokio::test]
     async fn test_semantic_search_sets_line_number_anchor() {
         let auth = Uuid::new_v4();
-        let (search, indexer, provider, _dir) = setup(&[Doc {
-            file_id: auth,
-            path: "auth.rs",
-            content: "fn login() { /* authentication */ }",
-        }])
-        .await;
+        let (search, indexer, provider, _dir) =
+            setup(&[Doc { file_id: auth, path: "auth.rs", content: "fn login() { /* authentication */ }" }]).await;
 
-        let results = semantic_search(&search, &provider, &indexer, query("authentication", SearchMode::Semantic))
-            .await
-            .unwrap();
-        assert_eq!(results.results[0].line_number, Some(1), "snippet should anchor on the matched chunk's start line");
+        let results = semantic_search(
+            &search,
+            &provider,
+            &indexer,
+            query("authentication", SearchMode::Semantic),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            results.results[0].line_number,
+            Some(1),
+            "snippet should anchor on the matched chunk's start line"
+        );
     }
 
     #[tokio::test]
@@ -347,28 +362,35 @@ mod tests {
 
         // Query text matches the auth doc both lexically ("login") and
         // semantically ("authentication"), so it should top the fused ranking.
-        let results = semantic_search(&search, &provider, &indexer, query("login authentication", SearchMode::Hybrid))
-            .await
-            .unwrap();
+        let results = semantic_search(
+            &search,
+            &provider,
+            &indexer,
+            query("login authentication", SearchMode::Hybrid),
+        )
+        .await
+        .unwrap();
 
         assert!(!results.results.is_empty());
-        assert_eq!(results.results[0].file_id, auth, "doc winning both engines must rank first under RRF");
+        assert_eq!(
+            results.results[0].file_id, auth,
+            "doc winning both engines must rank first under RRF"
+        );
     }
 
     #[tokio::test]
     async fn test_semantic_search_respects_filters() {
         let auth = Uuid::new_v4();
-        let (search, indexer, provider, _dir) = setup(&[Doc {
-            file_id: auth,
-            path: "auth.rs",
-            content: "fn login() { /* authentication */ }",
-        }])
-        .await;
+        let (search, indexer, provider, _dir) =
+            setup(&[Doc { file_id: auth, path: "auth.rs", content: "fn login() { /* authentication */ }" }]).await;
 
         // Filtering to a non-existent repository must yield nothing.
         let mut q = query("authentication", SearchMode::Semantic);
         q.repository_filter = Some("nonexistent".to_string());
         let results = semantic_search(&search, &provider, &indexer, q).await.unwrap();
-        assert!(results.results.is_empty(), "facet filter must restrict the vector universe");
+        assert!(
+            results.results.is_empty(),
+            "facet filter must restrict the vector universe"
+        );
     }
 }

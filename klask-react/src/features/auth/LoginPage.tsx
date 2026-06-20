@@ -70,11 +70,6 @@ const LoginPage: React.FC = () => {
       setServerError(null);
       const response = await apiClient.auth.login(data);
       login(response.token, response.user);
-
-      // Fetch full profile to get avatar_url and other profile fields
-      const fullProfile = await apiClient.auth.getProfile();
-      login(response.token, fullProfile);
-
       navigate('/home');
     } catch (error) {
       // Extract field-specific errors
