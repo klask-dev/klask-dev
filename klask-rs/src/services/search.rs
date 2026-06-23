@@ -34,6 +34,23 @@ const SIZE_BUCKETS: &[(&str, Option<u64>, Option<u64>)] = &[
     ("> 1 MB", Some(1024 * 1024), None),
 ];
 
+/// Convert octet to another unit
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.2} Go", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} Mo", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} Ko", bytes as f64 / KB as f64)
+    } else {
+        format!("{} octets", bytes)
+    }
+}
+
 /// Builds a regex pattern with inline flags based on the provided flags string.
 ///
 /// Supported flags (similar to regex101.com):
@@ -1205,7 +1222,70 @@ impl SearchService {
         // Generate the snippet with HTML highlighting using Tantivy's SnippetGenerator
         // The snippet generator uses the non-fuzzy query, so it can properly highlight matches
         let snippet = generator.snippet_from_doc(doc);
-        let highlighted_html = snippet.to_html();
+
+        let highlighted_html = std::panic::catch_unwind(|| snippet.to_html())
+           .unwrap_or_else(|_| {
+
+            // In case of an error in the function to_html, the information is displayed on the document on the log.
+            let file_id = doc.get_first(self.fields.file_id)
+                .and_then(|v| v.as_str())
+                .unwrap_or("[ID inconnu]");
+
+            let doc_name = doc.get_first(self.fields.file_name)
+                .and_then(|v| v.as_str())
+                .unwrap_or("[Nom inconnu]");
+
+            let file_path = doc.get_first(self.fields.file_path)
+                .and_then(|v| v.as_str())
+                .unwrap_or("[Chemin inconnu]");
+
+            let repository = doc.get_first(self.fields.repository)
+                .and_then(|v| v.as_str())
+                .unwrap_or("[Dépôt inconnu]");
+
+            let project = doc.get_first(self.fields.project)
+                .and_then(|v| v.as_str())
+                .unwrap_or("[project inconnu]");
+
+            let version = doc.get_first(self.fields.version)
+                .and_then(|v| v.as_str())
+                .unwrap_or("[version inconnue]");
+
+            let _extension = doc.get_first(self.fields.extension)
+                .and_then(|v| v.as_str())
+                .unwrap_or("[extension inconnue]");
+
+            let _size = if let Some(compact_value) = doc.get_first(self.fields.size) {
+                if let Some(u64_value) = compact_value.as_u64() {
+                     format_size(u64_value)
+                } else {
+                    "[Taille inconnue (pas u64)]".to_string()
+                }
+            } else {
+                "[Taille inconnue]".to_string()
+            };
+
+           let doc_content_preview = doc.get_first(self.fields.content)
+                .and_then(|v| v.as_str())
+                .map(|s| s.chars().take(50).collect::<String>())
+                .unwrap_or_else(|| "[Contenu vide]".to_string());
+
+            // File information
+            eprintln!(
+                "  Erreur HTML pour le document:\n\
+                - ID: {}\n\
+                - Nom: {}\n\
+                - Chemin: {}\n\
+                - Dépôt: {}\n\
+                - Project: {}\n\
+                - Version: {}\n\
+                - Extension: {}\n\
+                - Size: {} octets\n\
+                - Contenu: '{}...'",
+                file_id, doc_name, file_path, repository, project, version, _extension, _size, doc_content_preview
+            );
+            String::new() // Force le fallback
+        });
 
         // Extract clean search terms from query for line number calculation (remove fuzzy/wildcard chars)
         let clean_terms: Vec<String> = query

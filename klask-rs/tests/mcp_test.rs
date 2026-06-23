@@ -44,6 +44,16 @@ async fn setup_test_server() -> Result<(TestServer, AppState, TempDir)> {
             allow_registration: true,
         },
         cors: CorsConfig { allowed_origins: vec![] },
+        semantic: klask_rs::config::SemanticSearchConfig {
+            enabled: false,
+            model: "jinaai/jina-embeddings-v2-base-code".to_string(),
+            cache_dir: "./models".to_string(),
+            vector_store_dir: "./vector-index".to_string(),
+            chunk_max_lines: 60,
+            chunk_overlap_lines: 15,
+            batch_size: 32,
+            queue_capacity: 1000,
+        },
     };
 
     let progress_tracker = Arc::new(ProgressTracker::new());
@@ -55,6 +65,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState, TempDir)> {
         progress_tracker.clone(),
         encryption_service.clone(),
         config.crawler.temp_dir.clone(),
+        None,
     )?);
 
     let app_state = AppState {
@@ -63,6 +74,8 @@ async fn setup_test_server() -> Result<(TestServer, AppState, TempDir)> {
         crawler_service,
         progress_tracker,
         scheduler_service: None,
+        semantic_embedder: None,
+        semantic_indexer: None,
         jwt_service,
         encryption_service,
         config,
