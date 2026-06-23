@@ -7,6 +7,7 @@ use crate::services::progress::ProgressTracker;
 use crate::services::search::SearchService;
 use anyhow::{Result, anyhow};
 use gix::ObjectId;
+use std::env;
 use std::path::Path;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -629,7 +630,20 @@ impl BranchProcessor {
 
     /// Check if a file is supported for indexing based on its extension or name
     fn is_supported_file_static(file_path: &Path) -> bool {
-        let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+
+        let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+        // Find last point
+        let extension = if let Some(pos) = file_name.rfind('.') {
+            //  Avoid returning an empty string if the dot is at the end of the name(ex: "fichier.")
+            if pos < file_name.len() - 1 {
+                &file_name[pos + 1..]
+            } else {
+                ""
+            }
+        } else {
+            ""
+        };
 
         // Check if the file should be filtered (binary files are filtered)
         if ParserDispatcher::should_filter(extension) {
@@ -639,24 +653,30 @@ impl BranchProcessor {
         // If no extension, check for special file names that are supported
         if extension.is_empty() {
             if let Some(file_name) = file_path.file_name().and_then(|name| name.to_str()) {
-                return matches!(
-                    file_name.to_lowercase().as_str(),
-                    "dockerfile"
-                        | "makefile"
-                        | "rakefile"
-                        | "gemfile"
-                        | "vagrantfile"
-                        | "procfile"
-                        | "readme"
-                        | "license"
-                        | "changelog"
-                        | "authors"
-                        | "contributors"
-                        | "copying"
-                        | "install"
-                        | "news"
-                        | "todo"
-                );
+                debug!("is_supported_file_static : before return match");
+
+                // Statique file (lower case)
+                let mut all_special_files: Vec<String> = vec![
+                    "dockerfile", "makefile", "rakefile", "gemfile", "vagrantfile",
+                    "procfile", "readme", "license", "changelog", "authors",
+                    "contributors", "copying", "install", "news", "todo"
+                ]
+                .into_iter()
+                .map(String::from)
+                .collect();
+
+                // Adding files from the environment variable
+                if let Ok(additional_files) = env::var("ADD_FILE_NAME_WITH_NO_EXTENTION_ALLOW") {
+                    all_special_files.extend(
+                        additional_files
+                            .split(',')  // Separated by commas (ex: "file1,file2,file3")
+                            .map(|s| s.trim().to_lowercase())  // Cleans and converts to lowercase
+                    );
+                }
+
+               debug!("is_supported_file_static : (file_name.to_lowercase {}): {:?}", file_name.to_lowercase(), all_special_files);
+
+               return all_special_files.contains(&file_name.to_lowercase());
             }
             return false;
         }
