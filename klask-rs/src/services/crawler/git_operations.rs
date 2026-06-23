@@ -4,7 +4,9 @@ use anyhow::{Result, anyhow};
 use gix::open::Options;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
+use std::fs::OpenOptions;
+use std::io::{Write, Read, Seek, SeekFrom};
 
 /// Git operations for cloning and updating repositories
 #[derive(Clone)]
@@ -24,31 +26,81 @@ impl GitOperations {
     ) -> Result<gix::Repository> {
         let repo_path_owned = repo_path.to_owned();
 
+        // Décrypter le token
+        let access_token = if let Some(encrypted_token) = &repository.access_token {
+            match self.encryption_service.decrypt(encrypted_token) {
+                Ok(token) => Some(token),
+                Err(e) => {
+                    warn!("Failed to decrypt access token: {}. Proceeding without authentication.", e);
+                    None
+                }
+           }
+        } else {
+             None
+        };
+
         if repo_path.exists() {
             info!("Updating existing repository at: {:?}", repo_path);
 
             let result = tokio::time::timeout(
                 std::time::Duration::from_secs(180),
                 tokio::task::spawn_blocking(move || -> Result<gix::Repository> {
-                    // Disable ALL interactive prompts for server-mode operation
-                    let opts = Options::isolated().config_overrides(["gitoxide.credentials.terminalPrompt=0"]);
-
-                    let git_repo = gix::open_opts(&repo_path_owned, opts)?;
-
-                    info!("Fetching latest changes from remote");
-
-                    if let Ok(remote) = git_repo.find_remote("origin")
-                        && let Ok(conn) = remote.connect(gix::remote::Direction::Fetch)
-                        && let Ok(prep) = conn.prepare_fetch(gix::progress::Discard, Default::default())
-                    {
-                        if let Err(e) = prep.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED) {
-                            warn!("Failed to receive fetch: {}", e);
-                        } else {
-                            info!("Successfully fetched latest changes");
-                        }
-                    }
-
-                    Ok(git_repo)
+                info!("Opening repository with custom options");
+                     let opts = Options::isolated().config_overrides(["gitoxide.credentials.terminalPrompt=0"]);
+                     let git_repo = match gix::open_opts(&repo_path_owned, opts) {
+                         Ok(repo) => {
+                             info!("Repository opened successfully");
+                             repo
+                         }
+                         Err(e) => {
+                             error!("Failed to open repository: {}", e);
+                             return Err(e.into());
+                         }
+                     };
+     
+     
+                     info!("Fetching latest changes from remote");
+                     let remote = git_repo.find_remote("origin")?;
+                     if let Some(url) = remote.url(gix::remote::Direction::Fetch) {
+                         info!("Remote 'origin' URL: {}", url);
+                     } else {
+                         warn!("Remote 'origin' has no URL for fetch direction");
+                     }
+     
+                     info!("Before connect");
+                     let mut conn = remote.connect(gix::remote::Direction::Fetch)?;
+     
+                     // Configure les credentials
+                     info!("Before configure credential");
+                     if let Some(token) = &access_token {
+                         let token_clone = token.clone();
+                         conn.set_credentials(move |action| {
+                             if let gix::credentials::helper::Action::Get(ctx) = action {
+                                 Ok(Some(gix::credentials::protocol::Outcome {
+                                     identity: gix::sec::identity::Account {
+                                         username: "oauth2".to_string(),
+                                         password: token_clone.clone(),
+                                         oauth_refresh_token: None,
+                                     },
+                                     next: ctx.into(),
+                                 }))
+                             } else {
+                                 Ok(None)
+                             }
+                         });
+                     } else {
+                         conn.set_credentials(move |_action| {
+                             Err(gix::credentials::protocol::Error::Quit)
+                         });
+                     }
+     
+                     info!("Before fetch");
+                     let fetch_result = conn.prepare_fetch(gix::progress::Discard, Default::default())?;
+     
+                     info!("Before receive");
+                     fetch_result.receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
+                                     info!("Successfully fetched latest changes from remote");
+                     Ok(git_repo)
                 }),
             )
             .await;
@@ -63,6 +115,7 @@ impl GitOperations {
             }
         }
 
+        info!("repo_path does not exist, cloning fresh repository");
         self.clone_fresh_repository(repository, repo_path).await
     }
 
@@ -155,6 +208,31 @@ impl GitOperations {
                     .map_err(|e| anyhow!("fetch_only failed: {}", e))?;
 
                 let repo = gix::open(&repo_path_owned).map_err(|e| anyhow!("open cloned repo failed: {}", e))?;
+
+                info!("Successfully open repository");
+
+                let config_path = &repo_path_owned.join(".git/config");
+
+                info!("Check name and email exist in : {:?} ",config_path);
+                // Open git config file
+                let mut file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)  // Create file is not exist
+                    .open(&config_path)?;
+
+                // Read if exist
+                let mut contents = String::new();
+                file.read_to_string(&mut contents)?;
+
+                // Verif [user] section
+                if !contents.contains("[user]") {
+                    // Add user config if not exist
+                    file.seek(SeekFrom::End(0))?;
+                    writeln!(file, "[user]")?;
+                    writeln!(file, "    name = klask")?;
+                    writeln!(file, "    email = klask@email.com")?;
+                }
 
                 info!("Successfully cloned repository");
                 Ok(repo)
