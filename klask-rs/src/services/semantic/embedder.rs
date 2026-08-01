@@ -38,6 +38,15 @@ mod fastembed_provider {
     use std::path::PathBuf;
     use std::sync::Mutex;
 
+    /// Token budget per embedded sequence. fastembed truncates every input at
+    /// this length (its own default is also 512), so text past this point in a
+    /// chunk is invisible to semantic search. The chunker defaults
+    /// (`SEMANTIC_SEARCH_CHUNK_MAX_LINES` / overlap) are sized so a typical
+    /// code chunk fits within this budget — keep them in sync. Raising this
+    /// increases per-chunk inference cost superlinearly (attention is
+    /// quadratic in sequence length).
+    const MAX_SEQUENCE_TOKENS: usize = 512;
+
     /// Embedding provider backed by fastembed (ONNX Runtime, local inference).
     ///
     /// The first initialization downloads the model into `cache_dir`; later
@@ -75,6 +84,7 @@ mod fastembed_provider {
 
             let options = TextInitOptions::new(info.model)
                 .with_cache_dir(PathBuf::from(&config.cache_dir))
+                .with_max_length(MAX_SEQUENCE_TOKENS)
                 .with_show_download_progress(false);
 
             let model = TextEmbedding::try_new(options)

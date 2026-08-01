@@ -34,7 +34,9 @@ pub struct ChunkOptions {
 
 impl Default for ChunkOptions {
     fn default() -> Self {
-        Self { max_lines: 60, overlap_lines: 15 }
+        // Keep in sync with the config defaults (SEMANTIC_SEARCH_CHUNK_*):
+        // sized so a typical code chunk fits the embedder's 512-token window.
+        Self { max_lines: 45, overlap_lines: 10 }
     }
 }
 
@@ -205,9 +207,11 @@ mod tests {
     }
 
     #[test]
-    fn test_default_options_match_plan() {
+    fn test_default_options_fit_embedding_token_budget() {
+        // Sized so a typical code chunk stays within the embedder's 512-token
+        // truncation window (MAX_SEQUENCE_TOKENS in semantic::embedder).
         let options = ChunkOptions::default();
-        assert_eq!(options.max_lines, 60);
-        assert_eq!(options.overlap_lines, 15);
+        assert_eq!(options.max_lines, 45);
+        assert_eq!(options.overlap_lines, 10);
     }
 }

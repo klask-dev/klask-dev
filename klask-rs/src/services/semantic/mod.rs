@@ -154,7 +154,34 @@ pub async fn init_vector_indexer(
 
     let chunk_options = ChunkOptions { max_lines: config.chunk_max_lines, overlap_lines: config.chunk_overlap_lines };
 
-    let indexer = VectorIndexer::start(provider, store, chunk_options, config.batch_size, config.queue_capacity);
+    // Give the indexing worker its own ONNX session instead of sharing the
+    // query-path provider: a batch embed can hold a session for tens of
+    // seconds, and sharing one session (a Mutex) made interactive searches
+    // wait behind indexing batches. Costs one extra copy of the model in RAM;
+    // if the second load fails, fall back to sharing (slow queries during
+    // indexing, but functional).
+    let worker_provider: Arc<dyn EmbeddingProvider> = match FastEmbedProvider::try_new(config) {
+        Ok(p) => {
+            tracing::info!(
+                "Loaded a dedicated embedding session for indexing (queries no longer wait on indexing batches)"
+            );
+            Arc::new(p)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Could not load a dedicated indexing session, sharing the query session (searches may stall during indexing): {e}"
+            );
+            provider
+        }
+    };
+
+    let indexer = VectorIndexer::start(
+        worker_provider,
+        store,
+        chunk_options,
+        config.batch_size,
+        config.queue_capacity,
+    );
 
     match indexer.count().await {
         Ok(n) => tracing::info!(

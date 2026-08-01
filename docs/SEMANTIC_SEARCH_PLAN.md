@@ -130,7 +130,7 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 | **2** | LanceDB store + embedding worker + crawl integration + delete/update lifecycle | ✅ done (this PR) |
 | **3** | Backfill admin job + progress UI | ✅ done (this PR) |
 | **4** | Query path: `mode` param, RRF fusion wiring, API + tests | ✅ done (this PR) |
-| **5** | Frontend toggle + result badges + admin card | planned |
+| **5** | Frontend toggle + result badges + admin card | ✅ done (this PR) |
 | **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | planned |
 
 **Phase 1 measurements** (debug build, CPU, `Xenova/bge-small-en-v1.5`, 384 dims):
@@ -213,6 +213,60 @@ Reproduce with:
 - **Frontend:** API plumbing only (optional `mode` in `SearchQuery` /
   `useMultiSelectSearch`, sent only when non-default). The mode **toggle UI**,
   result badges and snippet-range rendering are Phase 5.
+
+**Phase 5 notes:**
+- **Engine toggle.** `SearchPageV3` gains a Keyword | Hybrid | Semantic segmented
+  control, persisted in the URL as `mode=` (omitted when keyword, so plain
+  keyword URLs stay clean and backward compatible) and wired into the existing
+  `mode` param of `useMultiSelectSearch`. It is **orthogonal** to the keyword-engine
+  toggles (fuzzy/regex/case) — those choose how the keyword engine matches; this
+  chooses which engine answers.
+- **Availability gating.** The admin `status` endpoint is admin-only, so the
+  regular search page can't use it to decide whether to show the toggle. Added a
+  lightweight authenticated **`GET /api/search/capabilities`** → `{ semantic_enabled }`
+  (true only when the feature is built, the model loaded, and the store opened);
+  the toggle renders only when true and degrades to hidden if the endpoint is
+  unreachable. Capabilities are static for the process lifetime, so the hook
+  caches them indefinitely.
+- **Result badges (match provenance).** Phase 4 hydrated results without saying
+  which engine matched. Phase 5 adds `MatchSource` (`keyword`/`semantic`/`both`)
+  on `SearchResult`, populated in the query path — `hydrate_semantic_only` tags
+  every hit `Semantic`; `hybrid_fuse` tags each fused file by membership in the
+  keyword/vector rankings (`Both` when in both). It serializes with
+  `skip_serializing_if = "Option::is_none"` so the keyword response is unchanged,
+  and the UI shows a small badge per result in hybrid/semantic mode.
+- **Admin card** (model/dimension, chunk count, rebuild + progress) already
+  shipped in Phase 3; nothing further needed here.
+- **Hydration fixes (post-Phase 4 field findings).** Semantic/hybrid results
+  initially displayed the Tantivy hydration score (BM25 / 1.0) and the whole
+  file as snippet. The query path now sets `score` to the cosine similarity
+  (`1 - distance`, clamped to [0,1]) in semantic mode and the RRF fused score
+  in hybrid mode, anchors `line_number` to the best-matching chunk and trims
+  `content_snippet` to that chunk's line range.
+- **Performance findings & fixes (measured on a dev machine, jina-v2-base-code
+  on CPU):**
+  - fastembed truncates every input at **512 tokens** (its default; now set
+    explicitly as `MAX_SEQUENCE_TOKENS` in `semantic::embedder`). A 60-line
+    code chunk is ~800 tokens, so chunk tails were silently *not embedded*,
+    and per-chunk cost was a flat ~1 s regardless of chunk size. Chunk
+    defaults are now **45 lines / 10 overlap** (stride 35) so every line falls
+    inside the embedded window of at least one chunk.
+  - Embedding cost is ~1 s/chunk with jina-v2-base-code and ~0.27 s/chunk with
+    `Xenova/bge-small-en-v1.5` (3.7×). Model choice — not chunk size — is the
+    indexing-throughput lever; switching models changes the dimension and
+    requires a vector-store wipe + backfill (enforced at open).
+  - The query path and the indexing worker used to share one ONNX session
+    behind a mutex, so an interactive search could wait tens of seconds behind
+    an indexing batch. `init_vector_indexer` now loads a **dedicated session
+    for the worker** (falls back to sharing if the second load fails), keeping
+    query embedding at ~35 ms even while indexing.
+- **Embedding-progress visibility.** The backfill previously reported
+  `running=false` once every document was *enqueued*, while the worker kept
+  embedding invisibly for a long time. `VectorIndexer` now tracks a
+  `pending` counter (queued + in-flight files), the backfill stays `running`
+  until the queue drains, the status payload exposes `queue_depth`, and the
+  admin card shows real embedding progress (`processed - queue_depth`) plus a
+  notice when a *crawl* is feeding the semantic index outside a rebuild.
 
 ## 9. Risks & Mitigations
 

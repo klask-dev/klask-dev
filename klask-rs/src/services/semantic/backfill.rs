@@ -42,6 +42,10 @@ pub struct BackfillStatus {
     pub total: Option<u64>,
     /// Chunks currently stored in the vector index (updated as the job runs).
     pub chunks_indexed: u64,
+    /// Files enqueued to the embedding worker but not yet embedded (queued +
+    /// in-flight). Non-zero outside a backfill means a crawl is feeding the
+    /// semantic index right now.
+    pub queue_depth: u64,
     /// Embedding model id (so the UI can show what the index was built with).
     pub model: String,
     /// Embedding dimension.
@@ -110,6 +114,7 @@ impl BackfillController {
             processed: state.processed,
             total: state.total,
             chunks_indexed,
+            queue_depth: self.indexer.pending(),
             model: self.model.clone(),
             dimension: self.dimension,
             error: state.error.clone(),
@@ -166,8 +171,8 @@ impl BackfillController {
     }
 
     /// The actual rebuild: clear the store, then stream every Tantivy document
-    /// into the embedding worker. Returns once all documents are *enqueued*
-    /// (the worker keeps embedding in the background afterwards).
+    /// into the embedding worker, then wait for the worker to drain its queue
+    /// — so `running` covers the whole rebuild, embedding included.
     async fn run(&self) -> Result<()> {
         // Wipe the vector index so a re-run never leaves stale or duplicated
         // rows (the worker upserts per file_id, but a rebuild should also drop
@@ -237,6 +242,15 @@ impl BackfillController {
             }
             Ok(Err(e)) => return Err(e),
             Err(join_err) => return Err(anyhow!("backfill reader task panicked: {join_err}")),
+        }
+
+        // Everything is enqueued, but the worker is still embedding. Stay
+        // "running" until the queue drains so the admin UI reports the real
+        // end of the rebuild, not just the end of the enqueue phase. A cancel
+        // stops the wait, but jobs already queued will still be embedded
+        // (they cannot be un-queued).
+        while self.indexer.pending() > 0 && !self.cancel.load(Ordering::SeqCst) {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
 
         if self.cancel.load(Ordering::SeqCst) {
@@ -382,6 +396,59 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(indexer.count().await.unwrap(), chunks);
         assert_eq!(controller.status().await.processed, 1);
+    }
+
+    /// Embeds slowly so the drain phase is observable: `running` must stay
+    /// true until the worker queue is empty (not just until enqueue ends),
+    /// and whenever `running` is false the reported queue depth must be zero.
+    #[tokio::test]
+    async fn test_running_covers_embedding_until_queue_drained() {
+        struct SlowProvider;
+        impl EmbeddingProvider for SlowProvider {
+            fn dimension(&self) -> usize {
+                DIM
+            }
+            fn model_id(&self) -> &str {
+                "slow-mock"
+            }
+            fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                Ok(texts.iter().map(|_| vec![1.0; DIM]).collect())
+            }
+        }
+
+        let tmp = tempfile::tempdir().unwrap();
+        let search = Arc::new(SearchService::new(tmp.path().join("tantivy")).unwrap());
+        let store: Arc<dyn VectorStore> =
+            Arc::new(LanceVectorStore::open(tmp.path().join("vectors"), DIM).await.unwrap());
+        let indexer = Arc::new(VectorIndexer::start(
+            Arc::new(SlowProvider),
+            store,
+            ChunkOptions::default(),
+            32,
+            64,
+        ));
+        for i in 0..5 {
+            index_doc(&search, "repo", &format!("f{i}.rs"), "fn f() {}").await;
+        }
+
+        let controller = BackfillController::new(search, indexer.clone(), "mock".into(), DIM);
+        controller.start().await.unwrap();
+
+        // 5 docs × 100ms embed ≈ 500ms of work + 500ms drain-poll granularity.
+        for _ in 0..600 {
+            let status = controller.status().await;
+            if !status.running {
+                assert_eq!(
+                    status.queue_depth, 0,
+                    "backfill reported finished while files were still awaiting embedding"
+                );
+                assert_eq!(status.processed, 5);
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("backfill did not finish in time");
     }
 
     #[tokio::test]

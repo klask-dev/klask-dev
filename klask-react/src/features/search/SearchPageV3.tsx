@@ -3,8 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { SearchBar } from '../../components/search/SearchBar';
 import { SearchResults } from '../../components/search/SearchResults';
 import { useMultiSelectSearch, useSearchHistory } from '../../hooks/useSearch';
+import { useSearchCapabilities } from '../../api/searchCapabilities';
 import { getErrorMessage } from '../../lib/api';
-import type { SearchResult } from '../../types';
+import type { SearchResult, SearchMode } from '../../types';
 import { useSearchFiltersContext } from '../../contexts/SearchFiltersContext';
 import {
   ClockIcon,
@@ -29,6 +30,13 @@ const SearchPageV3: React.FC = () => {
   });
 
   const [caseSensitive, setCaseSensitive] = useState(false);
+
+  // Semantic search engine selection (keyword | hybrid | semantic). Orthogonal
+  // to the keyword-engine variants (fuzzy/regex) above. Only meaningful when the
+  // server reports semantic search is available.
+  const [semanticMode, setSemanticMode] = useState<SearchMode>('keyword');
+  const { data: capabilities } = useSearchCapabilities();
+  const semanticAvailable = capabilities?.semantic_enabled ?? false;
 
   // Derive boolean flags from searchMode for backward compatibility
   const fuzzySearch = searchMode === 'fuzzy';
@@ -99,13 +107,19 @@ const SearchPageV3: React.FC = () => {
       params.set('case_sensitive', 'true');
     }
 
+    // Persist the semantic mode only when it differs from the default so plain
+    // keyword URLs stay clean and backward compatible.
+    if (semanticMode !== 'keyword') {
+      params.set('mode', semanticMode);
+    }
+
     if (page > 1) {
       params.set('page', page.toString());
     }
 
     const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState(null, '', newURL);
-  }, [fuzzySearch, regexSearch, caseSensitive]);
+  }, [fuzzySearch, regexSearch, caseSensitive, semanticMode]);
 
   // Track if we're initializing to avoid double URL updates
   const [isInitializing, setIsInitializing] = useState(true);
@@ -131,6 +145,7 @@ const SearchPageV3: React.FC = () => {
     const urlFuzzySearch = urlParams.get('fuzzySearch') === 'true';
     const urlRegexSearch = urlParams.get('regexSearch') === 'true';
     const urlCaseSensitive = urlParams.get('case_sensitive') === 'true';
+    const urlMode = urlParams.get('mode');
 
     const urlPage = parseInt(urlParams.get('page') || '1', 10);
 
@@ -168,6 +183,12 @@ const SearchPageV3: React.FC = () => {
     }
 
     setCaseSensitive(urlCaseSensitive);
+    // Restore the semantic mode from the URL (ignore unknown values).
+    if (urlMode === 'semantic' || urlMode === 'hybrid') {
+      setSemanticMode(urlMode);
+    } else {
+      setSemanticMode('keyword');
+    }
     setCurrentPage(urlPage);
     setIsInitializing(false);
   }, [location.search, setFilters]);
@@ -176,7 +197,7 @@ const SearchPageV3: React.FC = () => {
   useEffect(() => {
     if (isInitializing) return;
     updateURL(query, filters, currentPage);
-  }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch, caseSensitive]);
+  }, [query, filters, currentPage, updateURL, isInitializing, fuzzySearch, regexSearch, caseSensitive, semanticMode]);
 
   // Reset to page 1 when filters change (prevents showing empty results on non-existent pages)
   useEffect(() => {
@@ -224,7 +245,7 @@ const SearchPageV3: React.FC = () => {
     sizeRange: filters?.size,
   }, currentPage, {
     enabled: !!query.trim(),
-  }, fuzzySearch, regexSearch, regexFlagsString, caseSensitive);
+  }, fuzzySearch, regexSearch, regexFlagsString, caseSensitive, semanticMode);
 
   const results = searchData?.results || [];
   const totalResults = searchData?.total || 0;
@@ -312,6 +333,11 @@ const SearchPageV3: React.FC = () => {
   const handleCaseSensitiveToggle = useCallback(() => {
     setCaseSensitive(prev => !prev);
     setCurrentPage(1); // Reset to page 1 when toggling case sensitivity
+  }, []);
+
+  const handleSemanticModeChange = useCallback((mode: SearchMode) => {
+    setSemanticMode(mode);
+    setCurrentPage(1); // Reset to page 1 when changing the search engine
   }, []);
 
   // Regex flags toggle handlers
@@ -458,6 +484,44 @@ const SearchPageV3: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Semantic search engine selector (only when the server supports it).
+            Orthogonal to the keyword-engine toggles above: it picks which
+            engine answers the query. */}
+        {semanticAvailable && (
+          <div className="mt-4 flex items-center gap-3">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+              <SparklesIcon className="h-4 w-4 text-blue-500" />
+              Engine
+            </span>
+            <div
+              role="group"
+              aria-label="Search engine mode"
+              className="inline-flex rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden"
+            >
+              {([
+                { mode: 'keyword' as const, label: 'Keyword', title: 'Classic full-text (BM25) search — exact terms and patterns.' },
+                { mode: 'hybrid' as const, label: 'Hybrid', title: 'Combines keyword and meaning-based results (recommended for natural-language queries).' },
+                { mode: 'semantic' as const, label: 'Semantic', title: 'Meaning-based vector search only — find code by intent, not exact words.' },
+              ]).map(({ mode, label, title }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleSemanticModeChange(mode)}
+                  aria-pressed={semanticMode === mode}
+                  title={title}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
+                    semanticMode === mode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search History */}
         {!query && history.length > 0 && (

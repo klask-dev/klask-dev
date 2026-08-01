@@ -25,6 +25,7 @@ function setStatus(data: Partial<semanticApi.SemanticStatusResponse> | undefined
         processed: 0,
         total: null,
         chunks_indexed: 0,
+        queue_depth: 0,
         model: 'mock-model',
         dimension: 384,
         error: null,
@@ -86,6 +87,25 @@ describe('SemanticIndexCard', () => {
     expect(bar).toHaveAttribute('aria-valuenow', '25');
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     expect(screen.getByText(/50 \/ 200 documents/)).toBeInTheDocument();
+  });
+
+  it('reports embedding progress, not enqueue progress, while running', () => {
+    // 200 documents enqueued but 150 still waiting in the worker queue:
+    // only 50 are really embedded → 25%, with the queue depth surfaced.
+    setStatus({ running: true, processed: 200, total: 200, queue_depth: 150 });
+    render(<SemanticIndexCard />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25');
+    expect(screen.getByText(/50 \/ 200 documents/)).toBeInTheDocument();
+    expect(screen.getByText(/150.*queued/)).toBeInTheDocument();
+  });
+
+  it('shows a crawl-embedding notice when the queue is busy outside a rebuild', () => {
+    setStatus({ running: false, queue_depth: 42, chunks_indexed: 10 });
+    render(<SemanticIndexCard />);
+    expect(screen.getByText(/42 files awaiting embedding/)).toBeInTheDocument();
+    // Not a rebuild: no progress bar, and the rebuild button stays available.
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /rebuild index/i })).toBeInTheDocument();
   });
 
   it('surfaces the last error after a failed run', () => {

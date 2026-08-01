@@ -62,7 +62,13 @@ export const SemanticIndexCard: React.FC = () => {
   }
 
   const total = status.total ?? 0;
-  const progressPct = total > 0 ? Math.min(100, Math.round((status.processed / total) * 100)) : 0;
+  const queueDepth = status.queue_depth ?? 0;
+  // Real embedding progress: `processed` counts documents *enqueued*, so
+  // subtract what is still waiting in the worker queue.
+  const embedded = Math.max(0, status.processed - queueDepth);
+  const progressPct = total > 0 ? Math.min(100, Math.round((embedded / total) * 100)) : 0;
+  // A crawl (not a rebuild) is feeding the semantic index right now.
+  const crawlEmbedding = !running && queueDepth > 0;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -96,13 +102,16 @@ export const SemanticIndexCard: React.FC = () => {
           </div>
         </div>
 
-        {/* Progress while running */}
+        {/* Progress while a rebuild is running */}
         {running && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-700 dark:text-gray-300">
-                Rebuilding… {status.processed.toLocaleString()}
+                Embedding… {embedded.toLocaleString()}
                 {total > 0 ? ` / ${total.toLocaleString()}` : ''} documents
+                {queueDepth > 0 ? (
+                  <span className="text-gray-500 dark:text-gray-400"> ({queueDepth.toLocaleString()} queued)</span>
+                ) : null}
               </span>
               <span className="text-gray-500 dark:text-gray-400">{progressPct}%</span>
             </div>
@@ -116,6 +125,17 @@ export const SemanticIndexCard: React.FC = () => {
                 aria-valuemax={100}
               />
             </div>
+          </div>
+        )}
+
+        {/* A crawl is feeding the semantic index (no known total, so no bar) */}
+        {crawlEmbedding && (
+          <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md p-3">
+            <LoadingSpinner size="sm" />
+            <span>
+              Semantic indexing in progress — {queueDepth.toLocaleString()} file
+              {queueDepth === 1 ? '' : 's'} awaiting embedding (from a crawl).
+            </span>
           </div>
         )}
 
