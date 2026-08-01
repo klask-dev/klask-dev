@@ -150,10 +150,7 @@ pub async fn create_router() -> Result<Router<AppState>> {
 
 /// Report whether semantic/hybrid search is available (see [`SearchCapabilities`]).
 /// Authenticated but not admin-gated — every user needs it to render the toggle.
-async fn get_capabilities(
-    _auth: AuthenticatedUser,
-    State(app_state): State<AppState>,
-) -> Json<SearchCapabilities> {
+async fn get_capabilities(_auth: AuthenticatedUser, State(app_state): State<AppState>) -> Json<SearchCapabilities> {
     let _ = &app_state; // used only in the feature build below
     #[cfg(feature = "semantic-search")]
     let semantic_enabled = app_state.semantic_embedder.is_some() && app_state.semantic_indexer.is_some();

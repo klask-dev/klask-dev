@@ -111,19 +111,26 @@ async fn hydrate_semantic_only(
     let ordered_ids: Vec<Uuid> = dedup_by_file(vector_hits.iter().map(|h| h.file_id));
     let total = ordered_ids.len() as u64;
 
-    // Best (closest) chunk start line per file, to anchor the snippet on the
-    // matched region (vector_hits arrive closest-first, so first-seen wins).
-    let mut best_line: std::collections::HashMap<Uuid, u32> = std::collections::HashMap::new();
+    // Best (closest) chunk per file: its line range anchors/trims the snippet,
+    // and its cosine distance becomes the result score. vector_hits arrive
+    // closest-first, so first-seen wins.
+    let mut best_chunk: std::collections::HashMap<Uuid, &super::store::VectorHit> = std::collections::HashMap::new();
     for hit in &vector_hits {
-        best_line.entry(hit.file_id).or_insert(hit.start_line);
+        best_chunk.entry(hit.file_id).or_insert(hit);
     }
 
     let page_ids: Vec<Uuid> = ordered_ids.iter().skip(query.offset).take(query.limit).copied().collect();
     // fetch_results_by_file_ids preserves input order, so the ranking is kept.
     let mut results = search_service.fetch_results_by_file_ids(&page_ids).await?;
     for result in &mut results {
-        if let Some(line) = best_line.get(&result.file_id) {
-            result.line_number = Some(*line);
+        if let Some(hit) = best_chunk.get(&result.file_id) {
+            result.line_number = Some(hit.start_line);
+            // Replace Tantivy's keyword score (meaningless for a semantic query)
+            // with the cosine similarity of the matched chunk.
+            result.score = similarity_from_distance(hit.distance);
+            // Show the matched chunk, not the whole file (which made semantic
+            // results look unrelated even when the ranking was right).
+            result.content_snippet = snippet_for_chunk(&result.content_snippet, hit.start_line, hit.end_line);
         }
         // Semantic-only: every result came from the vector engine.
         result.match_source = Some(MatchSource::Semantic);
@@ -158,14 +165,35 @@ async fn hybrid_fuse(
     let in_keyword: std::collections::HashSet<Uuid> = keyword_ranking.iter().copied().collect();
     let in_vector: std::collections::HashSet<Uuid> = vector_ranking.iter().copied().collect();
 
+    // Best vector chunk per file (for the snippet range on vector/both hits).
+    let mut best_chunk: std::collections::HashMap<Uuid, &super::store::VectorHit> = std::collections::HashMap::new();
+    for hit in &vector_hits {
+        best_chunk.entry(hit.file_id).or_insert(hit);
+    }
+
     let fused = reciprocal_rank_fusion(&[keyword_ranking, vector_ranking], DEFAULT_RRF_K);
     let total = fused.len() as u64;
+    // Fused RRF score per file, so the response is sorted/scored by the actual
+    // hybrid ranking rather than Tantivy's keyword score.
+    let fused_score: std::collections::HashMap<Uuid, f32> = fused.iter().copied().collect();
 
     let page_ids: Vec<Uuid> = fused.iter().skip(query.offset).take(query.limit).map(|(id, _)| *id).collect();
     // fetch_results_by_file_ids preserves input (fused) order.
     let mut results = search_service.fetch_results_by_file_ids(&page_ids).await?;
     for result in &mut results {
-        result.match_source = Some(match_source(&in_keyword, &in_vector, result.file_id));
+        let source = match_source(&in_keyword, &in_vector, result.file_id);
+        result.match_source = Some(source);
+        if let Some(score) = fused_score.get(&result.file_id) {
+            result.score = *score;
+        }
+        // For results the vector engine matched, anchor + trim the snippet on the
+        // matched chunk; pure-keyword hits keep Tantivy's highlighted snippet.
+        if source != MatchSource::Keyword
+            && let Some(hit) = best_chunk.get(&result.file_id)
+        {
+            result.line_number = Some(hit.start_line);
+            result.content_snippet = snippet_for_chunk(&result.content_snippet, hit.start_line, hit.end_line);
+        }
     }
 
     Ok(SearchResultsWithTotal { results, total, facets: keyword.facets })
@@ -202,6 +230,32 @@ fn match_source(
         // (true, false) and the impossible (false, false) → keyword.
         _ => MatchSource::Keyword,
     }
+}
+
+/// Map a cosine *distance* (0 = identical, 2 = opposite) to a similarity score
+/// in `[0, 1]` for display/sorting, so semantic results carry a meaningful score
+/// instead of Tantivy's keyword score. `1 - distance` is the cosine similarity;
+/// clamped because distance can drift slightly outside `[0, 2]`.
+fn similarity_from_distance(distance: f32) -> f32 {
+    (1.0 - distance).clamp(0.0, 1.0)
+}
+
+/// Trim a file's stored content to the matched chunk's line range so the snippet
+/// shows the semantically-relevant region, not the whole file. Lines are
+/// 1-based and inclusive (matching `ChunkRecord`); out-of-range or empty input
+/// falls back to the original content so we never show nothing.
+fn snippet_for_chunk(content: &str, start_line: u32, end_line: u32) -> String {
+    if content.is_empty() || start_line == 0 || end_line < start_line {
+        return content.to_string();
+    }
+    let start = (start_line as usize).saturating_sub(1);
+    let end = end_line as usize; // inclusive 1-based end == exclusive 0-based end
+    let lines: Vec<&str> = content.lines().collect();
+    if start >= lines.len() {
+        return content.to_string();
+    }
+    let end = end.min(lines.len());
+    lines[start..end].join("\n")
 }
 
 /// Distinct file_ids in first-seen order (a file can contribute several chunks
@@ -374,6 +428,13 @@ mod tests {
             Some(1),
             "snippet should anchor on the matched chunk's start line"
         );
+        // The score must be the cosine similarity (0..=1), not Tantivy's keyword
+        // score — that was the bug making semantic results look meaningless.
+        let score = results.results[0].score;
+        assert!(
+            (0.0..=1.0).contains(&score),
+            "semantic score should be a cosine similarity in [0,1], got {score}"
+        );
     }
 
     #[tokio::test]
@@ -430,6 +491,29 @@ mod tests {
             Some(MatchSource::Semantic),
             "semantic-only results must be tagged Semantic"
         );
+    }
+
+    #[test]
+    fn test_similarity_from_distance() {
+        assert_eq!(super::similarity_from_distance(0.0), 1.0); // identical
+        assert!((super::similarity_from_distance(0.27) - 0.73).abs() < 1e-5);
+        assert_eq!(super::similarity_from_distance(1.5), 0.0); // far → clamped
+        assert_eq!(super::similarity_from_distance(-0.01), 1.0); // drift → clamped
+    }
+
+    #[test]
+    fn test_snippet_for_chunk() {
+        let content = "line1\nline2\nline3\nline4\nline5";
+        // 1-based inclusive range [2,4] → lines 2..4.
+        assert_eq!(super::snippet_for_chunk(content, 2, 4), "line2\nline3\nline4");
+        // Single line.
+        assert_eq!(super::snippet_for_chunk(content, 1, 1), "line1");
+        // End past EOF clamps.
+        assert_eq!(super::snippet_for_chunk(content, 4, 99), "line4\nline5");
+        // Degenerate inputs fall back to full content.
+        assert_eq!(super::snippet_for_chunk(content, 0, 3), content);
+        assert_eq!(super::snippet_for_chunk(content, 9, 10), content);
+        assert_eq!(super::snippet_for_chunk("", 1, 2), "");
     }
 
     #[test]
