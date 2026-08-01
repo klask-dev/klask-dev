@@ -19,6 +19,7 @@ use super::embedder::EmbeddingProvider;
 use super::store::{ChunkRecord, VectorHit, VectorSearchFilters, VectorStore};
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 use uuid::Uuid;
@@ -44,6 +45,10 @@ pub struct IndexJob {
 pub struct VectorIndexer {
     tx: mpsc::Sender<IndexJob>,
     store: Arc<dyn VectorStore>,
+    // Files enqueued but not yet fully embedded (queued + in-flight). Lets the
+    // admin UI show that semantic indexing is still working after the crawl /
+    // backfill has finished handing files over.
+    pending: Arc<AtomicU64>,
 }
 
 impl VectorIndexer {
@@ -59,10 +64,17 @@ impl VectorIndexer {
         capacity: usize,
     ) -> Self {
         let (tx, rx) = mpsc::channel(capacity.max(1));
-        let worker = Worker { provider, store: store.clone(), chunk_options, batch_size: batch_size.max(1) };
+        let pending = Arc::new(AtomicU64::new(0));
+        let worker = Worker {
+            provider,
+            store: store.clone(),
+            chunk_options,
+            batch_size: batch_size.max(1),
+            pending: pending.clone(),
+        };
         tokio::spawn(worker.run(rx));
         info!("Semantic embedding worker started (queue capacity {})", capacity.max(1));
-        Self { tx, store }
+        Self { tx, store, pending }
     }
 
     /// Enqueue a file for embedding.
@@ -71,7 +83,19 @@ impl VectorIndexer {
     /// worker has stopped (channel closed) — the caller logs and continues, as
     /// the Tantivy index remains the source of truth.
     pub async fn index_file(&self, job: IndexJob) -> Result<()> {
-        self.tx.send(job).await.map_err(|_| anyhow!("Semantic embedding worker is no longer running"))
+        // Count before sending so `pending` never under-reports; roll back if
+        // the worker is gone and the job was never queued.
+        self.pending.fetch_add(1, Ordering::SeqCst);
+        self.tx.send(job).await.map_err(|_| {
+            self.pending.fetch_sub(1, Ordering::SeqCst);
+            anyhow!("Semantic embedding worker is no longer running")
+        })
+    }
+
+    /// Files enqueued but not yet embedded (queued + in-flight). Zero means
+    /// the semantic index has caught up with everything handed to it.
+    pub fn pending(&self) -> u64 {
+        self.pending.load(Ordering::SeqCst)
     }
 
     /// Delete all chunks of a repository.
@@ -114,6 +138,7 @@ struct Worker {
     store: Arc<dyn VectorStore>,
     chunk_options: ChunkOptions,
     batch_size: usize,
+    pending: Arc<AtomicU64>,
 }
 
 impl Worker {
@@ -124,6 +149,9 @@ impl Worker {
                 // One bad file must never kill the worker: log and keep draining.
                 error!("Semantic indexing failed for file_id={file_id}: {e}");
             }
+            // Failed jobs also count down: pending tracks outstanding work,
+            // not successes.
+            self.pending.fetch_sub(1, Ordering::SeqCst);
         }
         info!("Semantic embedding worker stopped (queue drained)");
     }
@@ -315,6 +343,74 @@ mod tests {
         assert_eq!(store.count().await.unwrap(), 0);
         // Worker still alive: enqueue succeeds.
         assert!(indexer.index_file(job("fn c() {}")).await.is_ok());
+    }
+
+    /// Provider slow enough that jobs observably sit in the queue.
+    struct SlowProvider;
+
+    impl EmbeddingProvider for SlowProvider {
+        fn dimension(&self) -> usize {
+            DIM
+        }
+        fn model_id(&self) -> &str {
+            "slow-mock"
+        }
+        fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            Ok(texts.iter().map(|_| vec![1.0; DIM]).collect())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pending_tracks_outstanding_work_and_drains_to_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = store(&dir).await;
+        let indexer = VectorIndexer::start(Arc::new(SlowProvider), store.clone(), ChunkOptions::default(), 32, 16);
+
+        assert_eq!(indexer.pending(), 0);
+        for _ in 0..3 {
+            indexer.index_file(job("fn a() {}")).await.unwrap();
+        }
+        // Each embed blocks 100ms, so all three jobs cannot have finished yet.
+        assert!(
+            indexer.pending() >= 1,
+            "jobs should still be outstanding right after enqueue"
+        );
+
+        for _ in 0..100 {
+            if indexer.pending() == 0 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            indexer.pending(),
+            0,
+            "pending must drain to zero once the worker catches up"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_pending_drains_even_when_jobs_fail() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = store(&dir).await;
+        let indexer = VectorIndexer::start(
+            Arc::new(MockProvider { calls: Arc::new(AtomicUsize::new(0)), fail: true }),
+            store.clone(),
+            ChunkOptions::default(),
+            32,
+            16,
+        );
+        indexer.index_file(job("fn a() {}")).await.unwrap();
+        indexer.index_file(job("fn b() {}")).await.unwrap();
+        for _ in 0..100 {
+            if indexer.pending() == 0 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        // pending tracks outstanding work, not successes: failures count down too.
+        assert_eq!(indexer.pending(), 0);
     }
 
     #[tokio::test]

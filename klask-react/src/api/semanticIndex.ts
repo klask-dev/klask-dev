@@ -16,6 +16,8 @@ export interface SemanticStatusResponse {
   total: number | null;
   /** Chunks currently stored in the vector index. */
   chunks_indexed: number;
+  /** Files handed to the embedding worker but not yet embedded (queued + in-flight). */
+  queue_depth: number;
   /** Embedding model id the index is built with. */
   model: string | null;
   /** Embedding dimension. */
@@ -56,18 +58,22 @@ async function fetchSemanticStatus(): Promise<SemanticStatusResponse> {
 /**
  * Poll the semantic index status.
  *
- * Polls automatically every `runningIntervalMs` *only while a rebuild is
- * running*, and stops once it finishes — driven off the query's own data via a
- * function `refetchInterval`, so the component calls this hook exactly once
- * (no duplicate queries, no manual timers).
+ * Polls automatically every `runningIntervalMs` while a rebuild is running
+ * *or* the embedding worker still has queued files (e.g. a crawl feeding the
+ * semantic index), and stops once both are idle — driven off the query's own
+ * data via a function `refetchInterval`, so the component calls this hook
+ * exactly once (no duplicate queries, no manual timers).
  */
 export function useSemanticStatus(runningIntervalMs = 1500) {
   return useQuery({
     queryKey: semanticKeys.status(),
     queryFn: fetchSemanticStatus,
     staleTime: 2000,
-    // `query.state.data` is the latest fetched status; poll while running.
-    refetchInterval: (query) => (query.state.data?.running ? runningIntervalMs : false),
+    // `query.state.data` is the latest fetched status; poll while working.
+    refetchInterval: (query) => {
+      const status = query.state.data;
+      return status?.running || (status?.queue_depth ?? 0) > 0 ? runningIntervalMs : false;
+    },
     retry: 1,
     retryDelay: 1000,
     // Degrade gracefully: if the endpoint is unreachable, the card just hides.

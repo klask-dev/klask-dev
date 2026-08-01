@@ -39,6 +39,9 @@ pub struct SemanticStatusResponse {
     pub total: Option<u64>,
     /// Chunks currently stored in the vector index.
     pub chunks_indexed: u64,
+    /// Files handed to the embedding worker but not yet embedded. Non-zero
+    /// while a rebuild or a crawl is still feeding the semantic index.
+    pub queue_depth: u64,
     /// Embedding model id the index is built with.
     pub model: Option<String>,
     /// Embedding dimension.
@@ -62,6 +65,7 @@ impl SemanticStatusResponse {
             processed: 0,
             total: None,
             chunks_indexed: 0,
+            queue_depth: 0,
             model: None,
             dimension: None,
             error: None,
@@ -100,6 +104,7 @@ async fn get_semantic_status(
             processed: s.processed,
             total: s.total,
             chunks_indexed: s.chunks_indexed,
+            queue_depth: s.queue_depth,
             model: Some(s.model),
             dimension: Some(s.dimension),
             error: s.error,

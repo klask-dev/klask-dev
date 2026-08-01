@@ -153,3 +153,4 @@ klask-rs/.env
 klask-react/.env
 klask-rs/vector-index/
 klask-rs/models/models--jinaai--jina-embeddings-v2-base-code/
+klask-rs/models/models--Xenova--bge-small-en-v1.5/
