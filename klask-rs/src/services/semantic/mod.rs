@@ -26,7 +26,7 @@ pub use embedder::EmbeddingProvider;
 #[cfg(feature = "semantic-search")]
 pub use embedder::FastEmbedProvider;
 #[cfg(feature = "semantic-search")]
-pub use indexer::{IndexJob, VectorIndexer};
+pub use indexer::{IndexJob, VectorIndexer, WriteMode};
 #[cfg(feature = "semantic-search")]
 pub use store::VectorStore;
 

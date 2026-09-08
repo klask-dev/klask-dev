@@ -15,7 +15,7 @@
 //! Gated on the `semantic-search` feature (it drives the vector indexer).
 #![cfg(feature = "semantic-search")]
 
-use super::indexer::{IndexJob, VectorIndexer};
+use super::indexer::{IndexJob, VectorIndexer, WriteMode};
 use crate::services::SearchService;
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
@@ -23,7 +23,7 @@ use serde::Serialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{Mutex, mpsc};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Bounded buffer between the (blocking) Tantivy reader and the async enqueue
 /// loop. Small because the real backpressure is the indexer's own queue; this
@@ -211,6 +211,8 @@ impl BackfillController {
                     path: doc.path,
                     extension: doc.extension,
                     content: doc.content,
+                    // The store was cleared above, so nothing to replace.
+                    mode: WriteMode::Append,
                 };
                 // Blocking send applies backpressure when the async side lags.
                 // An error means the receiver was dropped — stop reading.
@@ -256,6 +258,15 @@ impl BackfillController {
         if self.cancel.load(Ordering::SeqCst) {
             let mut state = self.state.lock().await;
             state.cancelled = true;
+            return Ok(());
+        }
+
+        // The rebuild wrote in bulk: compact the store and build the ANN index
+        // now that every chunk is in. A failure here leaves the data intact
+        // (only fragmented / brute-force searched), so it must not fail the
+        // backfill the admin is watching.
+        if let Err(e) = self.indexer.optimize().await {
+            warn!("Semantic backfill finished but vector store optimization failed: {e}");
         }
 
         Ok(())
@@ -378,6 +389,7 @@ mod tests {
                 path: "gone.rs".into(),
                 extension: "rs".into(),
                 content: "fn ghost() {}".into(),
+                mode: WriteMode::Append,
             })
             .await
             .unwrap();

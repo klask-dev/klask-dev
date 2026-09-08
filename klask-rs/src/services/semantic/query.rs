@@ -355,6 +355,7 @@ mod tests {
                     path: doc.path.to_string(),
                     extension: "rs".to_string(),
                     content: doc.content.to_string(),
+                    mode: crate::services::semantic::WriteMode::Append,
                 })
                 .await
                 .unwrap();

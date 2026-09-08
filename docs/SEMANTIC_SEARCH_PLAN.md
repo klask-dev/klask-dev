@@ -146,10 +146,26 @@ Reproduce with:
 - The embedding worker is a single `tokio` task fed by a **bounded** queue;
   **the crawl blocks when the queue is full** (strict backpressure — chunks are
   never silently dropped, keeping the vector index consistent with the crawl).
-- Lifecycle mirrors Tantivy: delete-then-insert per `file_id` on upsert,
-  delete-by-`repository` on re-crawl and repository deletion. Re-opening the
-  store with a different embedding dimension (model change) is refused with a
-  clear error to prevent silent corruption.
+- Lifecycle mirrors Tantivy: delete-by-`repository` on re-crawl and repository
+  deletion, delete-then-insert per `file_id` when a single file is re-indexed on
+  its own. Re-opening the store with a different embedding dimension (model
+  change) is refused with a clear error to prevent silent corruption.
+- **Writes are batched, and only the bulk paths skip the delete probe.**
+  `IndexJob::mode` (`WriteMode`) says whether a file's existing chunks must be
+  removed first. A crawl and a backfill both purge up front (repository chunks /
+  whole store) and produce each `file_id` once, so they use `Append`: the worker
+  accumulates chunks across files and issues one LanceDB write per batch. This
+  matters because every write commits a table version and a fragment, and there
+  is no scalar index on `file_id`, so the previous per-file delete-then-insert
+  scanned the table and committed twice *per file* — the cost grew with the
+  table and dominated indexing time. `Replace` keeps the old behaviour for a
+  one-off file re-index and is applied on its own, never batched.
+- **Maintenance runs once per bulk write, not per file.** `VectorStore::optimize`
+  compacts fragments, prunes superseded versions, builds the `file_id` scalar
+  index (so a `Replace` delete is a lookup) and, above 10k chunks, the ANN index
+  on `vector` (without it every search is a brute-force scan of all vectors).
+  It is called after a backfill and, detached, once the embedding queue has
+  drained after a crawl; concurrent calls are skipped rather than queued.
 - **Build dependency:** lancedb→lance pulls `prost`, which needs `protoc`
   (Protocol Buffers compiler) at build time. Building with
   `--features semantic-search` requires `protobuf-compiler` installed; this must

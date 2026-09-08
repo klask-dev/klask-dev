@@ -103,6 +103,20 @@ pub trait VectorStore: Send + Sync {
     /// Every record's `vector` must have length [`VectorStore::dimension`].
     async fn upsert_file_chunks(&self, file_id: Uuid, records: Vec<ChunkRecord>) -> Result<()>;
 
+    /// Append `records` without probing for pre-existing rows.
+    ///
+    /// The caller guarantees that no chunk of these `file_id`s is stored yet.
+    /// Both write paths establish that: a crawl deletes the repository's chunks
+    /// before re-indexing, the backfill clears the whole store, and a `file_id`
+    /// is written at most once per run (it is derived deterministically from
+    /// repository + path + branch). Skipping the delete is what makes bulk
+    /// indexing viable: there is no scalar index on `file_id`, so a per-file
+    /// delete probe scans the table *and* commits a table version per file.
+    ///
+    /// Records from several files may be batched into a single call. Use
+    /// [`VectorStore::upsert_file_chunks`] when a file's chunks may already exist.
+    async fn insert_chunks(&self, records: Vec<ChunkRecord>) -> Result<()>;
+
     /// Delete all chunks of a single file. Returns the number of rows removed.
     /// Part of the lifecycle API for per-file removal (a file deleted from a
     /// repo between crawls); the incremental-delete wiring lands in a later
@@ -121,6 +135,19 @@ pub trait VectorStore: Send + Sync {
 
     /// Total number of stored chunks (for the admin index card, phases 3/5).
     async fn count(&self) -> Result<u64>;
+
+    /// Compact fragments, prune superseded versions and (re)build the indexes.
+    ///
+    /// Every write commits a new version and a new fragment, so a crawl leaves
+    /// the table fragmented and carrying one version per write. This also
+    /// creates the indexes the read paths need: a scalar index on `file_id`
+    /// (so a per-file delete is a lookup, not a scan) and an ANN index on
+    /// `vector` (so a search is not a brute-force scan of every chunk).
+    ///
+    /// Called once at the end of a crawl or backfill, never per file. Best
+    /// effort: each step logs and is skipped on failure rather than failing the
+    /// whole call, since none of them affect correctness of the stored data.
+    async fn optimize(&self) -> Result<()>;
 
     /// Embedding dimension the store was opened with. Used by tests and the
     /// query path (phase 4); kept on the trait for backend swappability.
@@ -170,13 +197,23 @@ mod lance_store {
     };
     use arrow_schema::{DataType, Field, Schema, SchemaRef};
     use futures::TryStreamExt;
+    use lancedb::index::Index;
+    use lancedb::index::scalar::BTreeIndexBuilder;
     use lancedb::query::{ExecutableQuery, QueryBase};
+    use lancedb::table::optimize::OptimizeAction;
     use lancedb::{Connection, DistanceType, Table, connect};
     use std::path::Path;
     use std::sync::Arc;
+    use tracing::{debug, info, warn};
     use uuid::Uuid;
 
     const TABLE_NAME: &str = "chunks";
+
+    /// Minimum number of stored vectors before building an ANN index.
+    ///
+    /// Under this size a brute-force scan is fast, and IVF partitioning has too
+    /// few samples to train usefully.
+    const MIN_ANN_ROWS: usize = 10_000;
 
     /// LanceDB-backed [`VectorStore`].
     pub struct LanceVectorStore {
@@ -440,6 +477,53 @@ mod lance_store {
             Ok(())
         }
 
+        async fn insert_chunks(&self, records: Vec<ChunkRecord>) -> Result<()> {
+            if records.is_empty() {
+                return Ok(());
+            }
+            let batch = self.records_to_batch(&records)?;
+            self.table.add(batch).execute().await.context("Failed to add chunk vectors to LanceDB")?;
+            Ok(())
+        }
+
+        async fn optimize(&self) -> Result<()> {
+            // Compact and prune first: fewer, larger fragments make the index
+            // builds below cheaper, and pruning reclaims the versions the
+            // indexing writes left behind.
+            match self.table.optimize(OptimizeAction::All).await {
+                Ok(_) => info!("Vector store compacted"),
+                Err(e) => warn!("Vector store compaction failed (index still usable): {e}"),
+            }
+
+            // Scalar index on file_id: turns the per-file delete of an
+            // incremental re-index into a lookup instead of a table scan.
+            // `replace(true)` keeps this idempotent across runs.
+            if let Err(e) = self
+                .table
+                .create_index(&["file_id"], Index::BTree(BTreeIndexBuilder::default()))
+                .replace(true)
+                .execute()
+                .await
+            {
+                warn!("Failed to build scalar index on file_id (deletes stay full scans): {e}");
+            }
+
+            // ANN index on the vector column. Below MIN_ANN_ROWS a brute-force
+            // scan is fast anyway and IVF training has too few samples to
+            // produce sane partitions.
+            let rows = self.table.count_rows(None).await.context("Failed to count rows before indexing")?;
+            if rows >= MIN_ANN_ROWS {
+                match self.table.create_index(&["vector"], Index::Auto).replace(true).execute().await {
+                    Ok(()) => info!("ANN index built over {rows} chunk vectors"),
+                    Err(e) => warn!("Failed to build ANN index (searches stay brute-force scans): {e}"),
+                }
+            } else {
+                debug!("Skipping ANN index: {rows} chunks is below the {MIN_ANN_ROWS} threshold");
+            }
+
+            Ok(())
+        }
+
         async fn delete_file(&self, file_id: Uuid) -> Result<u64> {
             self.delete_where(&format!("file_id = {}", sql_quote(&file_id.to_string()))).await
         }
@@ -504,6 +588,55 @@ mod lance_store {
                 .await
                 .unwrap();
             assert_eq!(store.count().await.unwrap(), 2);
+        }
+
+        #[tokio::test]
+        async fn test_insert_chunks_appends_without_probing() {
+            let (_dir, store) = temp_store(8).await;
+            let a = Uuid::new_v4();
+            let b = Uuid::new_v4();
+            // One call carrying several files' chunks: this is the batched write
+            // path the indexer uses during a crawl.
+            store
+                .insert_chunks(vec![
+                    record(a, "repo-a", 1, 8),
+                    record(a, "repo-a", 7, 8),
+                    record(b, "repo-b", 1, 8),
+                ])
+                .await
+                .unwrap();
+            assert_eq!(store.count().await.unwrap(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_insert_chunks_empty_is_noop() {
+            let (_dir, store) = temp_store(8).await;
+            store.insert_chunks(Vec::new()).await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 0);
+        }
+
+        #[tokio::test]
+        async fn test_optimize_succeeds_and_keeps_rows() {
+            let (_dir, store) = temp_store(8).await;
+            let fid = Uuid::new_v4();
+            // Several small writes leave several fragments — what a crawl produces.
+            for i in 0..3 {
+                store.insert_chunks(vec![record(fid, "repo-a", i * 10 + 1, 8)]).await.unwrap();
+            }
+            // Below the ANN threshold the vector index is skipped, but compaction
+            // and the scalar index still run, and no row may be lost.
+            store.optimize().await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 3);
+            // Idempotent: indexes are created with replace(true).
+            store.optimize().await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_optimize_on_empty_store_is_ok() {
+            let (_dir, store) = temp_store(8).await;
+            store.optimize().await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 0);
         }
 
         #[tokio::test]

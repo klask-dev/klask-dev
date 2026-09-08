@@ -14,7 +14,7 @@ use klask_rs::config::SemanticSearchConfig;
 use klask_rs::services::semantic::chunker::ChunkOptions;
 use klask_rs::services::semantic::embedder::{EmbeddingProvider, FastEmbedProvider};
 use klask_rs::services::semantic::store::LanceVectorStore;
-use klask_rs::services::semantic::{IndexJob, VectorIndexer};
+use klask_rs::services::semantic::{IndexJob, VectorIndexer, WriteMode};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -41,6 +41,7 @@ fn job(file_id: Uuid, repository: &str, path: &str, content: &str) -> IndexJob {
         path: path.to_string(),
         extension: "rs".to_string(),
         content: content.to_string(),
+        mode: WriteMode::Append,
     }
 }
 
@@ -102,8 +103,12 @@ async fn test_full_indexing_lifecycle() {
         "both files should produce at least one chunk each, got {after_index}"
     );
 
-    // 2. Re-index f1 with new content: chunks replaced, not duplicated.
-    indexer.index_file(job(f1, "repo-a", "src/auth.rs", "fn validate_jwt() {}")).await.unwrap();
+    // 2. Re-index f1 with new content outside a crawl: the Replace mode deletes
+    //    the file's previous chunks first, so rows are replaced, not duplicated.
+    //    (A crawl uses Append, which is safe because it purges the repository
+    //    up front — see WriteMode.)
+    let reindex = IndexJob { mode: WriteMode::Replace, ..job(f1, "repo-a", "src/auth.rs", "fn validate_jwt() {}") };
+    indexer.index_file(reindex).await.unwrap();
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     let after_reindex = indexer.count().await.unwrap();
     assert_eq!(
@@ -124,4 +129,7 @@ async fn test_full_indexing_lifecycle() {
         0,
         "store should be empty after deleting all repos"
     );
+
+    // 5. Post-crawl maintenance runs against a real LanceDB table without error.
+    indexer.optimize().await.expect("optimize should succeed on a real store");
 }

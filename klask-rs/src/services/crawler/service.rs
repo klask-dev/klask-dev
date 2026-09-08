@@ -18,6 +18,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+/// How long a post-crawl optimization waits for the embedding worker to drain
+/// before giving up. Generous: on a large crawl the worker legitimately lags
+/// hours behind, and skipping the compaction only leaves the store fragmented
+/// until the next crawl or rebuild.
+#[cfg(feature = "semantic-search")]
+const SEMANTIC_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(6 * 3600);
+
 /// Main crawler service that orchestrates all crawl operations
 pub struct CrawlerService {
     database: Pool<Postgres>,
@@ -760,6 +767,34 @@ impl CrawlerService {
 
         // Clean up cancellation token
         self.cleanup_cancellation_token(repository.id).await;
+
+        // The embedding worker is usually still draining its queue here. Once it
+        // has caught up, compact the vector store and refresh its indexes: the
+        // crawl wrote in bulk, which leaves fragments behind and the ANN index
+        // stale. Detached, because the crawl must not wait for compaction.
+        #[cfg(feature = "semantic-search")]
+        if let Some(indexer) = self.semantic_indexer.clone() {
+            let repo_name = repository.name.clone();
+            tokio::spawn(async move {
+                let deadline = std::time::Instant::now() + SEMANTIC_DRAIN_TIMEOUT;
+                while indexer.pending() > 0 {
+                    if std::time::Instant::now() >= deadline {
+                        warn!(
+                            "Vector store still has {} files pending {:?} after the crawl of {}; \
+                             skipping optimization",
+                            indexer.pending(),
+                            SEMANTIC_DRAIN_TIMEOUT,
+                            repo_name
+                        );
+                        return;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+                if let Err(e) = indexer.optimize().await {
+                    warn!("Vector store optimization after the crawl of {repo_name} failed: {e}");
+                }
+            });
+        }
 
         info!("Crawl completed for repository: {}", repository.name);
 

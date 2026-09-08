@@ -7,6 +7,12 @@
 //! funnels all inference through one ONNX session (the provider serializes
 //! internally), avoiding lock contention and unbounded parallel-batch memory.
 //!
+//! Chunks are accumulated across files and written to the store in batches:
+//! every LanceDB write commits a new table version and fragment, so one write
+//! per file made bulk indexing collapse. The worker flushes when the batch is
+//! full or when the queue goes quiet, so a lagging index still catches up
+//! promptly.
+//!
 //! Backpressure is strict: when the queue is full the crawl *awaits* capacity
 //! (it does not drop work), so the vector index stays consistent with what was
 //! crawled. See docs/SEMANTIC_SEARCH_PLAN.md §4.
@@ -20,9 +26,31 @@ use super::store::{ChunkRecord, VectorHit, VectorSearchFilters, VectorStore};
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 use tracing::{debug, error, info};
 use uuid::Uuid;
+
+/// Number of inference batches worth of chunks buffered before a store write.
+const WRITE_FLUSH_BATCHES: usize = 32;
+
+/// Floor for the write batch, so a tiny `batch_size` still writes in bulk.
+const MIN_FLUSH_CHUNKS: usize = 256;
+
+/// How a file's chunks are written to the store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteMode {
+    /// The file has no chunks in the store yet, so insert without probing for
+    /// them. Both bulk paths qualify: a crawl purges the repository's chunks
+    /// before re-indexing and the backfill clears the whole store, and a
+    /// `file_id` is produced at most once per run. This is what lets the worker
+    /// batch several files into a single write.
+    Append,
+    /// The file may already have chunks: delete them, then insert. For
+    /// re-indexing a single file outside a full crawl or rebuild. Applied on
+    /// its own (never batched) so the delete cannot race a buffered insert.
+    #[allow(dead_code)] // wiring for incremental re-index (crawler TODO)
+    Replace,
+}
 
 /// A single file to embed and store. Owns its content so the crawl can move on.
 #[derive(Debug, Clone)]
@@ -34,6 +62,8 @@ pub struct IndexJob {
     pub path: String,
     pub extension: String,
     pub content: String,
+    /// Whether the file's existing chunks must be removed first. See [`WriteMode`].
+    pub mode: WriteMode,
 }
 
 /// Handle to the background embedding worker.
@@ -49,6 +79,9 @@ pub struct VectorIndexer {
     // admin UI show that semantic indexing is still working after the crawl /
     // backfill has finished handing files over.
     pending: Arc<AtomicU64>,
+    // Serializes `optimize()`: concurrent crawls each finish with one, and two
+    // compactions of the same table race for the same fragments.
+    optimizing: Arc<Mutex<()>>,
 }
 
 impl VectorIndexer {
@@ -65,16 +98,21 @@ impl VectorIndexer {
     ) -> Self {
         let (tx, rx) = mpsc::channel(capacity.max(1));
         let pending = Arc::new(AtomicU64::new(0));
+        let batch_size = batch_size.max(1);
         let worker = Worker {
             provider,
             store: store.clone(),
             chunk_options,
-            batch_size: batch_size.max(1),
+            batch_size,
+            // Buffer roughly 32 inference batches before writing, so one crawl
+            // produces thousands of chunks per LanceDB commit instead of one
+            // commit per file.
+            flush_threshold: (batch_size * WRITE_FLUSH_BATCHES).max(MIN_FLUSH_CHUNKS),
             pending: pending.clone(),
         };
         tokio::spawn(worker.run(rx));
         info!("Semantic embedding worker started (queue capacity {})", capacity.max(1));
-        Self { tx, store, pending }
+        Self { tx, store, pending, optimizing: Arc::new(Mutex::new(())) }
     }
 
     /// Enqueue a file for embedding.
@@ -131,6 +169,20 @@ impl VectorIndexer {
     pub async fn clear(&self) -> Result<u64> {
         self.store.clear().await
     }
+
+    /// Compact the store and refresh its indexes after a bulk write.
+    ///
+    /// Call once a crawl or backfill has finished and the queue has drained,
+    /// never per file. Concurrent calls are skipped rather than queued: a
+    /// second compaction of the same table has nothing to add and would only
+    /// contend for the same fragments.
+    pub async fn optimize(&self) -> Result<()> {
+        let Ok(_guard) = self.optimizing.try_lock() else {
+            debug!("Vector store optimization already in progress, skipping");
+            return Ok(());
+        };
+        self.store.optimize().await
+    }
 }
 
 struct Worker {
@@ -138,30 +190,86 @@ struct Worker {
     store: Arc<dyn VectorStore>,
     chunk_options: ChunkOptions,
     batch_size: usize,
+    flush_threshold: usize,
     pending: Arc<AtomicU64>,
 }
 
 impl Worker {
     async fn run(self, mut rx: mpsc::Receiver<IndexJob>) {
+        // Chunks of several files, written to the store as one batch.
+        let mut buffer: Vec<ChunkRecord> = Vec::new();
+        // Files whose chunks sit in `buffer`; they stay counted in `pending`
+        // until the batch is actually stored.
+        let mut buffered_files: u64 = 0;
+
         while let Some(job) = rx.recv().await {
             let file_id = job.file_id;
-            if let Err(e) = self.process(job).await {
-                // One bad file must never kill the worker: log and keep draining.
-                error!("Semantic indexing failed for file_id={file_id}: {e}");
+            let mode = job.mode;
+
+            match self.embed(job).await {
+                Ok(records) => match mode {
+                    WriteMode::Append => {
+                        buffer.extend(records);
+                        buffered_files += 1;
+                    }
+                    WriteMode::Replace => {
+                        // Flush first: a buffered insert for this file must not
+                        // land after the delete this branch is about to issue.
+                        self.flush(&mut buffer, &mut buffered_files).await;
+                        if let Err(e) = self.store.upsert_file_chunks(file_id, records).await {
+                            error!("Semantic indexing failed for file_id={file_id}: {e}");
+                        }
+                        self.pending.fetch_sub(1, Ordering::SeqCst);
+                    }
+                },
+                Err(e) => {
+                    // One bad file must never kill the worker: log and keep
+                    // draining. Failed files also count down, since `pending`
+                    // tracks outstanding work, not successes.
+                    error!("Semantic indexing failed for file_id={file_id}: {e}");
+                    self.pending.fetch_sub(1, Ordering::SeqCst);
+                }
             }
-            // Failed jobs also count down: pending tracks outstanding work,
-            // not successes.
-            self.pending.fetch_sub(1, Ordering::SeqCst);
+
+            // Write when the batch is full, or when the crawl is no longer
+            // feeding us — an idle queue means the write costs nothing we need,
+            // and it lets `pending` reach zero so callers see the index caught up.
+            if buffer.len() >= self.flush_threshold || rx.is_empty() {
+                self.flush(&mut buffer, &mut buffered_files).await;
+            }
         }
+
+        self.flush(&mut buffer, &mut buffered_files).await;
         info!("Semantic embedding worker stopped (queue drained)");
     }
 
-    async fn process(&self, job: IndexJob) -> Result<()> {
+    /// Store the buffered chunks and release the files they belong to from
+    /// `pending`. A failed write is logged, not retried: Tantivy remains the
+    /// source of truth and the backfill reconciles the gap.
+    async fn flush(&self, buffer: &mut Vec<ChunkRecord>, buffered_files: &mut u64) {
+        if *buffered_files == 0 {
+            return;
+        }
+        let chunks = buffer.len();
+        let files = *buffered_files;
+        // Empty files legitimately contribute zero chunks; `insert_chunks`
+        // short-circuits, and the files still have to leave `pending`.
+        match self.store.insert_chunks(std::mem::take(buffer)).await {
+            Ok(()) => debug!("Stored {chunks} chunks from {files} files"),
+            Err(e) => error!("Semantic indexing failed to store {chunks} chunks from {files} files: {e}"),
+        }
+        *buffered_files = 0;
+        self.pending.fetch_sub(files, Ordering::SeqCst);
+    }
+
+    /// Chunk and embed one file. Returns its chunk records without touching the
+    /// store, so the caller decides how they are written (batched or replaced).
+    /// An empty file yields no records, which still clears its chunks under
+    /// [`WriteMode::Replace`].
+    async fn embed(&self, job: IndexJob) -> Result<Vec<ChunkRecord>> {
         let chunks = chunk_file(&job.path, &job.content, &self.chunk_options);
         if chunks.is_empty() {
-            // Empty file: still upsert (with no records) so a file that became
-            // empty has its old chunks removed.
-            return self.store.upsert_file_chunks(job.file_id, Vec::new()).await;
+            return Ok(Vec::new());
         }
 
         let mut records: Vec<ChunkRecord> = Vec::with_capacity(chunks.len());
@@ -199,10 +307,13 @@ impl Worker {
             }
         }
 
-        let n = records.len();
-        self.store.upsert_file_chunks(job.file_id, records).await?;
-        debug!("Embedded {n} chunks for {} (file_id={})", job.path, job.file_id);
-        Ok(())
+        debug!(
+            "Embedded {} chunks for {} (file_id={})",
+            records.len(),
+            job.path,
+            job.file_id
+        );
+        Ok(records)
     }
 }
 
@@ -257,6 +368,7 @@ mod tests {
             path: "src/lib.rs".to_string(),
             extension: "rs".to_string(),
             content: content.to_string(),
+            mode: WriteMode::Append,
         }
     }
 
@@ -306,6 +418,9 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         j.content = new_content.clone();
+        // Re-indexing a file outside a crawl/rebuild is the Replace path: the
+        // worker applies it on its own and deletes the file's old chunks first.
+        j.mode = WriteMode::Replace;
         indexer.index_file(j).await.unwrap();
         // The new content is deterministically multi-chunk; compute the exact
         // expected count by re-chunking it.
@@ -411,6 +526,75 @@ mod tests {
         }
         // pending tracks outstanding work, not successes: failures count down too.
         assert_eq!(indexer.pending(), 0);
+    }
+
+    /// Wraps a real store to count how many write calls the worker issues.
+    struct CountingStore {
+        inner: Arc<dyn VectorStore>,
+        inserts: Arc<AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl VectorStore for CountingStore {
+        async fn search(
+            &self,
+            query_vector: &[f32],
+            limit: usize,
+            filters: &VectorSearchFilters,
+        ) -> Result<Vec<VectorHit>> {
+            self.inner.search(query_vector, limit, filters).await
+        }
+        async fn upsert_file_chunks(&self, file_id: Uuid, records: Vec<ChunkRecord>) -> Result<()> {
+            self.inner.upsert_file_chunks(file_id, records).await
+        }
+        async fn insert_chunks(&self, records: Vec<ChunkRecord>) -> Result<()> {
+            self.inserts.fetch_add(1, Ordering::SeqCst);
+            self.inner.insert_chunks(records).await
+        }
+        async fn optimize(&self) -> Result<()> {
+            self.inner.optimize().await
+        }
+        async fn delete_file(&self, file_id: Uuid) -> Result<u64> {
+            self.inner.delete_file(file_id).await
+        }
+        async fn delete_project_chunks(&self, repository: &str) -> Result<u64> {
+            self.inner.delete_project_chunks(repository).await
+        }
+        async fn clear(&self) -> Result<u64> {
+            self.inner.clear().await
+        }
+        async fn count(&self) -> Result<u64> {
+            self.inner.count().await
+        }
+        fn dimension(&self) -> usize {
+            self.inner.dimension()
+        }
+    }
+
+    /// The per-file LanceDB commit was what made bulk indexing collapse: every
+    /// write commits a table version and a fragment. While the queue is
+    /// non-empty the worker must accumulate chunks and write them once.
+    #[tokio::test]
+    async fn test_appends_are_batched_into_one_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let inserts = Arc::new(AtomicUsize::new(0));
+        let store: Arc<dyn VectorStore> =
+            Arc::new(CountingStore { inner: store(&dir).await, inserts: inserts.clone() });
+        // SlowProvider blocks 100ms per embed, so the files enqueued below all
+        // sit in the queue while the first is embedded — no scheduling race.
+        let indexer = VectorIndexer::start(Arc::new(SlowProvider), store.clone(), ChunkOptions::default(), 32, 16);
+
+        const FILES: usize = 6;
+        for i in 0..FILES {
+            indexer.index_file(job(&format!("fn f{i}() {{}}"))).await.unwrap();
+        }
+        wait_until(|| store.count(), FILES as u64).await;
+
+        let writes = inserts.load(Ordering::SeqCst);
+        assert!(
+            writes < FILES,
+            "worker must batch: {writes} writes for {FILES} files is one commit per file"
+        );
     }
 
     #[tokio::test]
