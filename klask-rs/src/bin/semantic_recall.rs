@@ -291,9 +291,14 @@ async fn main() -> Result<()> {
     let modes = [("keyword", SearchMode::Keyword), ("semantic", SearchMode::Semantic), ("hybrid", SearchMode::Hybrid)];
     let mut scores: Vec<(&str, ModeScore)> = modes.iter().map(|(n, _)| (*n, ModeScore::default())).collect();
 
+    // Top hits for queries nothing found, so a reviewer can tell a weak engine
+    // from a bad golden entry without re-running anything.
+    let mut unexplained: Vec<(String, Vec<String>)> = Vec::new();
+
     println!("{:<58} {:>8} {:>9} {:>7}", "query", "keyword", "semantic", "hybrid");
     for golden_query in &golden.queries {
         let mut ranks = Vec::new();
+        let mut last_paths = Vec::new();
         for (slot, (_, mode)) in modes.iter().enumerate() {
             let mut query = SearchQuery::new(golden_query.query.clone());
             query.limit = TOP_K;
@@ -308,6 +313,11 @@ async fn main() -> Result<()> {
             let rank = rank_of_expected(&paths, &golden_query.expect);
             scores[slot].1.record(&golden_query.query, rank);
             ranks.push(rank);
+            last_paths = paths;
+        }
+
+        if ranks.iter().all(|r| r.is_none()) {
+            unexplained.push((golden_query.query.clone(), last_paths.into_iter().take(3).collect()));
         }
 
         let cell = |r: Option<usize>| r.map(|r| format!("#{r}")).unwrap_or_else(|| "-".to_string());
@@ -327,10 +337,14 @@ async fn main() -> Result<()> {
         println!("{:<10} {:>10.2} {:>8.2}", name, score.hits as f64 / n, score.rr_sum / n);
     }
 
-    println!("\nMissed by every mode (candidates for a bad golden entry):");
-    for golden_query in &golden.queries {
-        if scores.iter().all(|(_, s)| s.misses.iter().any(|m| m == &golden_query.query)) {
-            println!("  - {}", golden_query.query);
+    if !unexplained.is_empty() {
+        println!("\nMissed by every mode, with what the last mode actually returned.");
+        println!("A plausible answer here means the golden entry is too narrow, not that retrieval failed:");
+        for (query, top) in &unexplained {
+            println!("  - {query}");
+            for path in top {
+                println!("      {path}");
+            }
         }
     }
 

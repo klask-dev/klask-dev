@@ -131,13 +131,69 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 | **3** | Backfill admin job + progress UI | ✅ done (this PR) |
 | **4** | Query path: `mode` param, RRF fusion wiring, API + tests | ✅ done (this PR) |
 | **5** | Frontend toggle + result badges + admin card | ✅ done (this PR) |
-| **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | planned |
+| **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | eval done, MCP param + latency pending |
 
 **Phase 1 measurements** (debug build, CPU, `Xenova/bge-small-en-v1.5`, 384 dims):
 embedding throughput ≈ 7.6 chunks/s on ~6-line-function chunks; semantically
 related code snippets score cosine ≈ 0.82 vs ≈ 0.35–0.45 for unrelated ones.
 Reproduce with:
 `cargo test --features semantic-search --test semantic_embedding_test -- --ignored --nocapture`
+
+**Phase 6 measurements** (`cargo run --features semantic-search --bin semantic-recall -- --repo ..`,
+this repository as corpus: 421 files, 3503 chunks, `jina-embeddings-v2-base-code`,
+45-line chunks, ANN index built):
+
+| query set | mode | recall@10 | MRR |
+|---|---|---|---|
+| 22 natural-language questions | keyword | 0.09 | 0.06 |
+| | semantic | 0.95 | 0.71 |
+| | hybrid | 0.95 | 0.71 |
+| 10 short identifier queries | keyword | 0.90 | 0.68 |
+| | semantic | 1.00 | 0.95 |
+| | hybrid | 1.00 | 0.90 |
+
+Reading:
+- On natural-language questions BM25 collapses (2 hits out of 22) while the
+  vector side answers 21 out of 22, usually at rank 1. This is the case the
+  feature exists for, and it delivers.
+- The second set exists to keep the comparison honest: scoring only NL
+  questions would show the vector engine beating BM25 at a game BM25 never
+  played. On the short queries users type today, keyword already works (0.90),
+  and enabling the vector side does not degrade it — it improves it to 1.00.
+- Hybrid matches semantic on this corpus and is marginally *behind* pure
+  semantic on short-query MRR (0.90 vs 0.95): RRF dilutes a ranking the vector
+  side already got right. Worth revisiting the RRF constant. Hybrid still keeps
+  BM25 as a quality floor, which a 421-file corpus under-rewards.
+- The one universal miss ("report how far along a long running indexing job
+  is" -> `services/progress.rs`) is a genuine failure, not a narrow golden
+  entry: the model returned `search.rs` and `search_metrics.rs`, conflating
+  Tantivy indexing with crawl progress.
+
+Limits of this measurement, which matter before generalizing:
+- 421 files / 3503 chunks is orders of magnitude smaller than a real
+  deployment. Recall degrades as distractors multiply.
+- The golden set was written by the same author as the code under test, so the
+  queries are likely cleaner than what real users type. Queries collected from
+  actual usage would be more credible.
+- Every query is in English. The model probe (`semantic-eval`) shows the query
+  language, not the identifier language, is what breaks: with French queries
+  the cosine margin drops from +0.217 to +0.046 on English-identifier code.
+- Indexing throughput was 1.9 chunks/s (debug build, CPU), i.e. 31 minutes for
+  this small repository. Latency P95 on the query path is still unmeasured.
+
+**Phase 1 model comparison** (`cargo run --features semantic-search --bin semantic-eval`,
+8 concepts, chance P@1 = 0.12, margin = cosine gap to the best distractor):
+
+| model | EN code / EN query | EN code / FR query | FR code / FR query | FR code / EN query |
+|---|---|---|---|---|
+| jina-embeddings-v2-base-code (768) | 1.00 / +0.217 | 0.75 / +0.046 | 0.62 / +0.013 | 1.00 / +0.147 |
+| bge-small-en-v1.5 (384) | 0.88 / +0.078 | 0.62 / -0.000 | 0.50 / -0.002 | 0.62 / +0.021 |
+| multilingual-e5-small (384) | 0.62 / +0.010 | 0.50 / +0.002 | 0.50 / -0.002 | 0.50 / +0.004 |
+
+The code-specialized model wins by a factor of 3 on margin, which settles the
+default. The multilingual model is worst even on English, so fastembed offers
+no model that is both multilingual and code-aware: non-English queries stay a
+known weakness, mitigated only by hybrid mode's BM25 floor.
 
 **Phase 2 notes:**
 - Vector store is **LanceDB** (`lancedb` 0.30, embedded), table `chunks` with the
