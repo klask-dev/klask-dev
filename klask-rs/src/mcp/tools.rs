@@ -42,8 +42,9 @@ pub fn tool_definitions() -> Value {
     json!([
         {
             "name": "search_code",
-            "description": "Full-text search across all indexed Git repositories and branches. \
-                Supports plain terms, exact phrases (in double quotes) and regular expressions. \
+            "description": "Search across all indexed Git repositories and branches. \
+                Supports plain terms, exact phrases (in double quotes) and regular expressions, \
+                and can also answer natural-language questions about what the code does. \
                 Returns matching files with a content snippet, the matching line number and a \
                 doc_address usable with the get_file tool.",
             "inputSchema": {
@@ -64,6 +65,17 @@ pub fn tool_definitions() -> Value {
                     "case_sensitive": {
                         "type": "boolean",
                         "description": "Case-sensitive matching (default false)"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["keyword", "semantic", "hybrid"],
+                        "description": "How to match. 'keyword' is lexical BM25: use it when you \
+                            know the identifier, symbol or literal string you are looking for. \
+                            'semantic' embeds the query and searches by meaning: use it for a \
+                            question like \"where do we validate auth tokens\" when you do not know \
+                            the vocabulary of the codebase. 'hybrid' (the default) fuses both and \
+                            is the safe choice. Ignored when regex is true, and silently falls back \
+                            to keyword when the server has no semantic index."
                     },
                     "limit": {
                         "type": "integer",
@@ -195,6 +207,26 @@ struct SearchCodeArgs {
     case_sensitive: bool,
     limit: Option<u32>,
     page: Option<u32>,
+    /// Absent means hybrid: agents mostly ask questions, and hybrid keeps the
+    /// BM25 floor for the ones that are really identifier lookups.
+    mode: Option<SearchMode>,
+}
+
+/// Pick the search mode for an MCP `search_code` call.
+///
+/// Defaults to hybrid: agents mostly ask questions, and hybrid keeps BM25 as a
+/// floor for the calls that are really identifier lookups. A regex is a purely
+/// lexical construct, though, so embedding the pattern itself would only add
+/// noise — regex searches stay keyword whatever the caller asked for.
+///
+/// This never has to consider whether a semantic backend exists: `run_search`
+/// degrades to keyword on its own when there is none.
+fn resolve_search_mode(regex: bool, requested: Option<SearchMode>) -> SearchMode {
+    if regex {
+        SearchMode::Keyword
+    } else {
+        requested.unwrap_or(SearchMode::Hybrid)
+    }
 }
 
 async fn search_code(state: &AppState, arguments: &Value) -> Result<Value, ToolCallError> {
@@ -215,6 +247,8 @@ async fn search_code(state: &AppState, arguments: &Value) -> Result<Value, ToolC
     // Compute in u64: (page - 1) * limit overflows u32 for very large pages
     let offset = ((page as u64 - 1) * limit as u64) as usize;
 
+    let mode = resolve_search_mode(args.regex, args.mode);
+
     let search_query = SearchQuery {
         query: args.query,
         repository_filter: join_filter(&args.repositories),
@@ -230,11 +264,13 @@ async fn search_code(state: &AppState, arguments: &Value) -> Result<Value, ToolC
         regex_search: args.regex,
         regex_flags: None,
         case_sensitive: args.case_sensitive,
-        // Unchanged behaviour: the MCP tool gains a mode of its own separately.
-        mode: SearchMode::Keyword,
+        mode,
     };
 
-    match state.search_service.search(search_query).await {
+    // Go through the shared dispatcher rather than SearchService directly: it
+    // owns the "degrade to keyword when the semantic backend is missing"
+    // decision, so the MCP tool and the HTTP API cannot drift apart.
+    match crate::api::search::run_search(state, search_query).await {
         Ok(response) => {
             let results: Vec<Value> = response
                 .results
@@ -479,6 +515,56 @@ async fn get_search_facets(state: &AppState, arguments: &Value) -> Result<Value,
 
 #[cfg(test)]
 mod tests {
+    use super::{SearchMode, resolve_search_mode, tool_definitions};
+
+    #[test]
+    fn test_search_mode_defaults_to_hybrid() {
+        assert_eq!(resolve_search_mode(false, None), SearchMode::Hybrid);
+    }
+
+    #[test]
+    fn test_search_mode_honours_an_explicit_request() {
+        assert_eq!(
+            resolve_search_mode(false, Some(SearchMode::Keyword)),
+            SearchMode::Keyword
+        );
+        assert_eq!(
+            resolve_search_mode(false, Some(SearchMode::Semantic)),
+            SearchMode::Semantic
+        );
+    }
+
+    #[test]
+    fn test_regex_forces_keyword_even_when_semantic_is_asked_for() {
+        // Embedding a regex pattern retrieves noise, so the lexical engine wins.
+        assert_eq!(
+            resolve_search_mode(true, Some(SearchMode::Semantic)),
+            SearchMode::Keyword
+        );
+        assert_eq!(resolve_search_mode(true, Some(SearchMode::Hybrid)), SearchMode::Keyword);
+        assert_eq!(resolve_search_mode(true, None), SearchMode::Keyword);
+    }
+
+    #[test]
+    fn test_search_code_schema_advertises_the_three_modes() {
+        let tools = tool_definitions();
+        let search = tools
+            .as_array()
+            .expect("tool array")
+            .iter()
+            .find(|t| t["name"] == "search_code")
+            .expect("search_code tool");
+        let modes = search["inputSchema"]["properties"]["mode"]["enum"].as_array().expect("mode enum in the schema");
+        assert_eq!(modes, &vec!["keyword", "semantic", "hybrid"]);
+        // An agent picks the mode from this text alone, so it must not be empty.
+        assert!(
+            search["inputSchema"]["properties"]["mode"]["description"]
+                .as_str()
+                .is_some_and(|d| d.contains("keyword") && d.contains("semantic")),
+            "the mode description has to tell an agent when to use which"
+        );
+    }
+
     use super::*;
 
     #[test]

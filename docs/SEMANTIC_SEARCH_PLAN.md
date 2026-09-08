@@ -131,7 +131,7 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 | **3** | Backfill admin job + progress UI | ✅ done (this PR) |
 | **4** | Query path: `mode` param, RRF fusion wiring, API + tests | ✅ done (this PR) |
 | **5** | Frontend toggle + result badges + admin card | ✅ done (this PR) |
-| **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | recall + latency done; MCP param blocked until this branch reconciles with master, where `src/mcp/` lives |
+| **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | ✅ done |
 
 **Phase 1 measurements** (debug build, CPU, `Xenova/bge-small-en-v1.5`, 384 dims):
 embedding throughput ≈ 7.6 chunks/s on ~6-line-function chunks; semantically

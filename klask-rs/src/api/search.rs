@@ -164,7 +164,7 @@ async fn get_capabilities(_auth: AuthenticatedUser, State(app_state): State<AppS
 /// mode needs it and the semantic backend is present, otherwise to keyword
 /// search. Centralizes the "degrade to keyword" decision so both build modes
 /// and all callers behave identically.
-async fn run_search(
+pub(crate) async fn run_search(
     app_state: &AppState,
     query: SearchQuery,
 ) -> anyhow::Result<crate::services::SearchResultsWithTotal> {
