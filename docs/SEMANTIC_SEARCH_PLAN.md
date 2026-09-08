@@ -178,8 +178,49 @@ Limits of this measurement, which matter before generalizing:
 - Every query is in English. The model probe (`semantic-eval`) shows the query
   language, not the identifier language, is what breaks: with French queries
   the cosine margin drops from +0.217 to +0.046 on English-identifier code.
-- Indexing throughput was 1.9 chunks/s (debug build, CPU), i.e. 31 minutes for
-  this small repository. Latency P95 on the query path is still unmeasured.
+- Latency P95 on the query path is still unmeasured.
+
+**Phase 6 cost measurements** (same corpus, Intel Core Ultra 7 165U, 14 threads,
+CPU only, ANN index built):
+
+| model | params | dim | throughput | recall@10 (NL, hybrid) |
+|---|---|---|---|---|
+| jina-embeddings-v2-base-code | 137M | 768 | 2.26 chunks/s | 0.95 |
+| bge-small-en-v1.5 | 33M | 384 | 9.22 chunks/s | 0.86 |
+
+- **The build profile is not a lever**: release only beats debug 2.26 vs 1.89
+  chunks/s (x1.2). The bottleneck is ONNX inference, not the surrounding Rust,
+  so roughly 440 ms per chunk for the 137M model on this CPU.
+- The model *is* a lever, and it scales with parameter count: the 4.1x speedup
+  matches the 4.2x parameter ratio. It costs 9 points of recall@10 here, and
+  that gap should be expected to *widen* with corpus size, since the weaker
+  model starts with a much thinner cosine margin (+0.078 vs +0.217 on the model
+  probe) and margins are what survive extra distractors.
+- **Hybrid earns its keep exactly when the model is weaker**: with bge-small it
+  beats pure semantic (0.86 vs 0.82 recall, 0.64 vs 0.58 MRR), while with jina
+  the two are identical. The BM25 floor is insurance against model quality, so
+  hybrid is the right default regardless of which model is configured.
+- Sizing, from the measured ratio of one chunk per 32 lines of indexed text:
+
+| corpus | chunks | jina | bge-small | vector bytes (jina) |
+|---|---|---|---|---|
+| 1M lines | 31k | 3.8 h | 0.9 h | 95 MB |
+| 10M lines | 312k | 38 h | 9.4 h | 960 MB |
+| 25M lines | 780k | 96 h | 23.5 h | 2.4 GB |
+
+  These are full-index times. They are acceptable as a one-off backfill running
+  in the background and unacceptable per crawl, which is what happens today:
+  the crawler re-indexes every file every time (no `last_modified` check), so
+  **incremental crawling is the precondition for semantic search at scale**, not
+  a nice-to-have. It is worth 2 to 3 orders of magnitude on recurring crawls,
+  far more than any model or runtime tuning, and it speeds up Tantivy indexing
+  too.
+- Untested cheap leads: `intra_threads` is left at ORT's default (every logical
+  core), which on a hybrid P/E-core CPU can be slower than pinning to the
+  performance cores; fastembed exposes it and Klask does not. GPU execution
+  providers are exposed by fastembed and unused. Markdown alone accounts for
+  20% of this repository's chunks, so a vector-index inclusion policy separate
+  from the (much cheaper) Tantivy one is worth 20-40% on a real corpus.
 
 **Phase 1 model comparison** (`cargo run --features semantic-search --bin semantic-eval`,
 8 concepts, chance P@1 = 0.12, margin = cosine gap to the best distractor):
