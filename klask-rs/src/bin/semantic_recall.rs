@@ -85,6 +85,8 @@ struct Args {
     work: PathBuf,
     model: String,
     reuse: bool,
+    /// Timed repetitions per query and per mode, for the latency percentiles.
+    repeats: usize,
 }
 
 fn parse_args() -> Args {
@@ -94,6 +96,7 @@ fn parse_args() -> Args {
         work: PathBuf::from("target/eval"),
         model: "jinaai/jina-embeddings-v2-base-code".to_string(),
         reuse: false,
+        repeats: 5,
     };
     let mut it = std::env::args().skip(1);
     while let Some(flag) = it.next() {
@@ -103,6 +106,9 @@ fn parse_args() -> Args {
             "--work" => args.work = PathBuf::from(it.next().expect("--work needs a path")),
             "--model" => args.model = it.next().expect("--model needs a model code"),
             "--reuse" => args.reuse = true,
+            "--repeats" => {
+                args.repeats = it.next().expect("--repeats needs a count").parse().expect("--repeats must be a number")
+            }
             other => panic!("unknown flag {other}"),
         }
     }
@@ -217,11 +223,23 @@ fn rank_of_expected(results: &[String], expect: &[String]) -> Option<usize> {
     results.iter().position(|path| expect.iter().any(|want| path.ends_with(want.as_str()))).map(|i| i + 1)
 }
 
+/// Percentile of already-collected samples, nearest-rank. `samples` is sorted
+/// in place by the caller.
+fn percentile(sorted: &[f64], p: f64) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let rank = ((p * sorted.len() as f64).ceil() as usize).clamp(1, sorted.len());
+    sorted[rank - 1]
+}
+
 #[derive(Default)]
 struct ModeScore {
     hits: usize,
     rr_sum: f64,
     misses: Vec<String>,
+    /// End-to-end query latencies in milliseconds, one per timed repetition.
+    latencies: Vec<f64>,
 }
 
 impl ModeScore {
@@ -304,11 +322,24 @@ async fn main() -> Result<()> {
             query.limit = TOP_K;
             query.mode = *mode;
 
-            let found = if mode.needs_semantic() {
-                semantic_search(&search, &embedder, &indexer, query).await?
-            } else {
-                search.search(query).await?
+            // One untimed run warms whatever the first call would pay for
+            // (page cache, ANN index load), then `repeats` timed ones. A
+            // semantic query embeds the question, so every one of them pays a
+            // model forward pass the keyword path does not.
+            let run = async |q: SearchQuery| {
+                if mode.needs_semantic() {
+                    semantic_search(&search, &embedder, &indexer, q).await
+                } else {
+                    search.search(q).await
+                }
             };
+
+            let found = run(query.clone()).await?;
+            for _ in 0..args.repeats {
+                let started = std::time::Instant::now();
+                run(query.clone()).await?;
+                scores[slot].1.latencies.push(started.elapsed().as_secs_f64() * 1000.0);
+            }
             let paths: Vec<String> = found.results.iter().map(|r| r.file_path.clone()).collect();
             let rank = rank_of_expected(&paths, &golden_query.expect);
             scores[slot].1.record(&golden_query.query, rank);
@@ -332,10 +363,28 @@ async fn main() -> Result<()> {
     }
 
     let n = golden.queries.len() as f64;
-    println!("\n{:<10} {:>10} {:>8}", "mode", "recall@10", "MRR");
-    for (name, score) in &scores {
-        println!("{:<10} {:>10.2} {:>8.2}", name, score.hits as f64 / n, score.rr_sum / n);
+    println!(
+        "\n{:<10} {:>10} {:>8} {:>9} {:>9} {:>9}",
+        "mode", "recall@10", "MRR", "p50 ms", "p95 ms", "max ms"
+    );
+    for (name, score) in &mut scores {
+        score.latencies.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        println!(
+            "{:<10} {:>10.2} {:>8.2} {:>9.0} {:>9.0} {:>9.0}",
+            name,
+            score.hits as f64 / n,
+            score.rr_sum / n,
+            percentile(&score.latencies, 0.50),
+            percentile(&score.latencies, 0.95),
+            score.latencies.last().copied().unwrap_or(0.0)
+        );
     }
+    println!(
+        "({} timed runs per mode: {} queries x {} repetitions)",
+        scores[0].1.latencies.len(),
+        golden.queries.len(),
+        args.repeats
+    );
 
     if !unexplained.is_empty() {
         println!("\nMissed by every mode, with what the last mode actually returned.");

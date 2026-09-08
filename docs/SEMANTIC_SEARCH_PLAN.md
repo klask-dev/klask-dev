@@ -131,7 +131,7 @@ Once this lands, the MCP `search_code` tool gains a `mode` parameter (default
 | **3** | Backfill admin job + progress UI | ✅ done (this PR) |
 | **4** | Query path: `mode` param, RRF fusion wiring, API + tests | ✅ done (this PR) |
 | **5** | Frontend toggle + result badges + admin card | ✅ done (this PR) |
-| **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | eval done, MCP param + latency pending |
+| **6** | MCP `mode` param; eval pass (latency P95, recall@10 vs keyword) and tuning | recall + latency done; MCP param blocked until this branch reconciles with master, where `src/mcp/` lives |
 
 **Phase 1 measurements** (debug build, CPU, `Xenova/bge-small-en-v1.5`, 384 dims):
 embedding throughput ≈ 7.6 chunks/s on ~6-line-function chunks; semantically
@@ -178,7 +178,19 @@ Limits of this measurement, which matter before generalizing:
 - Every query is in English. The model probe (`semantic-eval`) shows the query
   language, not the identifier language, is what breaks: with French queries
   the cosine margin drops from +0.217 to +0.046 on English-identifier code.
-- Latency P95 on the query path is still unmeasured.
+- Query latency, same corpus with the ANN index built, 110 timed runs per mode
+  (22 queries x 5 repetitions, one untimed warm-up each):
+
+| mode | p50 | p95 | max |
+|---|---|---|---|
+| keyword | 0 ms | 15 ms | 19 ms |
+| semantic | 31 ms | 43 ms | 50 ms |
+| hybrid | 33 ms | 46 ms | 54 ms |
+
+  The ~30 ms the semantic modes add is almost entirely the forward pass that
+  embeds the question; a short query costs far less than a 400-token chunk.
+  That part is constant with corpus size, while ANN search grows sub-linearly,
+  so latency is not the scaling risk here. Indexing throughput is.
 
 **Phase 6 cost measurements** (same corpus, Intel Core Ultra 7 165U, 14 threads,
 CPU only, ANN index built):
