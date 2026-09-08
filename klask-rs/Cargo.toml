@@ -91,6 +91,13 @@ name = "semantic-eval"
 path = "src/bin/semantic_eval.rs"
 required-features = ["semantic-search"]
 
+# Phase 6 corpus-level evaluation: builds its own Tantivy + LanceDB index from
+# a directory and scores keyword / semantic / hybrid recall@10 on a golden set.
+[[bin]]
+name = "semantic-recall"
+path = "src/bin/semantic_recall.rs"
+required-features = ["semantic-search"]
+
 [features]
 test-utils = []
 pdf-parser = []
