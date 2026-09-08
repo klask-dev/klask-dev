@@ -1,3 +1,4 @@
+import React from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types';
@@ -76,9 +77,9 @@ export const useAuthStore = create<AuthState>()(
           const user = await apiClient.auth.getProfile();
           set({ user, isAuthenticated: true, isLoading: false });
         } catch (error) {
-          console.error('Failed to refresh user on rehydrate:', error);
+          console.error('Failed to refresh user:', error);
+          await get().logout();
           set({ isLoading: false });
-          get().logout();
         }
       },
 
@@ -112,6 +113,17 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Hook to wait for rehydration to complete
+export const useIsHydrated = () => {
+  const [isHydrated, setIsHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  return isHydrated;
+};
 
 // Selectors for convenient access to auth state (use getState() — safe outside React components)
 export const authSelectors = {

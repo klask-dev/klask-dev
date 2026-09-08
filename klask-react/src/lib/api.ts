@@ -475,6 +475,12 @@ class ApiClient {
     });
   }
 
+  async delete<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+    });
+  }
+
 }
 
 // Create and export the API client instance
@@ -542,6 +548,7 @@ export const api = {
   // Generic methods
   get: <T>(endpoint: string) => apiClient.get<T>(endpoint),
   post: <T>(endpoint: string, data?: unknown) => apiClient.post<T>(endpoint, data),
+  delete: <T>(endpoint: string) => apiClient.delete<T>(endpoint),
 
   // User Management
   getUsers: () => apiClient.getUsers(),

@@ -125,7 +125,7 @@ JWT_SECRET=your-super-secret-jwt-key-change-in-production
 JWT_EXPIRES_IN=24h
 
 # Search Index
-SEARCH_INDEX_PATH=./search_index
+SEARCH_INDEX_DIR=./search_index
 
 # Crawler
 TEMP_DIR=./temp_crawl
@@ -186,7 +186,7 @@ npm run build
    - Clear browser localStorage if needed
 
 4. **Search Index Errors**
-   - Ensure SEARCH_INDEX_PATH directory exists
+   - Ensure SEARCH_INDEX_DIR directory exists
    - Check write permissions
    - Re-run crawler if index is corrupted
 

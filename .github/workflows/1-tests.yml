@@ -104,3 +104,13 @@ jobs:
       run: cargo test
       env:
         DATABASE_URL: postgres://postgres:postgres@localhost:5432/klask_test
+
+    # Tests marked #[ignore = "Requires PostgreSQL database"] are skipped by
+    # plain `cargo test`; run the suites known to be green against the service
+    # container. (admin_endpoints_test is excluded: its ignored tests are stale.)
+    - name: Run PostgreSQL-backed integration tests
+      run: |
+        cargo test --test mcp_test -- --ignored
+        cargo test --test search_service_test -- --ignored
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/klask_test

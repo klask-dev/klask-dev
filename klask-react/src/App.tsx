@@ -29,6 +29,7 @@ const IndexManagement = React.lazy(() => import('./features/admin/IndexManagemen
 const LoginPage = React.lazy(() => import('./features/auth/LoginPage'));
 const RegisterPage = React.lazy(() => import('./features/auth/RegisterPage'));
 const ProfilePage = React.lazy(() => import('./features/auth/ProfilePage'));
+const ApiTokensPage = React.lazy(() => import('./features/auth/tokens/ApiTokensPage'));
 const SetupPage = React.lazy(() => import('./features/auth/SetupPage'));
 const SetupRedirect = React.lazy(() => import('./components/setup/SetupRedirect'));
 const SyntaxHighlighterTest = React.lazy(() => import('./components/test/SyntaxHighlighterTest'));
@@ -162,15 +163,25 @@ function App() {
               />
               
               {/* Profile route */}
-              <Route 
-                path="profile" 
+              <Route
+                path="profile"
                 element={
                   <Suspense fallback={<LoadingSpinner />}>
                     <ProfilePage />
                   </Suspense>
-                } 
+                }
               />
-              
+
+              {/* API Tokens route */}
+              <Route
+                path="settings/api-tokens"
+                element={
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <ApiTokensPage />
+                  </Suspense>
+                }
+              />
+
               {/* Test route for syntax highlighter */}
               <Route 
                 path="test/syntax-highlighter" 
