@@ -83,6 +83,14 @@ arrow-schema = { version = "58", optional = true }
 # is not yet dyn-compatible.
 async-trait = { version = "0.1", optional = true }
 
+# Phase 6 evaluation probe: compares embedding models on a small NL -> code
+# retrieval set, across identifier and query languages. Dev tool, not shipped in
+# the default build.
+[[bin]]
+name = "semantic-eval"
+path = "src/bin/semantic_eval.rs"
+required-features = ["semantic-search"]
+
 [features]
 test-utils = []
 pdf-parser = []
