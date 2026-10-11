@@ -38,6 +38,7 @@ services:
             - HOST=0.0.0.0
             - ENCRYPTION_KEY=${ENCRYPTION_KEY:-default-encryption-key-change-me}
             - JWT_SECRET=${JWT_SECRET:-default-jwt-key-change-me}
+            - ADD_FILE_NAME_WITH_NO_EXTENTION_ALLOW=${ADD_FILE_NAME_WITH_NO_EXTENTION_ALLOW:-}
         ports:
             - "3000:3000"
         volumes:
