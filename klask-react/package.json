@@ -1,6 +1,7 @@
 {
   "name": "klask-react",
   "private": true,
+  "license": "GPL-3.0-only",
   "version": "2.2.0",
   "type": "module",
   "scripts": {
