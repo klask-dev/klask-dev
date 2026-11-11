@@ -1,7 +1,7 @@
 name: 2️⃣ Build images
 
 on:
-  workflow_dispatch:             # Déclenchement manuel si besoin
+  workflow_dispatch:
   workflow_run:
     workflows: ["1️⃣ Tests"]
     types:
@@ -11,22 +11,25 @@ on:
       - master
       - 'releases/**'
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   FRONTEND_IMAGE_NAME: klask-frontend
   BACKEND_IMAGE_NAME: klask-backend
 
 jobs:
-  # Détecte quels répertoires ont été modifiés
+  # Detects which directories changed
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
         id: filter
         with:
           filters: |
@@ -37,18 +40,16 @@ jobs:
 
   build-frontend:
     needs: detect-changes
-    # Condition pour exécuter ce job :
-    # - Sur main/master : toujours (pour garder les versions homogènes)
-    # - Sur autres branches : seulement si frontend modifié
-    # - Sur workflow_dispatch manuel : seulement si frontend modifié
-    if: >
-        ${{ (github.event.workflow_run.conclusion == 'success' &&
+    # Conditions:
+    # - default branch: always (keeps the versions homogeneous)
+    # - other branches: only when the frontend changed
+    # - manual run: only when the frontend changed
+    if: (github.event.workflow_run.conclusion == 'success' &&
             (startsWith(github.event.workflow_run.head_branch, 'main') ||
              startsWith(github.event.workflow_run.head_branch, 'master') ||
              needs.detect-changes.outputs.frontend == 'true')) ||
             (github.event_name == 'workflow_dispatch' &&
              needs.detect-changes.outputs.frontend == 'true')
-        }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -57,13 +58,16 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        # Build the commit that the tests validated, not the current default branch tip
+        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
     - name: Log in to Container Registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
@@ -71,7 +75,7 @@ jobs:
 
     - name: Extract metadata (frontend)
       id: meta-frontend
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
       with:
         images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}
         tags: |
@@ -87,11 +91,11 @@ jobs:
       id: build-meta-frontend
       run: |
         echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "commit=${{ github.event.workflow_run.head_sha || github.sha }}" >> $GITHUB_OUTPUT
         echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
     - name: Build and push frontend
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
       with:
         context: ./klask-react
         file: ./klask-react/Dockerfile
@@ -102,23 +106,20 @@ jobs:
           VITE_APP_VERSION=${{ steps.build-meta-frontend.outputs.version }}
           VITE_APP_COMMIT=${{ steps.build-meta-frontend.outputs.commit }}
           VITE_APP_BUILD_TIME=${{ steps.build-meta-frontend.outputs.build_time }}
+        provenance: mode=max
+        sbom: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
   build-backend:
     needs: detect-changes
-    # Condition pour exécuter ce job :
-    # - Sur main/master : toujours (pour garder les versions homogènes)
-    # - Sur autres branches : seulement si backend modifié
-    # - Sur workflow_dispatch manuel : seulement si backend modifié
-    if: >
-        ${{ (github.event.workflow_run.conclusion == 'success' &&
+    # Conditions: same as build-frontend, for the backend
+    if: (github.event.workflow_run.conclusion == 'success' &&
             (startsWith(github.event.workflow_run.head_branch, 'main') ||
              startsWith(github.event.workflow_run.head_branch, 'master') ||
              needs.detect-changes.outputs.backend == 'true')) ||
             (github.event_name == 'workflow_dispatch' &&
              needs.detect-changes.outputs.backend == 'true')
-        }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -127,13 +128,15 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
     - name: Log in to Container Registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
@@ -141,7 +144,7 @@ jobs:
 
     - name: Extract metadata (backend)
       id: meta-backend
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
       with:
         images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}
         tags: |
@@ -157,11 +160,11 @@ jobs:
       id: build-meta-backend
       run: |
         echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "commit=${{ github.event.workflow_run.head_sha || github.sha }}" >> $GITHUB_OUTPUT
         echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
     - name: Build and push backend
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
       with:
         context: ./klask-rs
         file: ./klask-rs/Dockerfile
@@ -172,10 +175,12 @@ jobs:
           KLASK_VERSION=${{ steps.build-meta-backend.outputs.version }}
           GIT_COMMIT_HASH=${{ steps.build-meta-backend.outputs.commit }}
           BUILD_TIMESTAMP=${{ steps.build-meta-backend.outputs.build_time }}
+        provenance: mode=max
+        sbom: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    # Make packages public (optional - uncomment if you want automatic public visibility)
+    # Optional: make the packages public automatically (uncomment if wanted)
     # - name: Make frontend package public
     #   run: |
     #     gh api -X PATCH "/user/packages/container/klask-frontend/versions" \
@@ -192,98 +197,105 @@ jobs:
 
   security-scan-frontend:
     needs: [detect-changes, build-frontend]
-    # Même condition que build-frontend : scan si l'image a été construite
-    if: >
-        ${{ (github.event.workflow_run.conclusion == 'success' &&
+    # Same condition as build-frontend: scan when the image was built
+    if: (github.event.workflow_run.conclusion == 'success' &&
             (startsWith(github.event.workflow_run.head_branch, 'main') ||
              startsWith(github.event.workflow_run.head_branch, 'master') ||
              needs.detect-changes.outputs.frontend == 'true')) ||
             (github.event_name == 'workflow_dispatch' &&
              needs.detect-changes.outputs.frontend == 'true')
-        }}
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # Needed to upload SARIF results to code scanning
+      security-events: write
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - name: Determine image tag for security scan
       id: tag
       run: |
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          # Pour les PRs, utiliser pr-NUMBER
+          # Pull requests: use pr-NUMBER
           echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
         elif [[ "${{ github.ref_type }}" == "tag" ]]; then
-          # Pour les tags Git (v1.0.0), utiliser la version
+          # Git tags (v1.0.0): use the version
           echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
         elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
-          # Pour main/master, utiliser latest
+          # main/master: use latest
           echo "tag=latest" >> $GITHUB_OUTPUT
         else
-          # Pour les autres branches, utiliser le nom de la branche (nettoyé)
+          # Other branches: use the cleaned branch name
           BRANCH_NAME="${{ github.ref_name }}"
           CLEAN_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g')
           echo "tag=$CLEAN_BRANCH_NAME" >> $GITHUB_OUTPUT
         fi
 
+    # Pinned to the commit of tag 0.28.0 (the tag is "0.28.0", without "v")
     - name: Run Trivy vulnerability scanner (frontend)
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # 0.28.0
       with:
         image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
         format: 'sarif'
         output: 'trivy-frontend.sarif'
 
     - name: Upload Trivy scan results (frontend)
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
       with:
         sarif_file: 'trivy-frontend.sarif'
         category: 'trivy-frontend'
 
   security-scan-backend:
     needs: [detect-changes, build-backend]
-    # Même condition que build-backend : scan si l'image a été construite
-    if: >
-        ${{ (github.event.workflow_run.conclusion == 'success' &&
+    # Same condition as build-backend: scan when the image was built
+    if: (github.event.workflow_run.conclusion == 'success' &&
             (startsWith(github.event.workflow_run.head_branch, 'main') ||
              startsWith(github.event.workflow_run.head_branch, 'master') ||
              needs.detect-changes.outputs.backend == 'true')) ||
             (github.event_name == 'workflow_dispatch' &&
              needs.detect-changes.outputs.backend == 'true')
-        }}
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - name: Determine image tag for security scan
       id: tag
       run: |
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          # Pour les PRs, utiliser pr-NUMBER
+          # Pull requests: use pr-NUMBER
           echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
         elif [[ "${{ github.ref_type }}" == "tag" ]]; then
-          # Pour les tags Git (v1.0.0), utiliser la version
+          # Git tags (v1.0.0): use the version
           echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
         elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
-          # Pour main/master, utiliser latest
+          # main/master: use latest
           echo "tag=latest" >> $GITHUB_OUTPUT
         else
-          # Pour les autres branches, utiliser le nom de la branche (nettoyé)
+          # Other branches: use the cleaned branch name
           BRANCH_NAME="${{ github.ref_name }}"
           CLEAN_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g')
           echo "tag=$CLEAN_BRANCH_NAME" >> $GITHUB_OUTPUT
         fi
 
+    # Was "@master" (mobile reference); now pinned like the frontend scan
     - name: Run Trivy vulnerability scanner (backend)
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # 0.28.0
       with:
         image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
         format: 'sarif'
         output: 'trivy-backend.sarif'
 
     - name: Upload Trivy scan results (backend)
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
       with:
         sarif_file: 'trivy-backend.sarif'
         category: 'trivy-backend'

@@ -1,0 +1,11 @@
+# The Dockerfile copies only Cargo.toml, Cargo.lock, src/, migrations/ and
+# docker-entrypoint.sh. Keep local build output and secrets out of the context.
+target
+.git
+.env
+.env.*
+!.env.example
+*.md
+eval
+examples
+tests
