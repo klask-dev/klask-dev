@@ -15,6 +15,11 @@ data:
   {{- if .Values.backend.config.gitlabAcceptInvalidCerts }}
   KLASK_GITLAB_ACCEPT_INVALID_CERTS: {{ .Values.backend.config.gitlabAcceptInvalidCerts | quote }}
   {{- end }}
+  ALLOW_REGISTRATION: {{ .Values.backend.config.allowRegistration | default false | toString | quote }}
+  COOKIE_SECURE: {{ .Values.backend.config.cookieSecure | default false | toString | quote }}
+  TRUSTED_PROXY_HOPS: "{{ if eq (toString .Values.backend.config.trustedProxyHops) "auto" }}{{ if or .Values.ingress.enabled .Values.istio.enabled }}1{{ else }}0{{ end }}{{ else }}{{ .Values.backend.config.trustedProxyHops }}{{ end }}"
+  FILESYSTEM_ALLOWED_ROOTS: {{ .Values.backend.config.filesystemAllowedRoots | default "" | quote }}
+  ALLOW_PRIVATE_NETWORK_URLS: {{ .Values.backend.config.allowPrivateNetworkUrls | default true | toString | quote }}
   {{- range $key, $value := .Values.backend.config.extra }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}

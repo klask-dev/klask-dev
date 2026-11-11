@@ -17,7 +17,7 @@ impl JwtService {
         let secret = config.jwt_secret.as_bytes();
 
         // Parse expires_in from config (e.g., "24h", "1d", "60m")
-        let expires_in = Self::parse_duration(&config.jwt_expires_in)?;
+        let expires_in = Duration::seconds(crate::config::parse_duration_secs(&config.jwt_expires_in)?);
 
         let mut validation = Validation::default();
         validation.set_issuer(&["klask"]);
@@ -29,6 +29,11 @@ impl JwtService {
             validation,
             expires_in,
         })
+    }
+
+    /// Session lifetime in seconds; also used for the cookie `Max-Age`.
+    pub fn expires_in_secs(&self) -> i64 {
+        self.expires_in.num_seconds()
     }
 
     pub fn encode_token(&self, claims: &TokenClaims) -> Result<String> {
@@ -45,25 +50,5 @@ impl JwtService {
     pub fn create_token_for_user(&self, user_id: uuid::Uuid, username: String, role: String) -> Result<String> {
         let claims = TokenClaims::new(user_id, username, role, self.expires_in);
         self.encode_token(&claims)
-    }
-
-    fn parse_duration(duration_str: &str) -> Result<Duration> {
-        if duration_str.ends_with('h') {
-            let hours: i64 = duration_str.trim_end_matches('h').parse()?;
-            Ok(Duration::hours(hours))
-        } else if duration_str.ends_with('d') {
-            let days: i64 = duration_str.trim_end_matches('d').parse()?;
-            Ok(Duration::days(days))
-        } else if duration_str.ends_with('m') {
-            let minutes: i64 = duration_str.trim_end_matches('m').parse()?;
-            Ok(Duration::minutes(minutes))
-        } else if duration_str.ends_with('s') {
-            let seconds: i64 = duration_str.trim_end_matches('s').parse()?;
-            Ok(Duration::seconds(seconds))
-        } else {
-            // Default to hours if no unit specified
-            let hours: i64 = duration_str.parse()?;
-            Ok(Duration::hours(hours))
-        }
     }
 }

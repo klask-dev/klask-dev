@@ -5,8 +5,13 @@ also reads a `.env` file in its working directory (see
 [`klask-rs/.env.example`](../../klask-rs/.env.example)); for Docker Compose
 use the `.env` file at the repository root (see [`.env.example`](../../.env.example)).
 
-Defaults below are the ones of the current code. Boolean and numeric values that
-cannot be parsed silently fall back to their default.
+Defaults below are the ones of the current code. The security settings are
+strict: an invalid value for `ALLOW_REGISTRATION`, `COOKIE_SECURE`,
+`ALLOW_PRIVATE_NETWORK_URLS` (booleans: `true/false`, `1/0`, `yes/no`, `on/off`)
+or `JWT_EXPIRES_IN` stops the backend at startup. Other numeric or boolean values
+that cannot be parsed fall back to their default.
+
+Settings whose default changed are listed in the [upgrade notes](upgrading.md).
 
 ## Required
 
@@ -31,8 +36,48 @@ cannot be parsed silently fall back to their default.
 | Variable | Default | Description |
 |---|---|---|
 | `JWT_EXPIRES_IN` | `24h` | Lifetime of a login token: a number followed by `s`, `m`, `h` or `d` (a bare number means hours). |
-| `ALLOW_REGISTRATION` | `true` | Whether visitors can create their own account from the login page. The very first account is created through the initial setup page and becomes the administrator; set this to `false` to prevent self-registration afterwards. |
+| `ALLOW_REGISTRATION` | `false` | Whether visitors can create their own account from the login page. The very first account is created through the initial setup page and becomes the administrator; further accounts are created from the admin panel unless this is `true`. |
+| `SETUP_TOKEN` | unset | Secret required by the first-run setup (`POST /api/auth/setup`, field `setup_token`) while no user exists. Without it, the setup is open to anyone who reaches the instance before you do. The setup page has no field for it yet: use the API, or leave it unset. |
+| `COOKIE_SECURE` | `false` | Adds `Secure` to the session cookie. Set `true` whenever the site is served over HTTPS. |
 | `ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:8080` | Comma-separated origins allowed by CORS. It must contain the URL of the frontend as seen by the browser. `docker-compose.yml` sets it to `http://localhost:8080` unless overridden. |
+| `TRUSTED_PROXY_HOPS` | `0` | Number of proxies in front of the backend that append to `X-Forwarded-For`. `0` ignores the header; `N` takes the N-th entry counted from the right, and the TCP peer when the header is too short or invalid. See below. |
+
+Passwords chosen at setup, registration and password change need at least 8
+characters with an uppercase letter, a lowercase letter and a digit. Changing a
+password revokes the API tokens of the account.
+
+**Login rate limit.** A (client address, username) pair that fails 10 times in
+15 minutes is refused until the window ends. Failures from one client address
+across many usernames only slow that client down (up to 5 s per request), so a
+shared address cannot lock out the whole instance.
+
+**Client address behind proxies (`TRUSTED_PROXY_HOPS`).** The rate limit is per
+client address, so the backend must know which proxies to trust. Count only the
+proxies a request really goes through before reaching the backend. In the
+compose stack the browser calls the backend on its published port, with no proxy
+in between: the value is `0`. In Kubernetes the ingress or gateway routes `/api`
+straight to the backend, which is one hop: the chart sets `1` when the ingress,
+the Gateway API route or Istio is enabled. Add one for each extra proxy or load
+balancer in front. A value higher than the real number of proxies lets a client
+choose the address it is counted under, by sending its own `X-Forwarded-For`,
+and so escape the login limit.
+
+## Repositories and limits
+
+| Variable | Default | Description |
+|---|---|---|
+| `ALLOW_PRIVATE_NETWORK_URLS` | `true` | Allows `http://` and private or loopback hosts for Git, GitLab and GitHub repositories. Set `false` on an instance whose administrators are not all trusted. |
+| `FILESYSTEM_ALLOWED_ROOTS` | empty | Comma-separated directories that `FileSystem` repositories may point into; paths are canonicalised (symlinks resolved). Empty means that no FileSystem repository can be created or edited. |
+| `MAX_REQUEST_BODY_BYTES` | `4194304` (4 MiB) | Maximum request body; larger requests get `413`. |
+| `REQUEST_TIMEOUT_SECS` | `60` | Maximum duration of a request; `0` disables it. Crawls run in the background and are not affected. |
+
+`ALLOW_PRIVATE_NETWORK_URLS=false` only checks the *syntax* of the URL: the
+scheme, IP literals in private or loopback ranges and the names `localhost`,
+`*.local`, `*.internal`, `*.localhost`. It does not resolve DNS names, so a name
+that resolves to a private address is accepted. It guards against mistakes and
+casual SSRF; it is not a boundary against a malicious administrator. Whatever
+the setting, `file://` URLs, the git `ext::` transport and URLs starting with
+`-` are refused.
 
 ## Search index and crawler
 

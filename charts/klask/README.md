@@ -273,7 +273,7 @@ helm uninstall klask
 ### Health Checks
 
 The chart includes health checks for all components:
-- Backend: `GET /api/status`
+- Backend: liveness `GET /api/status`, readiness `GET /health` (returns `503` when the database is unreachable)
 - Frontend: `GET /health`
 - PostgreSQL: Built-in health checks
 

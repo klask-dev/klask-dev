@@ -10,6 +10,7 @@
 
 - [Installation with Docker Compose](admin/installation.md): install, add repositories, back up, update.
 - [Configuration reference](admin/configuration.md): every environment variable.
+- [Upgrade notes](admin/upgrading.md): changes to check before updating an instance.
 - [Kubernetes with Helm](admin/helm.md): install, secrets, storage, upgrades.
 - [Semantic search](admin/semantic-search.md): optional meaning-based search.
 
