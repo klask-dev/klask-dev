@@ -202,7 +202,8 @@ async fn search_files(
 
     let page = params.page.unwrap_or(1);
     let limit = params.limit.unwrap_or(50).min(1000); // Cap at 1000 results max
-    let offset = (page - 1) * limit;
+    // Page and limit must be >= 1, and the window must stay within the search engine's bound
+    let offset = crate::services::search::result_window_offset(page, limit).ok_or(StatusCode::BAD_REQUEST)?;
 
     // Get search query from either 'q' or 'query' parameter
     let query_string = params.q.or(params.query).ok_or(StatusCode::BAD_REQUEST)?;
@@ -227,7 +228,7 @@ async fn search_files(
         min_size: params.min_size,
         max_size: params.max_size,
         limit: limit as usize,
-        offset: offset as usize,
+        offset,
         include_facets: params.include_facets.unwrap_or(false),
         fuzzy_search: params.fuzzy_search.unwrap_or(false),
         regex_search: params.regex_search.unwrap_or(false),
