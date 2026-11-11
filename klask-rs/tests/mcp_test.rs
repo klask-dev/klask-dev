@@ -34,7 +34,12 @@ async fn setup_test_server() -> Result<(TestServer, AppState, TempDir)> {
     let search_service = Arc::new(SearchService::new(&index_dir)?);
 
     let config = AppConfig {
-        server: ServerConfig { host: "127.0.0.1".to_string(), port: 0 },
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            max_body_bytes: 4_194_304,
+            request_timeout_secs: 60,
+        },
         database: DatabaseConfig { url: database_url, max_connections: 5 },
         search: SearchConfig { index_dir: index_dir.to_string_lossy().to_string(), max_results: 10000 },
         crawler: CrawlerConfig { temp_dir: temp_dir.path().join("crawler").to_string_lossy().to_string() },
@@ -42,6 +47,13 @@ async fn setup_test_server() -> Result<(TestServer, AppState, TempDir)> {
             jwt_secret: TEST_JWT_SECRET.to_string(),
             jwt_expires_in: "1h".to_string(),
             allow_registration: true,
+            cookie_secure: false,
+            trusted_proxy_hops: 0,
+            setup_token: None,
+        },
+        repositories: klask_rs::config::RepositoryPolicyConfig {
+            filesystem_allowed_roots: vec![],
+            allow_private_network_urls: false,
         },
         cors: CorsConfig { allowed_origins: vec![] },
         semantic: klask_rs::config::SemanticSearchConfig {
@@ -83,7 +95,7 @@ async fn setup_test_server() -> Result<(TestServer, AppState, TempDir)> {
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time: Instant::now(),
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
-        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        auth_rate_limits: Arc::new(klask_rs::auth::rate_limit::AuthRateLimits::default()),
     };
 
     let app = klask_rs::mcp::create_router().with_state(app_state.clone());

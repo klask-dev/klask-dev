@@ -28,7 +28,12 @@ async fn create_test_app_state() -> AppState {
 
     // Create test config
     let config = AppConfig {
-        server: klask_rs::config::ServerConfig { host: "127.0.0.1".to_string(), port: 3000 },
+        server: klask_rs::config::ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 3000,
+            max_body_bytes: 4_194_304,
+            request_timeout_secs: 60,
+        },
         database: klask_rs::config::DatabaseConfig {
             url: "postgres://test:test@localhost:9999/test".to_string(),
             max_connections: 1,
@@ -41,6 +46,13 @@ async fn create_test_app_state() -> AppState {
             jwt_secret: "test-secret-key-for-jwt-authentication".to_string(),
             jwt_expires_in: "1h".to_string(),
             allow_registration: true,
+            cookie_secure: false,
+            trusted_proxy_hops: 0,
+            setup_token: None,
+        },
+        repositories: klask_rs::config::RepositoryPolicyConfig {
+            filesystem_allowed_roots: vec![],
+            allow_private_network_urls: false,
         },
         cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
         semantic: klask_rs::config::SemanticSearchConfig {
@@ -95,7 +107,7 @@ async fn create_test_app_state() -> AppState {
         startup_time: Instant::now(),
         encryption_service: Arc::new(EncryptionService::new("test-encryption-key-32bytes").unwrap()),
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
-        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        auth_rate_limits: Arc::new(klask_rs::auth::rate_limit::AuthRateLimits::default()),
     }
 }
 
@@ -210,6 +222,9 @@ async fn test_jwt_token_creation() {
         jwt_secret: "test-secret-key".to_string(),
         jwt_expires_in: "1h".to_string(),
         allow_registration: true,
+        cookie_secure: false,
+        trusted_proxy_hops: 0,
+        setup_token: None,
     };
 
     let jwt_service = JwtService::new(&config).expect("Failed to create JWT service");
@@ -271,7 +286,12 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
 
     // Create test config with custom allow_registration
     let config = AppConfig {
-        server: klask_rs::config::ServerConfig { host: "127.0.0.1".to_string(), port: 3000 },
+        server: klask_rs::config::ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 3000,
+            max_body_bytes: 4_194_304,
+            request_timeout_secs: 60,
+        },
         database: klask_rs::config::DatabaseConfig {
             url: "postgres://test:test@localhost:9999/test".to_string(),
             max_connections: 1,
@@ -284,6 +304,13 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
             jwt_secret: "test-secret-key-for-jwt-authentication".to_string(),
             jwt_expires_in: "1h".to_string(),
             allow_registration,
+            cookie_secure: false,
+            trusted_proxy_hops: 0,
+            setup_token: None,
+        },
+        repositories: klask_rs::config::RepositoryPolicyConfig {
+            filesystem_allowed_roots: vec![],
+            allow_private_network_urls: false,
         },
         cors: klask_rs::config::CorsConfig { allowed_origins: vec!["http://localhost:5173".to_string()] },
         semantic: klask_rs::config::SemanticSearchConfig {
@@ -338,7 +365,7 @@ async fn create_test_app_state_with_registration(allow_registration: bool) -> Ap
         startup_time: Instant::now(),
         encryption_service,
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
-        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        auth_rate_limits: Arc::new(klask_rs::auth::rate_limit::AuthRateLimits::default()),
     }
 }
 
@@ -353,6 +380,9 @@ async fn test_allow_registration_true_via_config() {
         jwt_secret: "test-secret".to_string(),
         jwt_expires_in: "1h".to_string(),
         allow_registration: true,
+        cookie_secure: false,
+        trusted_proxy_hops: 0,
+        setup_token: None,
     };
 
     assert!(config.allow_registration);
@@ -365,6 +395,9 @@ async fn test_allow_registration_false_via_config() {
         jwt_secret: "test-secret".to_string(),
         jwt_expires_in: "1h".to_string(),
         allow_registration: false,
+        cookie_secure: false,
+        trusted_proxy_hops: 0,
+        setup_token: None,
     };
 
     assert!(!config.allow_registration);

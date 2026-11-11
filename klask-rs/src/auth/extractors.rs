@@ -1,5 +1,7 @@
+use crate::auth::rate_limit::AuthRateLimits;
 use crate::auth::{claims::TokenClaims, errors::AuthError, jwt::JwtService};
 use crate::database::Database;
+use crate::models::TokenScope;
 use crate::models::user::{User, UserRole};
 use crate::repositories::api_token_repository::ApiTokenRepository;
 use crate::repositories::user_repository::UserRepository;
@@ -44,8 +46,8 @@ pub struct AppState {
     pub startup_time: Instant,
     /// Rate limiter for delete account attempts (user_id -> (attempts, last_reset_time))
     pub delete_account_rate_limiter: Arc<RwLock<HashMap<Uuid, (u32, std::time::SystemTime)>>>,
-    /// Rate limiter for login attempts (username -> (attempts, last_reset_time))
-    pub login_rate_limiter: Arc<RwLock<HashMap<String, (u32, std::time::SystemTime)>>>,
+    /// Bounded rate limits for login, registration and setup (per client address)
+    pub auth_rate_limits: Arc<AuthRateLimits>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +55,8 @@ pub struct AuthenticatedUser {
     pub user: User,
     #[allow(dead_code)]
     pub claims: TokenClaims,
+    /// `ReadWrite` for browser sessions (JWT); the stored scope for API tokens.
+    pub scope: TokenScope,
 }
 
 impl FromRequestParts<AppState> for AuthenticatedUser {
@@ -60,7 +64,29 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         let token = extract_token(&parts.headers)?;
-        extract_authenticated_user(state, &token).await
+        let auth_user = extract_authenticated_user(state, &token).await?;
+        if auth_user.scope == TokenScope::ReadOnly && !is_read_only_request(parts) {
+            warn!(
+                "Read-only API token of user {} used for a write request",
+                auth_user.user.username
+            );
+            return Err(AuthError::Forbidden("This API token is read-only".to_string()));
+        }
+        Ok(auth_user)
+    }
+}
+
+/// POST endpoints that only read data and may therefore be called with a
+/// read-only token. Every MCP tool is a search/read tool.
+const READ_ONLY_POST_PATHS: &[&str] = &["/mcp"];
+
+/// True when the request cannot modify server state, as far as a read-only
+/// token is concerned.
+fn is_read_only_request(parts: &Parts) -> bool {
+    match parts.method {
+        axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS => true,
+        axum::http::Method::POST => READ_ONLY_POST_PATHS.contains(&parts.uri.path()),
+        _ => false,
     }
 }
 
@@ -76,6 +102,16 @@ impl FromRequestParts<AppState> for AdminUser {
 
         let token = extract_token(&parts.headers)?;
         let auth_user = extract_authenticated_user(state, &token).await?;
+
+        // Administration requires a read-write credential, whatever the role
+        // of the token owner: a read-only token must never reach admin routes.
+        if auth_user.scope == TokenScope::ReadOnly {
+            warn!(
+                "Read-only API token of user {} used on an admin endpoint",
+                auth_user.user.username
+            );
+            return Err(AuthError::InsufficientPermissions);
+        }
 
         if auth_user.user.role != UserRole::Admin {
             warn!(
@@ -188,7 +224,7 @@ async fn extract_authenticated_user(state: &AppState, token: &str) -> Result<Aut
     }
 
     trace!("AuthenticatedUser extracted successfully: {}", user.username);
-    Ok(AuthenticatedUser { user, claims })
+    Ok(AuthenticatedUser { user, claims, scope: TokenScope::ReadWrite })
 }
 
 /// Extract and validate an authenticated user from a personal API token
@@ -220,6 +256,8 @@ async fn extract_authenticated_user_from_api_token(
             trace!("API token not found or invalid");
             AuthError::InvalidToken("Token not found or invalid".to_string())
         })?;
+
+    let scope = TokenScope::from_stored(&api_token.scope);
 
     // Check if token is active (not revoked)
     if !api_token.active {
@@ -279,12 +317,29 @@ async fn extract_authenticated_user_from_api_token(
         }
     });
 
-    Ok(AuthenticatedUser { user, claims })
+    Ok(AuthenticatedUser { user, claims, scope })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parts_for(method: &str, path: &str) -> Parts {
+        axum::http::Request::builder().method(method).uri(path).body(()).expect("valid request").into_parts().0
+    }
+
+    #[test]
+    fn test_read_only_requests_are_safe_methods_or_read_only_posts() {
+        assert!(is_read_only_request(&parts_for("GET", "/api/search")));
+        assert!(is_read_only_request(&parts_for("HEAD", "/api/search")));
+        assert!(is_read_only_request(&parts_for("POST", "/mcp")));
+        // Writes are refused for read-only tokens
+        assert!(!is_read_only_request(&parts_for("POST", "/api/repositories")));
+        assert!(!is_read_only_request(&parts_for("PUT", "/api/auth/password")));
+        assert!(!is_read_only_request(&parts_for("DELETE", "/api/users/tokens/1")));
+        // A write path that merely starts with /mcp is not exempt
+        assert!(!is_read_only_request(&parts_for("POST", "/mcp/admin")));
+    }
 
     #[test]
     fn test_extract_token_from_cookie() {

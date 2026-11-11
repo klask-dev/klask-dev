@@ -1,9 +1,10 @@
 use crate::auth::extractors::{AdminUser, AppState};
+use crate::config::RepositoryPolicyConfig;
 use crate::models::{Repository, RepositoryType};
 use crate::repositories::RepositoryRepository;
 use crate::services::github::{GitHubRepository, GitHubService};
 use crate::services::gitlab::{GitLabProject, GitLabService};
-use crate::utils::url_validator::validate_external_url;
+use crate::utils::url_validator::{validate_git_remote, validate_outbound_url};
 use anyhow::Result;
 use axum::{
     Router,
@@ -173,34 +174,84 @@ fn validate_github_namespace(namespace: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Validates FileSystem repository paths against path traversal attacks
-fn validate_filesystem_path(path: &str) -> Result<(), String> {
+/// Validates a repository name. The name is used to build a clone directory
+/// (`<temp_dir>/<name>-<id>`), so path separators, `..` and control characters
+/// are refused.
+fn validate_repository_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("Repository name cannot be empty".to_string());
+    }
+    if name.len() > 255 {
+        return Err("Repository name must be 255 characters or less".to_string());
+    }
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err("Repository name cannot contain '/', '\\' or '..'".to_string());
+    }
+    if name.chars().any(|c| c.is_control()) {
+        return Err("Repository name cannot contain control characters".to_string());
+    }
+    Ok(())
+}
+
+/// Validates a FileSystem repository path against the configured allowed roots
+/// (`FILESYSTEM_ALLOWED_ROOTS`). The path must exist and, once symlinks and
+/// `..` are resolved, lie inside one of the roots. Returns the canonical path,
+/// which is what gets stored.
+fn validate_filesystem_path(path: &str, allowed_roots: &[String]) -> Result<String, String> {
     use std::path::{Component, Path};
 
-    let pb = Path::new(path);
-
-    // Must be an absolute path
-    if !pb.is_absolute() {
-        return Err("FileSystem path must be absolute".to_string());
+    if allowed_roots.is_empty() {
+        return Err(
+            "FileSystem repositories are disabled: the server has no FILESYSTEM_ALLOWED_ROOTS configured".to_string(),
+        );
     }
 
-    // Check for ".." components (parent directory traversal)
-    if pb.components().any(|c| c == Component::ParentDir) {
+    let input = Path::new(path);
+    if !input.is_absolute() {
+        return Err("FileSystem path must be absolute".to_string());
+    }
+    if input.components().any(|c| c == Component::ParentDir) {
         return Err("FileSystem path must not contain '..'".to_string());
     }
 
-    // Reject access to dangerous system directories
-    let forbidden_dirs =
-        ["/etc", "/proc", "/sys", "/root", "/boot", "/dev", "/sbin", "/bin", "/lib", "/usr/bin", "/usr/sbin"];
-    let path_str = path;
-
-    for forbidden in &forbidden_dirs {
-        if path_str == *forbidden || path_str.starts_with(&format!("{}/", forbidden)) {
-            return Err("FileSystem path points to a restricted directory".to_string());
-        }
+    let canonical =
+        std::fs::canonicalize(input).map_err(|_| "FileSystem path does not exist or is not accessible".to_string())?;
+    if !canonical.is_dir() {
+        return Err("FileSystem path must be a directory".to_string());
     }
 
-    Ok(())
+    // Defence in depth: never index system directories, even if an operator
+    // configured a broad root.
+    let forbidden_dirs =
+        ["/etc", "/proc", "/sys", "/root", "/boot", "/dev", "/sbin", "/bin", "/lib", "/usr/bin", "/usr/sbin"];
+    if forbidden_dirs.iter().any(|f| canonical.starts_with(f)) {
+        return Err("FileSystem path points to a restricted directory".to_string());
+    }
+
+    let inside_root = allowed_roots
+        .iter()
+        .filter_map(|root| std::fs::canonicalize(root).ok())
+        .any(|root| canonical.starts_with(&root));
+    if !inside_root {
+        return Err("FileSystem path is outside the allowed roots (FILESYSTEM_ALLOWED_ROOTS)".to_string());
+    }
+
+    canonical.to_str().map(str::to_string).ok_or_else(|| "FileSystem path is not valid UTF-8".to_string())
+}
+
+/// Validates the location of a repository for its type and returns the value
+/// to store when it must be normalised (canonical FileSystem path).
+fn validate_location(
+    repository_type: &RepositoryType,
+    url: &str,
+    policy: &RepositoryPolicyConfig,
+) -> Result<Option<String>, String> {
+    match repository_type {
+        RepositoryType::FileSystem => validate_filesystem_path(url, &policy.filesystem_allowed_roots).map(Some),
+        RepositoryType::Git | RepositoryType::GitLab | RepositoryType::GitHub => {
+            validate_git_remote(url, policy.allow_private_network_urls).map(|_| None)
+        }
+    }
 }
 
 pub async fn create_router() -> Result<Router<AppState>> {
@@ -552,13 +603,21 @@ async fn create_repository(
         }
     };
     let repo_repository = RepositoryRepository::new(app_state.database.pool().clone());
+    let mut request = request;
 
-    // Validate FileSystem path if it's a FileSystem repository
-    if request.repository_type == RepositoryType::FileSystem
-        && let Err(e) = validate_filesystem_path(&request.url)
-    {
-        error!("Invalid FileSystem path '{}': {}", request.url, e);
+    if let Err(e) = validate_repository_name(&request.name) {
+        error!("Invalid repository name '{}': {}", request.name, e);
         return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // FileSystem paths must sit under an allowed root; remote URLs follow the outbound policy
+    match validate_location(&request.repository_type, &request.url, &app_state.config.repositories) {
+        Ok(Some(canonical)) => request.url = canonical,
+        Ok(None) => {}
+        Err(e) => {
+            error!("Invalid repository location '{}': {}", request.url, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
     }
 
     // Validate GitHub namespace if provided
@@ -684,32 +743,29 @@ async fn update_repository(
 
     // Update fields if provided
     if let Some(name) = request.name {
+        if let Err(e) = validate_repository_name(&name) {
+            error!("Invalid repository name '{}': {}", name, e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
         if name != old_name {
             name_changed = true;
         }
         repository.name = name;
     }
-    if let Some(url) = request.url {
-        // Validate FileSystem path if it's a FileSystem repository (either existing or being changed to)
-        let is_filesystem = request
-            .repository_type
-            .as_ref()
-            .map(|t| t == &RepositoryType::FileSystem)
-            .unwrap_or_else(|| repository.repository_type == RepositoryType::FileSystem);
-        if is_filesystem && let Err(e) = validate_filesystem_path(&url) {
-            error!("Invalid FileSystem path '{}': {}", url, e);
-            return Err(StatusCode::BAD_REQUEST);
+    // URL and type are validated together, against the type the repository will have
+    if request.url.is_some() || request.repository_type.is_some() {
+        let target_type = request.repository_type.clone().unwrap_or_else(|| repository.repository_type.clone());
+        let candidate = request.url.clone().unwrap_or_else(|| repository.url.clone());
+        match validate_location(&target_type, &candidate, &app_state.config.repositories) {
+            Ok(Some(canonical)) => repository.url = canonical,
+            Ok(None) => repository.url = candidate,
+            Err(e) => {
+                error!("Invalid repository location '{}': {}", candidate, e);
+                return Err(StatusCode::BAD_REQUEST);
+            }
         }
-        repository.url = url;
     }
     if let Some(repository_type) = request.repository_type {
-        // If changing to FileSystem, validate the URL
-        if repository_type == RepositoryType::FileSystem
-            && let Err(e) = validate_filesystem_path(&repository.url)
-        {
-            error!("Invalid FileSystem path '{}': {}", repository.url, e);
-            return Err(StatusCode::BAD_REQUEST);
-        }
         repository.repository_type = repository_type;
     }
     if let Some(branch) = request.branch {
@@ -1162,11 +1218,14 @@ async fn test_github_token(
 // GitLab discovery endpoint
 async fn discover_gitlab_repositories(
     _user: AdminUser,
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Json(request): Json<DiscoverGitLabRequest>,
 ) -> Result<Json<DiscoverGitLabResponse>, StatusCode> {
     // Validate GitLab URL against SSRF
-    if let Err(e) = validate_external_url(&request.gitlab_url) {
+    if let Err(e) = validate_outbound_url(
+        &request.gitlab_url,
+        app_state.config.repositories.allow_private_network_urls,
+    ) {
         warn!("SSRF validation failed for GitLab URL: {}", e);
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -1196,11 +1255,14 @@ async fn discover_gitlab_repositories(
 // GitLab token test endpoint
 async fn test_gitlab_token(
     _user: AdminUser,
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Json(request): Json<TestGitLabTokenRequest>,
 ) -> Result<Json<TestTokenResponse>, StatusCode> {
     // Validate GitLab URL against SSRF
-    if let Err(e) = validate_external_url(&request.gitlab_url) {
+    if let Err(e) = validate_outbound_url(
+        &request.gitlab_url,
+        app_state.config.repositories.allow_private_network_urls,
+    ) {
         warn!("SSRF validation failed for GitLab URL: {}", e);
         return Ok(Json(TestTokenResponse {
             valid: false,
@@ -1390,4 +1452,69 @@ async fn get_active_crawl_progress(
     Ok(Json(serde_json::json!({
         "active_progress": progress_data
     })))
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    #[test]
+    fn test_repository_name_rules() {
+        assert!(validate_repository_name("my-repo_1.0").is_ok());
+        assert!(validate_repository_name("").is_err());
+        assert!(validate_repository_name("   ").is_err());
+        assert!(validate_repository_name("a/b").is_err());
+        assert!(validate_repository_name("a\\b").is_err());
+        assert!(validate_repository_name("..").is_err());
+        assert!(validate_repository_name("x..y").is_err());
+        assert!(validate_repository_name("bad\nname").is_err());
+        assert!(validate_repository_name(&"n".repeat(256)).is_err());
+    }
+
+    #[test]
+    fn test_filesystem_disabled_without_allowed_roots() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().to_string_lossy().to_string();
+        assert!(validate_filesystem_path(&path, &[]).is_err());
+    }
+
+    #[test]
+    fn test_filesystem_path_must_be_under_an_allowed_root() {
+        let root = tempfile::tempdir().expect("root");
+        let outside = tempfile::tempdir().expect("outside");
+        let inside_dir = root.path().join("project");
+        std::fs::create_dir(&inside_dir).expect("mkdir");
+        let roots = vec![root.path().to_string_lossy().to_string()];
+
+        let accepted = validate_filesystem_path(&inside_dir.to_string_lossy(), &roots).expect("inside root accepted");
+        assert!(accepted.starts_with(&*root.path().canonicalize().expect("canon").to_string_lossy()));
+
+        let outside_path = outside.path().to_string_lossy().to_string();
+        assert!(validate_filesystem_path(&outside_path, &roots).is_err());
+        assert!(validate_filesystem_path("relative/path", &roots).is_err());
+        assert!(validate_filesystem_path("/nonexistent/klask-test-path", &roots).is_err());
+        let traversal = format!("{}/../{}", inside_dir.to_string_lossy(), "x");
+        assert!(validate_filesystem_path(&traversal, &roots).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_filesystem_symlink_escape_is_refused() {
+        let root = tempfile::tempdir().expect("root");
+        let outside = tempfile::tempdir().expect("outside");
+        let link = root.path().join("escape");
+        std::os::unix::fs::symlink(outside.path(), &link).expect("symlink");
+        let roots = vec![root.path().to_string_lossy().to_string()];
+        assert!(validate_filesystem_path(&link.to_string_lossy(), &roots).is_err());
+    }
+
+    #[test]
+    fn test_location_policy_for_remote_types() {
+        let policy = RepositoryPolicyConfig { filesystem_allowed_roots: vec![], allow_private_network_urls: false };
+        assert!(validate_location(&RepositoryType::GitHub, "https://github.com/a/b.git", &policy).is_ok());
+        assert!(validate_location(&RepositoryType::Git, "file:///etc", &policy).is_err());
+        assert!(validate_location(&RepositoryType::GitLab, "https://10.0.0.5/group/p.git", &policy).is_err());
+        let lan = RepositoryPolicyConfig { filesystem_allowed_roots: vec![], allow_private_network_urls: true };
+        assert!(validate_location(&RepositoryType::GitLab, "http://gitlab.lan/group/p.git", &lan).is_ok());
+    }
 }

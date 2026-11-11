@@ -267,6 +267,16 @@ backend:
     logFormat: "json"
     ## @param backend.config.gitlabAcceptInvalidCerts Accept invalid SSL certificates for GitLab (useful for self-signed certificates)
     gitlabAcceptInvalidCerts: "false"
+    ## @param backend.config.allowRegistration Allow self-service registration (ALLOW_REGISTRATION). Default false: the first admin is created on the setup page, other users are created by an admin
+    allowRegistration: false
+    ## @param backend.config.cookieSecure Add the Secure flag to the auth cookie (COOKIE_SECURE). Enable when the site is served over HTTPS
+    cookieSecure: false
+    ## @param backend.config.trustedProxyHops Number of proxies appending to X-Forwarded-For in front of the backend (TRUSTED_PROXY_HOPS). "auto" = 1 when ingress or istio is enabled (the gateway routes /api straight to the backend service), otherwise 0 (header ignored). Raise it if more proxies sit in front of the gateway
+    trustedProxyHops: "auto"
+    ## @param backend.config.filesystemAllowedRoots Comma-separated directories FileSystem repositories may index (FILESYSTEM_ALLOWED_ROOTS). Empty disables FileSystem repositories
+    filesystemAllowedRoots: ""
+    ## @param backend.config.allowPrivateNetworkUrls Allow http:// and private-network hosts for Git/GitLab/GitHub repositories (ALLOW_PRIVATE_NETWORK_URLS). Default true (self-hosted GitLab/Gitea). Set false on exposed or shared instances
+    allowPrivateNetworkUrls: true
     ## @param backend.config.auditLog Audit logging configuration for security events
     auditLog:
       ## @param backend.config.auditLog.enabled Enable structured audit logging for production
@@ -324,8 +334,9 @@ backend:
   ## @param backend.readinessProbe Backend readiness probe configuration
   readinessProbe:
     enabled: true
+    # /health answers 503 while the database is unreachable, so the pod leaves the Service
     httpGet:
-      path: /api/status
+      path: /health
       port: 3000
     initialDelaySeconds: 5
     periodSeconds: 5

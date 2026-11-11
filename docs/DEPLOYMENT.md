@@ -78,6 +78,62 @@ RUST_LOG=info
 VITE_API_URL=http://localhost:3000
 ```
 
+### Security settings
+
+These variables change the security posture of the backend. Defaults are
+safe for a new install; **existing instances are affected by the default changes
+marked "Upgrade impact"**.
+
+| Variable | Default | Purpose | Upgrade impact |
+|----------|---------|---------|----------------|
+| `ALLOW_REGISTRATION` | `false` | Self-service sign-up on `/api/auth/register`. | **Changed** (was `true`). Instances that relied on open sign-up must set `ALLOW_REGISTRATION=true` explicitly, or create accounts from the admin panel. |
+| `COOKIE_SECURE` | `false` | Adds `Secure` to the `auth_token` cookie. | None. Set `true` when the site is served over HTTPS. |
+| `TRUSTED_PROXY_HOPS` | `0` | Number of proxies that append to `X-Forwarded-For` in front of the backend. `0` ignores the header; `N` takes the N-th entry counted from the right. Falls back to the TCP peer when the header is too short or invalid. | None for direct access. The compose files use `0`; the chart sets `1` when the ingress or Istio is enabled. See the note below the table. |
+| `SETUP_TOKEN` | unset | Secret required by `POST /api/auth/setup` while no user exists. | None. The setup page does not yet have a field for it: use the API (`setup_token` in the JSON body) or leave it unset. |
+| `FILESYSTEM_ALLOWED_ROOTS` | empty | Comma-separated directories that `FileSystem` repositories may point into. Paths are canonicalised (symlinks resolved). | **Changed**: with the empty default, no FileSystem repository can be created or updated. Existing FileSystem repositories keep crawling, but set this variable to the directories they use before editing them. |
+| `ALLOW_PRIVATE_NETWORK_URLS` | `true` | Allow `http://` and private/loopback hosts for Git, GitLab and GitHub repositories and for GitLab discovery. | Compared with the previous release: `file://` URLs are now refused for Git repositories, and Git URLs are checked at creation and update. Set `false` on exposed or shared instances. See "What the URL option protects" below. |
+| `MAX_REQUEST_BODY_BYTES` | `4194304` (4 MiB) | Maximum request body; larger requests get `413`. | None for normal use. Raise it if you upload very large profile avatars. |
+| `REQUEST_TIMEOUT_SECS` | `60` | Maximum duration of a request; `0` disables it. Long crawls run in the background and are not affected. | None. |
+| `JWT_EXPIRES_IN` | `24h` | Session lifetime (`s`, `m`, `h`, `d` suffixes). Invalid values now stop the server at startup. | Invalid values used to fall back silently. |
+
+Boolean variables accept `true/false`, `1/0`, `yes/no`, `on/off`; any other value stops
+the server at startup.
+
+**Client address behind proxies (`TRUSTED_PROXY_HOPS`).** Rate limits are per client address.
+Count only the proxies that sit between the client and the backend and append to
+`X-Forwarded-For`. In the compose stack the browser calls the backend directly on its published
+port (`BACKEND_BASE_URL`), with no proxy in between, so the value is `0` and the header is
+ignored. In Kubernetes the ingress (or Istio gateway) routes `/api` straight to the backend
+service, which makes one hop: the chart sets `1` automatically when either is enabled. Add one
+for each extra proxy or load balancer in front of that gateway.
+Setting the value higher than the real number of proxies lets a client choose the address it is
+counted under, by sending its own `X-Forwarded-For`, and so escape the per-account login limit.
+
+**What the URL option protects (`ALLOW_PRIVATE_NETWORK_URLS`).** It only checks the *syntax*
+of the URL: scheme, and with `false`, IP literals in private or loopback ranges and the names
+`localhost`, `*.local`, `*.internal`, `*.localhost`. It does **not** resolve DNS names, so a name
+that resolves to a private address is accepted, and an administrator can always point a repository
+at an internal service. It is a guard against mistakes and casual SSRF, not a security boundary
+against a malicious administrator. The following are refused whatever the setting:
+`file://`, the git `ext::` transport, and URLs starting with `-`.
+
+**Other behaviour changes in this release**
+
+- API tokens: a token created with `scope: "read-only"` (the only scope created so far)
+  is now enforced. It is refused on every write request and on every admin endpoint.
+  Tokens can be created with `scope: "read-write"`. Clients that wrote data with a token
+  created before this change must be given a new `read-write` token.
+- Changing the password revokes all personal API tokens of the account.
+- Registration and first-run setup passwords must have at least 8 characters, with an
+  uppercase letter, a lowercase letter and a digit (the rule already used by password
+  change). Login still accepts any password of 6 characters or more, so existing accounts are not locked out.
+- Login: a (client address, username) pair that fails 10 times in 15 minutes is refused until the
+  window ends. Failures from one client address across all usernames only slow its requests
+  down (up to 5 s each), so a shared address cannot lock out the whole instance. Registration
+  and setup attempts are slowed down the same way.
+- `GET /health` returns `503` when the database is unreachable (it returned `200` before).
+  The chart's backend readiness probe now uses `/health`.
+
 ---
 
 ## ☸️ Kubernetes (Helm)

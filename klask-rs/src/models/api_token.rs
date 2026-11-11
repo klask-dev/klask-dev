@@ -9,6 +9,42 @@ use sha2::{Digest, Sha256};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+/// Permission level of a personal API token, stored in `api_tokens.scope`.
+///
+/// Enforced in `auth::extractors`: a read-only token is refused on every
+/// write (non-GET/HEAD/OPTIONS) request and can never pass `AdminUser`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenScope {
+    ReadOnly,
+    ReadWrite,
+}
+
+impl TokenScope {
+    pub const READ_ONLY: &'static str = "read-only";
+    pub const READ_WRITE: &'static str = "read-write";
+
+    /// Parse a scope supplied by a client. Unknown values are rejected.
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            Self::READ_ONLY => Some(Self::ReadOnly),
+            Self::READ_WRITE => Some(Self::ReadWrite),
+            _ => None,
+        }
+    }
+
+    /// Interpret a stored scope. Unknown values fail closed to read-only.
+    pub fn from_stored(value: &str) -> Self {
+        Self::parse(value).unwrap_or(Self::ReadOnly)
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ReadOnly => Self::READ_ONLY,
+            Self::ReadWrite => Self::READ_WRITE,
+        }
+    }
+}
+
 /// Represents a stored API token (internal use, includes hash)
 #[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct ApiToken {
@@ -56,6 +92,9 @@ pub struct CreateApiTokenRequest {
     pub name: String,
     #[serde(default)]
     pub expires_in_days: Option<i32>,
+    /// `read-only` (default) or `read-write`.
+    #[serde(default)]
+    pub scope: Option<String>,
 }
 
 impl From<ApiToken> for ApiTokenInfo {
@@ -136,6 +175,16 @@ mod tests {
         let token = "klask_pat_abcdefghij";
         let prefix = extract_token_prefix(token);
         assert_eq!(prefix, "klask_pat_ab");
+    }
+
+    #[test]
+    fn test_token_scope_parsing_fails_closed() {
+        assert_eq!(TokenScope::parse("read-only"), Some(TokenScope::ReadOnly));
+        assert_eq!(TokenScope::parse("read-write"), Some(TokenScope::ReadWrite));
+        assert_eq!(TokenScope::parse("admin"), None);
+        assert_eq!(TokenScope::from_stored("admin"), TokenScope::ReadOnly);
+        assert_eq!(TokenScope::from_stored(""), TokenScope::ReadOnly);
+        assert_eq!(TokenScope::ReadWrite.as_str(), "read-write");
     }
 
     #[test]

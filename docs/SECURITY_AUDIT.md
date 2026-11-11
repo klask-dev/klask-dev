@@ -24,6 +24,25 @@ The audit identified **48 findings** across the three domains, including **1 Cri
 
 **All findings resolved.** No open findings remain.
 
+### Follow-up hardening (2026-11-11)
+
+A second review of the authentication and repository code found the points below.
+Status after the `fix/security-hardening` branch:
+
+| # | Point | Status | Where / notes |
+|---|-------|--------|---------------|
+| 1 | Open registration by default | Fixed (default changed) | `ALLOW_REGISTRATION` defaults to `false`. Upgrade impact in `docs/DEPLOYMENT.md`. Per-repository rights are not implemented (separate work). |
+| 2 | API token scope never enforced | Fixed | `TokenScope` in `models/api_token.rs`, enforced in `auth/extractors.rs`: read-only tokens are refused on writes and on `AdminUser` routes. Password change revokes all API tokens. |
+| 3 | Login limiter keyed by username, unbounded | Fixed | `auth/rate_limit.rs`: bounded fixed-window limiter. (client, username) pairs are refused after 10 failures per 15 min; per-client limits (logins, registration, setup) only slow requests down, so a shared address cannot lock out the instance. `TRUSTED_PROXY_HOPS` selects the client address in `X-Forwarded-For` (default 0 = ignored). |
+| 4 | Argon2 on async worker threads | Fixed | `utils/password.rs::{hash,verify}_password_async` run on `spawn_blocking`. |
+| 5 | Auth cookie without `Secure` | Partial | `COOKIE_SECURE` (default `false`, to keep plain-HTTP installs working). Duration parsing unified in `config::parse_duration_secs`; the cookie `Max-Age` now comes from the JWT service. |
+| 6 | Inconsistent password policy | Fixed | One rule (8+ characters, upper, lower, digit) for registration, setup, admin user creation, password change. Login keeps a 6-character minimum. |
+| 7 | No security headers, body limit or timeout | Fixed | `main.rs::create_app`: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `frame-ancestors 'none'` CSP on API responses; `MAX_REQUEST_BODY_BYTES`, `REQUEST_TIMEOUT_SECS`. |
+| 8 | `/health` returned 200 without a database | Fixed | Returns `503`. Helm backend readiness probe uses `/health`. |
+| 9 | FileSystem repositories accept any server path | Fixed (API side) | `FILESYSTEM_ALLOWED_ROOTS` (default empty = disabled), canonical path stored, symlink escapes refused, repository names validated (`/`, `..`, control characters). The crawler does not yet re-check existing repositories. |
+| 10 | Inconsistent SSRF policy | Fixed (configurable) | `utils/url_validator.rs`: Git/GitLab/GitHub URLs validated at create and update; `ALLOW_PRIVATE_NETWORK_URLS` (default `true`, self-hosted use case). Git transports `file://`, `ext::` and leading `-` are always refused. DNS names resolving to private addresses are not detected. |
+| 11 | Setup open to the first visitor, timezone list, avatar stub, per-request user reload | Partial | `SETUP_TOKEN` added (API only, no UI field yet). Timezone list, avatar endpoint and per-request user reload are unchanged. |
+
 ---
 
 ## Findings

@@ -29,6 +29,25 @@ pub fn hash_password(password: &str) -> Result<String> {
     Ok(password_hash)
 }
 
+/// Hash a password on the blocking thread pool.
+///
+/// Argon2 is deliberately expensive (tens of milliseconds of CPU); running it
+/// inline in an async handler stalls the Tokio worker that polls every other
+/// request scheduled on it.
+pub async fn hash_password_async(password: String) -> Result<String> {
+    tokio::task::spawn_blocking(move || hash_password(&password))
+        .await
+        .map_err(|e| anyhow::anyhow!("Password hashing task failed: {}", e))?
+}
+
+/// Verify a password against an Argon2id hash on the blocking thread pool.
+/// See [`hash_password_async`] for why.
+pub async fn verify_password_async(password: String, hash: String) -> Result<bool> {
+    tokio::task::spawn_blocking(move || verify_password(&password, &hash))
+        .await
+        .map_err(|e| anyhow::anyhow!("Password verification task failed: {}", e))?
+}
+
 /// Verify a password against an Argon2id hash
 pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
     let parsed_hash = PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Failed to parse password hash: {}", e))?;
@@ -64,5 +83,17 @@ mod tests {
 
         // Wrong password should not match
         assert!(!verify_password("wrong_password", &hash).expect("Verification error"));
+    }
+}
+
+#[cfg(test)]
+mod async_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_async_hash_and_verify_round_trip() {
+        let hash = hash_password_async("Round-trip-1".to_string()).await.expect("hash");
+        assert!(verify_password_async("Round-trip-1".to_string(), hash.clone()).await.expect("verify"));
+        assert!(!verify_password_async("wrong".to_string(), hash).await.expect("verify"));
     }
 }

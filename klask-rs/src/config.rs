@@ -10,12 +10,17 @@ pub struct AppConfig {
     pub auth: AuthConfig,
     pub cors: CorsConfig,
     pub semantic: SemanticSearchConfig,
+    pub repositories: RepositoryPolicyConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    /// Maximum accepted request body size in bytes (`MAX_REQUEST_BODY_BYTES`).
+    pub max_body_bytes: usize,
+    /// Per-request timeout in seconds, 0 disables it (`REQUEST_TIMEOUT_SECS`).
+    pub request_timeout_secs: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,7 +44,34 @@ pub struct CrawlerConfig {
 pub struct AuthConfig {
     pub jwt_secret: String,
     pub jwt_expires_in: String,
+    /// Self-service registration (`ALLOW_REGISTRATION`, default `false`).
     pub allow_registration: bool,
+    /// Adds the `Secure` attribute to the auth cookie (`COOKIE_SECURE`, default `false`).
+    /// Enable it whenever the instance is served over HTTPS.
+    pub cookie_secure: bool,
+    /// Number of reverse proxies in front of the backend that append to
+    /// `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`, default `0` = header ignored).
+    /// Count only the proxies the request really goes through: `1` behind an
+    /// ingress or gateway that routes `/api` to the backend, one more for each
+    /// extra proxy. See `api::auth` / `auth::rate_limit::client_key`.
+    pub trusted_proxy_hops: usize,
+    /// Optional secret required by `POST /api/auth/setup` (`SETUP_TOKEN`).
+    /// When unset, the first-run setup is open to anyone who can reach the instance.
+    pub setup_token: Option<String>,
+}
+
+/// Policy applied to repository definitions supplied through the API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepositoryPolicyConfig {
+    /// Directories a `FileSystem` repository may point into
+    /// (`FILESYSTEM_ALLOWED_ROOTS`, comma-separated, default empty = no
+    /// FileSystem repository can be created or updated).
+    pub filesystem_allowed_roots: Vec<String>,
+    /// Allow `http://` URLs and private/loopback hosts for Git, GitLab and
+    /// GitHub repositories and GitLab discovery (`ALLOW_PRIVATE_NETWORK_URLS`,
+    /// default `true`: Klask is self-hosted and usually indexes an internal
+    /// GitLab or Gitea). Set `false` on exposed or shared instances.
+    pub allow_private_network_urls: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +106,40 @@ pub struct SemanticSearchConfig {
     pub queue_capacity: usize,
 }
 
+/// Parse a boolean environment variable. Unset yields `default`; any value
+/// other than the usual truthy/falsy spellings is an error, so a typo cannot
+/// silently change a security setting.
+fn env_bool(name: &str, default: bool) -> Result<bool> {
+    match std::env::var(name) {
+        Err(_) => Ok(default),
+        Ok(raw) => match raw.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" | "yes" | "on" => Ok(true),
+            "false" | "0" | "no" | "off" => Ok(false),
+            other => Err(anyhow::anyhow!("{name} must be true or false, got '{other}'")),
+        },
+    }
+}
+
+/// Parse a duration such as `"90s"`, `"30m"`, `"24h"`, `"7d"` into seconds.
+/// A number without unit is read as hours (historical default of `JWT_EXPIRES_IN`).
+/// Used both for JWT lifetime and the auth cookie `Max-Age`, so they cannot diverge.
+pub fn parse_duration_secs(input: &str) -> Result<i64> {
+    let trimmed = input.trim();
+    let (digits, multiplier) = match trimmed.chars().last() {
+        Some('s') => (&trimmed[..trimmed.len() - 1], 1),
+        Some('m') => (&trimmed[..trimmed.len() - 1], 60),
+        Some('h') => (&trimmed[..trimmed.len() - 1], 3600),
+        Some('d') => (&trimmed[..trimmed.len() - 1], 86_400),
+        _ => (trimmed, 3600),
+    };
+    let value: i64 =
+        digits.parse().map_err(|_| anyhow::anyhow!("invalid duration '{input}' (expected e.g. 90s, 30m, 24h, 7d)"))?;
+    if value <= 0 {
+        return Err(anyhow::anyhow!("duration '{input}' must be strictly positive"));
+    }
+    value.checked_mul(multiplier).ok_or_else(|| anyhow::anyhow!("duration '{input}' is too large"))
+}
+
 impl AppConfig {
     pub fn new() -> Result<Self> {
         // Load .env file if it exists
@@ -84,6 +150,14 @@ impl AppConfig {
             server: ServerConfig {
                 host: std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
                 port: std::env::var("PORT").unwrap_or_else(|_| "3000".to_string()).parse().unwrap_or(3000),
+                max_body_bytes: std::env::var("MAX_REQUEST_BODY_BYTES")
+                    .unwrap_or_else(|_| "4194304".to_string())
+                    .parse()
+                    .map_err(|_| anyhow::anyhow!("MAX_REQUEST_BODY_BYTES must be a positive integer"))?,
+                request_timeout_secs: std::env::var("REQUEST_TIMEOUT_SECS")
+                    .unwrap_or_else(|_| "60".to_string())
+                    .parse()
+                    .map_err(|_| anyhow::anyhow!("REQUEST_TIMEOUT_SECS must be a non-negative integer"))?,
             },
             database: DatabaseConfig {
                 url: {
@@ -127,11 +201,29 @@ impl AppConfig {
                     }
                     secret
                 },
-                jwt_expires_in: std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "24h".to_string()),
-                allow_registration: std::env::var("ALLOW_REGISTRATION")
-                    .unwrap_or_else(|_| "true".to_string())
-                    .parse()
-                    .unwrap_or(true),
+                jwt_expires_in: {
+                    let raw = std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "24h".to_string());
+                    // Validate at startup rather than failing on the first login
+                    parse_duration_secs(&raw).map_err(|e| anyhow::anyhow!("JWT_EXPIRES_IN: {e}"))?;
+                    raw
+                },
+                allow_registration: env_bool("ALLOW_REGISTRATION", false)?,
+                cookie_secure: env_bool("COOKIE_SECURE", false)?,
+                trusted_proxy_hops: std::env::var("TRUSTED_PROXY_HOPS")
+                    .unwrap_or_else(|_| "0".to_string())
+                    .trim()
+                    .parse::<usize>()
+                    .map_err(|_| anyhow::anyhow!("TRUSTED_PROXY_HOPS must be a non-negative integer"))?,
+                setup_token: std::env::var("SETUP_TOKEN").ok().filter(|t| !t.trim().is_empty()),
+            },
+            repositories: RepositoryPolicyConfig {
+                filesystem_allowed_roots: std::env::var("FILESYSTEM_ALLOWED_ROOTS")
+                    .unwrap_or_default()
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect(),
+                allow_private_network_urls: env_bool("ALLOW_PRIVATE_NETWORK_URLS", true)?,
             },
             cors: CorsConfig {
                 allowed_origins: std::env::var("ALLOWED_ORIGINS")
@@ -180,5 +272,41 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self::new().expect("Failed to create default config")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_duration_secs_units() {
+        assert_eq!(parse_duration_secs("90s").unwrap(), 90);
+        assert_eq!(parse_duration_secs("30m").unwrap(), 1800);
+        assert_eq!(parse_duration_secs("24h").unwrap(), 86_400);
+        assert_eq!(parse_duration_secs("7d").unwrap(), 604_800);
+        // Bare number: hours, as before
+        assert_eq!(parse_duration_secs("2").unwrap(), 7200);
+    }
+
+    #[test]
+    fn test_parse_duration_secs_rejects_invalid() {
+        assert!(parse_duration_secs("").is_err());
+        assert!(parse_duration_secs("abc").is_err());
+        assert!(parse_duration_secs("0h").is_err());
+        assert!(parse_duration_secs("-5m").is_err());
+        assert!(parse_duration_secs("999999999999999d").is_err());
+    }
+}
+
+#[cfg(test)]
+mod env_bool_tests {
+    use super::*;
+
+    #[test]
+    fn test_env_bool_default_when_unset() {
+        // Unique variable name: never set by the environment or a .env file
+        assert!(!env_bool("KLASK_TEST_UNSET_BOOL_VARIABLE", false).expect("default"));
+        assert!(env_bool("KLASK_TEST_UNSET_BOOL_VARIABLE", true).expect("default"));
     }
 }

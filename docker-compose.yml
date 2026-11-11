@@ -38,6 +38,15 @@ services:
             - HOST=0.0.0.0
             - ENCRYPTION_KEY=${ENCRYPTION_KEY:-default-encryption-key-change-me}
             - JWT_SECRET=${JWT_SECRET:-default-jwt-key-change-me}
+            # Security defaults (see klask-rs/.env.example): registration closed,
+            # cookie without Secure (set COOKIE_SECURE=true behind HTTPS).
+            - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
+            - COOKIE_SECURE=${COOKIE_SECURE:-false}
+            # The browser calls the backend directly (BACKEND_BASE_URL), with no proxy in between,
+            # so X-Forwarded-For is ignored. Set the number of proxies only if you put a reverse
+            # proxy in front of the backend: see docs/DEPLOYMENT.md.
+            - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-0}
+            - ALLOW_PRIVATE_NETWORK_URLS=${ALLOW_PRIVATE_NETWORK_URLS:-true}
         ports:
             - "3000:3000"
         volumes:
