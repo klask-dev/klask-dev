@@ -111,6 +111,20 @@ The following table lists the configurable parameters and their default values:
 | `ingress.enabled` | Enable ingress | `false` |
 | `ingress.hosts[0].host` | Hostname | `klask.local` |
 
+The ingress routes `/api` and `/mcp` to the backend and the other paths to the frontend.
+
+### Gateway API Parameters
+
+An alternative to the Ingress: the chart creates an `HTTPRoute` (same routes)
+attached to a Gateway that already exists. Enable one or the other.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `httpRoute.enabled` | Create an HTTPRoute | `false` |
+| `httpRoute.parentRefs` | Gateways the route attaches to (required when enabled) | `[]` |
+| `httpRoute.hostnames` | Hostnames matched by the route | `[klask.local]` |
+| `httpRoute.annotations` | Annotations of the HTTPRoute | `{}` |
+
 ## Secrets Configuration
 
 The chart manages sensitive data using Kubernetes Secret objects, with **separate secrets for infrastructure and application concerns**:
