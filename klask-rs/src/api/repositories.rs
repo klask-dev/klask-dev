@@ -589,8 +589,7 @@ async fn create_repository(
     };
 
     // Helper function to clean empty strings from optional fields
-    let clean_optional_string =
-        |s: Option<String>| -> Option<String> { s.and_then(|v| if v.trim().is_empty() { None } else { Some(v) }) };
+    let clean_optional_string = |s: Option<String>| -> Option<String> { s.filter(|v| !v.trim().is_empty()) };
 
     let repository = Repository {
         id: Uuid::new_v4(),
