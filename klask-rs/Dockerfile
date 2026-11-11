@@ -64,8 +64,11 @@ COPY --from=builder /app/migrations /app/migrations
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
 
-# Create data directories owned by the application user
+# Create data directories owned by the application user. /app itself is owned
+# by that user too (not its content: the binary and migrations stay read-only),
+# because relative defaults such as ./models and ./vector-index are created there.
 RUN mkdir -p /app/data /app/index \
+    && chown 1000:1000 /app \
     && chown -R 1000:1000 /app/data /app/index
 
 # Run as the unprivileged user by default
