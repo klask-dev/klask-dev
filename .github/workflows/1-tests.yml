@@ -41,6 +41,7 @@ jobs:
               - 'klask-react/Dockerfile'
               - 'klask-react/entrypoint.sh'
               - 'klask-react/nginx.conf'
+              - 'klask-react/nginx-proxy.inc'
               - '**/.dockerignore'
 
   test-frontend:
