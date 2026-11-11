@@ -47,9 +47,10 @@ services:
             # cookie without Secure (set COOKIE_SECURE=true behind HTTPS).
             - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
             - COOKIE_SECURE=${COOKIE_SECURE:-false}
-            # The browser calls the backend directly (BACKEND_BASE_URL), with no proxy in between,
-            # so X-Forwarded-For is ignored. Set the number of proxies only if you put a reverse
-            # proxy in front of the backend: see docs/admin/configuration.md.
+            # By default the browser calls the backend directly (BACKEND_BASE_URL), with no
+            # proxy in between, so X-Forwarded-For is ignored. Set the number of proxies when
+            # requests go through the frontend nginx or a reverse proxy: see
+            # docs/admin/configuration.md.
             - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-0}
             - ALLOW_PRIVATE_NETWORK_URLS=${ALLOW_PRIVATE_NETWORK_URLS:-true}
         ports:
@@ -69,8 +70,11 @@ services:
         image: ghcr.io/klask-dev/klask-frontend:${KLASK_IMAGE_TAG:-latest}
         container_name: klask-frontend
         environment:
-            # URL the browser uses to reach the backend API
-            - BACKEND_BASE_URL=${BACKEND_BASE_URL:-http://localhost:3000}
+            # URL the browser uses to reach the backend API. Set it to an empty
+            # value to serve everything from this container: the browser then calls
+            # /api on the same host and nginx relays it to the backend
+            # (see "Serving Klask on another host name" in docs/admin/installation.md).
+            - BACKEND_BASE_URL=${BACKEND_BASE_URL-http://localhost:3000}
         ports:
             - "8080:8080"
         networks:

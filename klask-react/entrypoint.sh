@@ -5,8 +5,12 @@
 
 echo "🔧 Configuring frontend at runtime..."
 
-# Default values
-API_BASE_URL=${BACKEND_BASE_URL:-"http://localhost:3000"}
+# URL of the backend as seen by the browser.
+# - unset: http://localhost:3000 (the backend port published by docker compose)
+# - empty: same origin; the browser calls /api on the host that serves the
+#   interface, which must route it to the backend (ingress, gateway, or the
+#   nginx of this container, see BACKEND_UPSTREAM below)
+API_BASE_URL=${BACKEND_BASE_URL-"http://localhost:3000"}
 
 echo "📝 Setting API_BASE_URL to: '$API_BASE_URL'"
 
@@ -33,6 +37,31 @@ echo "✅ Runtime configuration complete"
 sed -i 's|<script|<script nonce="__CSP_NONCE__"|g' /usr/share/nginx/html/index.html
 
 echo "✅ CSP nonce attributes added"
+
+# Backend address used by nginx to relay /api and /mcp (host:port, as seen from
+# this container). nginx resolves it at request time with the resolvers of the
+# container, which do not apply search domains: in Kubernetes use the full
+# service name (<service>.<namespace>.svc.cluster.local:3000).
+BACKEND_UPSTREAM=${BACKEND_UPSTREAM:-"klask-backend:3000"}
+case "$BACKEND_UPSTREAM" in
+    *[!A-Za-z0-9._:-]*|"")
+        echo "❌ Invalid BACKEND_UPSTREAM: '$BACKEND_UPSTREAM' (expected host:port)" >&2
+        exit 1
+        ;;
+esac
+
+# DNS servers of the container (NGINX_RESOLVERS overrides them)
+if [ -z "${NGINX_RESOLVERS:-}" ]; then
+    NGINX_RESOLVERS=$(awk '$1 == "nameserver" && $2 !~ /%/ { if ($2 ~ /:/) printf "[%s] ", $2; else printf "%s ", $2 }' /etc/resolv.conf 2>/dev/null)
+fi
+NGINX_RESOLVERS=${NGINX_RESOLVERS:-"127.0.0.11"}
+
+{
+    echo "resolver ${NGINX_RESOLVERS% } valid=10s;"
+    echo "set \$backend \"${BACKEND_UPSTREAM}\";"
+} > /tmp/klask-nginx-backend.conf
+
+echo "✅ Backend upstream for /api and /mcp: $BACKEND_UPSTREAM"
 
 # Start nginx
 exec nginx -g "daemon off;"

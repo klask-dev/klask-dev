@@ -57,15 +57,32 @@ The configuration options are listed in [Configuration](configuration.md).
 
 ## Serving Klask on another host name
 
-The browser talks to the backend directly, so both must be told the public URLs
-in `.env`:
+With the default settings the browser calls the backend on
+`http://localhost:3000`, which only works on the machine that runs the stack.
+To serve Klask to other machines, use a single origin: the frontend container
+(port 8080) serves the interface and relays `/api` and `/mcp` to the backend.
+In `.env`:
 
 ```bash
-BACKEND_BASE_URL=https://klask-api.example.com   # URL of the backend, as seen by the browser
-ALLOWED_ORIGINS=https://klask.example.com        # URL of the frontend
+BACKEND_BASE_URL=                            # empty: the browser calls /api on the host serving the interface
+ALLOWED_ORIGINS=https://klask.example.com    # public URL of Klask
+COOKIE_SECURE=true                           # when Klask is served over HTTPS
+TRUSTED_PROXY_HOPS=2                         # your reverse proxy + the frontend nginx (1 without a reverse proxy)
 ```
 
-Put a reverse proxy with TLS in front of the two ports (8080 and 3000).
+Put a reverse proxy with TLS in front of port 8080 only. The API is then at
+`https://klask.example.com/api` and the MCP endpoint at
+`https://klask.example.com/mcp`.
+
+`TRUSTED_PROXY_HOPS` tells the backend how many proxies to trust when it reads
+the client address for the login rate limit. With a value above 0, the backend
+port (3000) must not be reachable by clients directly, since they could then
+forge that address: remove the `ports:` entry of `klask-backend` in
+`docker-compose.yml`, or block the port on the host firewall.
+
+Serving the API from its own host name still works: set `BACKEND_BASE_URL` to
+its public URL (for example `https://klask-api.example.com`), list the URL of
+the interface in `ALLOWED_ORIGINS`, and proxy both ports.
 
 ## Data and backups
 

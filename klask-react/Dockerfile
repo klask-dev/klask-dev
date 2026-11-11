@@ -33,6 +33,7 @@ RUN apk add --no-cache jq
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx-proxy.inc /etc/nginx/klask-proxy.inc
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh

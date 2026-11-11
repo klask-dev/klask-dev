@@ -7,6 +7,8 @@ backend: there is nothing to enable or install.
 ## Endpoint and authentication
 
 - **URL:** `POST /mcp` on the backend (for example `http://localhost:3000/mcp`).
+  The frontend container and the Helm chart (ingress, HTTPRoute, Istio) also
+  route `/mcp`, so on a deployed instance it is `https://<your-klask-host>/mcp`.
 - **Transport:** Streamable HTTP, stateless: every JSON-RPC message gets a plain
   JSON response. There are no sessions and no server-sent events, so `GET` and
   `DELETE` return `405`.

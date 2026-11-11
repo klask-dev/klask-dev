@@ -62,9 +62,8 @@ services:
             # cookie without Secure (set COOKIE_SECURE=true behind HTTPS).
             - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
             - COOKIE_SECURE=${COOKIE_SECURE:-false}
-            # The browser calls the backend directly (BACKEND_BASE_URL), with no proxy in between,
-            # so X-Forwarded-For is ignored. Set the number of proxies only if you put a reverse
-            # proxy in front of the backend: see docs/admin/configuration.md.
+            # The browser calls the backend directly (BACKEND_BASE_URL), with no proxy in
+            # between, so X-Forwarded-For is ignored. See docs/admin/configuration.md.
             - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-0}
             - ALLOW_PRIVATE_NETWORK_URLS=${ALLOW_PRIVATE_NETWORK_URLS:-true}
         ports:
@@ -97,8 +96,7 @@ services:
             - klask-network
         restart: unless-stopped
         environment:
-            # Backend is exposed on localhost:3000, frontend calls it directly
-            # No nginx proxy needed since backend has permissive CORS
+            # The backend is published on localhost:3001 and the browser calls it directly
             BACKEND_BASE_URL: "http://localhost:3001"
         deploy:
             resources:
