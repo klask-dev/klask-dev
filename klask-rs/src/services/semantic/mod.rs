@@ -8,19 +8,27 @@
 //! Roadmap and design decisions: docs/SEMANTIC_SEARCH_PLAN.md. The vector
 //! store, indexing worker and query path land in later phases.
 
+#[cfg(feature = "semantic-search")]
+pub mod backfill;
 pub mod chunker;
 pub mod embedder;
 pub mod fusion;
 #[cfg(feature = "semantic-search")]
 pub mod indexer;
 #[cfg(feature = "semantic-search")]
+pub mod query;
+#[cfg(feature = "semantic-search")]
 pub mod store;
 
+#[cfg(feature = "semantic-search")]
+pub use backfill::BackfillController;
 pub use embedder::EmbeddingProvider;
 #[cfg(feature = "semantic-search")]
 pub use embedder::FastEmbedProvider;
 #[cfg(feature = "semantic-search")]
-pub use indexer::{IndexJob, VectorIndexer};
+pub use indexer::{IndexJob, VectorIndexer, WriteMode};
+#[cfg(feature = "semantic-search")]
+pub use store::VectorStore;
 
 use crate::config::SemanticSearchConfig;
 use std::sync::Arc;
@@ -42,6 +50,15 @@ pub struct DisabledIndexer;
 pub type MaybeIndexer = Option<Arc<VectorIndexer>>;
 #[cfg(not(feature = "semantic-search"))]
 pub type MaybeIndexer = Option<DisabledIndexer>;
+
+/// Optional handle to the semantic backfill controller, carried by `AppState`
+/// so the admin endpoints can start/cancel/poll a rebuild. Resolves to the
+/// real controller with the feature and to an always-`None` zero-sized type
+/// without it (same pattern as [`MaybeIndexer`]).
+#[cfg(feature = "semantic-search")]
+pub type MaybeBackfill = Option<BackfillController>;
+#[cfg(not(feature = "semantic-search"))]
+pub type MaybeBackfill = Option<DisabledIndexer>;
 
 /// Initialize the embedding provider from configuration.
 ///
@@ -137,7 +154,34 @@ pub async fn init_vector_indexer(
 
     let chunk_options = ChunkOptions { max_lines: config.chunk_max_lines, overlap_lines: config.chunk_overlap_lines };
 
-    let indexer = VectorIndexer::start(provider, store, chunk_options, config.batch_size, config.queue_capacity);
+    // Give the indexing worker its own ONNX session instead of sharing the
+    // query-path provider: a batch embed can hold a session for tens of
+    // seconds, and sharing one session (a Mutex) made interactive searches
+    // wait behind indexing batches. Costs one extra copy of the model in RAM;
+    // if the second load fails, fall back to sharing (slow queries during
+    // indexing, but functional).
+    let worker_provider: Arc<dyn EmbeddingProvider> = match FastEmbedProvider::try_new(config) {
+        Ok(p) => {
+            tracing::info!(
+                "Loaded a dedicated embedding session for indexing (queries no longer wait on indexing batches)"
+            );
+            Arc::new(p)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Could not load a dedicated indexing session, sharing the query session (searches may stall during indexing): {e}"
+            );
+            provider
+        }
+    };
+
+    let indexer = VectorIndexer::start(
+        worker_provider,
+        store,
+        chunk_options,
+        config.batch_size,
+        config.queue_capacity,
+    );
 
     match indexer.count().await {
         Ok(n) => tracing::info!(
@@ -150,6 +194,28 @@ pub async fn init_vector_indexer(
     }
 
     Some(Arc::new(indexer))
+}
+
+/// Build the semantic backfill controller from a running indexer.
+///
+/// Returns `None` when there is no indexer (semantic search disabled or failed
+/// to start). The controller lets admins rebuild the vector index from the
+/// existing Tantivy documents (Phase 3); it carries clones of the search
+/// service and indexer to drive the rebuild.
+#[cfg(feature = "semantic-search")]
+pub fn init_backfill_controller(
+    indexer: &MaybeIndexer,
+    search_service: Arc<crate::services::SearchService>,
+    provider: &Arc<dyn EmbeddingProvider>,
+) -> MaybeBackfill {
+    indexer.as_ref().map(|indexer| {
+        BackfillController::new(
+            search_service,
+            indexer.clone(),
+            provider.model_id().to_string(),
+            provider.dimension(),
+        )
+    })
 }
 
 #[cfg(test)]

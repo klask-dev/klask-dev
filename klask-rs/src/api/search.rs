@@ -1,5 +1,5 @@
 use crate::auth::extractors::{AppState, AuthenticatedUser};
-use crate::services::SearchQuery;
+use crate::services::{MatchSource, SearchMode, SearchQuery};
 use anyhow::Result;
 use axum::{
     Router,
@@ -70,6 +70,7 @@ pub struct SearchRequest {
     pub regex_search: Option<bool>, // Enable regex search (pattern matching) - default: false
     pub regex_flags: Option<String>, // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
     pub case_sensitive: Option<bool>, // Enable case-sensitive search - default: false
+    pub mode: Option<SearchMode>,    // Search mode: keyword (default) | semantic | hybrid
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -123,12 +124,73 @@ pub struct SearchResult {
     pub extension: String,
     pub score: f32,
     pub line_number: Option<u32>,
+    /// Which engine(s) this result matched in (hybrid/semantic only); omitted for
+    /// keyword results so the keyword response is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_source: Option<MatchSource>,
+}
+
+/// Whether the semantic/hybrid search modes are usable on this server, surfaced
+/// to the regular search UI (non-admin) so it only shows the mode toggle when it
+/// would actually do something. True only when the feature is built in, the
+/// embedding model loaded, and the vector store opened.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchCapabilities {
+    pub semantic_enabled: bool,
 }
 
 pub async fn create_router() -> Result<Router<AppState>> {
-    let router = Router::new().route("/", get(search_files)).route("/facets", get(get_facets_with_filters));
+    let router = Router::new()
+        .route("/", get(search_files))
+        .route("/facets", get(get_facets_with_filters))
+        .route("/capabilities", get(get_capabilities));
 
     Ok(router)
+}
+
+/// Report whether semantic/hybrid search is available (see [`SearchCapabilities`]).
+/// Authenticated but not admin-gated — every user needs it to render the toggle.
+async fn get_capabilities(_auth: AuthenticatedUser, State(app_state): State<AppState>) -> Json<SearchCapabilities> {
+    let _ = &app_state; // used only in the feature build below
+    #[cfg(feature = "semantic-search")]
+    let semantic_enabled = app_state.semantic_embedder.is_some() && app_state.semantic_indexer.is_some();
+    #[cfg(not(feature = "semantic-search"))]
+    let semantic_enabled = false;
+
+    Json(SearchCapabilities { semantic_enabled })
+}
+
+/// Execute a search, dispatching to the semantic/hybrid query path when the
+/// mode needs it and the semantic backend is present, otherwise to keyword
+/// search. Centralizes the "degrade to keyword" decision so both build modes
+/// and all callers behave identically.
+pub(crate) async fn run_search(
+    app_state: &AppState,
+    query: SearchQuery,
+) -> anyhow::Result<crate::services::SearchResultsWithTotal> {
+    #[cfg(feature = "semantic-search")]
+    {
+        if query.mode.needs_semantic() {
+            match (&app_state.semantic_embedder, &app_state.semantic_indexer) {
+                (Some(embedder), Some(indexer)) => {
+                    return crate::services::semantic::query::semantic_search(
+                        &app_state.search_service,
+                        embedder,
+                        indexer,
+                        query,
+                    )
+                    .await;
+                }
+                _ => {
+                    // Backend unavailable (disabled or model failed to load):
+                    // degrade to keyword so search never breaks for the client.
+                    tracing::debug!("Semantic mode requested but backend unavailable; using keyword search");
+                }
+            }
+        }
+    }
+
+    app_state.search_service.search(query).await
 }
 
 async fn search_files(
@@ -153,6 +215,8 @@ async fn search_files(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let mode = params.mode.unwrap_or(SearchMode::Keyword);
+
     // Build search query - filters are already comma-separated strings
     let search_query = SearchQuery {
         query: query_string,
@@ -169,10 +233,14 @@ async fn search_files(
         regex_search: params.regex_search.unwrap_or(false),
         regex_flags: params.regex_flags,
         case_sensitive: params.case_sensitive.unwrap_or(false),
+        mode,
     };
 
-    // Perform search using Tantivy
-    match app_state.search_service.search(search_query).await {
+    // Route to the semantic/hybrid query path when requested AND the semantic
+    // backend is available; otherwise fall back to keyword search (the API
+    // degrades gracefully rather than erroring — plan decision). `run_search`
+    // returns keyword results for `SearchMode::Keyword` or when no backend.
+    match run_search(&app_state, search_query).await {
         Ok(search_response) => {
             let results: Vec<SearchResult> = search_response
                 .results
@@ -189,6 +257,7 @@ async fn search_files(
                     extension: r.extension,
                     score: r.score,
                     line_number: r.line_number,
+                    match_source: r.match_source,
                 })
                 .collect();
 
@@ -289,11 +358,12 @@ async fn get_facets_with_filters(
         max_size: params.max_size,
         limit: 0, // We only need facets, not results
         offset: 0,
-        include_facets: true,  // Always include facets for this endpoint
-        fuzzy_search: false,   // Facets request doesn't use fuzzy search
-        regex_search: false,   // Facets request doesn't use regex search
-        regex_flags: None,     // Facets request doesn't use regex flags
-        case_sensitive: false, // Facets request doesn't use case-sensitive search
+        include_facets: true,      // Always include facets for this endpoint
+        fuzzy_search: false,       // Facets request doesn't use fuzzy search
+        regex_search: false,       // Facets request doesn't use regex search
+        regex_flags: None,         // Facets request doesn't use regex flags
+        case_sensitive: false,     // Facets request doesn't use case-sensitive search
+        mode: SearchMode::Keyword, // Facets are computed over the keyword universe
     };
 
     // Perform search using Tantivy

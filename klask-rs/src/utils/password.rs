@@ -6,15 +6,15 @@ use argon2::{
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 
-/// Create an Argon2 instance with hardened security parameters
-/// - Memory: 64KB
-/// - Time cost: 3 iterations
-/// - Parallelism: 2 threads
+/// Create an Argon2 instance with balanced security and performance parameters
+/// - Memory: 19MB (balance between security and speed)
+/// - Time cost: 2 iterations
+/// - Parallelism: 1 thread
 fn create_argon2() -> Argon2<'static> {
     Argon2::new(
         argon2::Algorithm::default(),
         argon2::Version::default(),
-        Params::new(64 * 1024, 3, 2, Some(Params::DEFAULT_OUTPUT_LEN)).unwrap_or_default(),
+        Params::new(19 * 1024, 2, 1, Some(Params::DEFAULT_OUTPUT_LEN)).unwrap_or_default(),
     )
 }
 
@@ -46,8 +46,8 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
 /// Used to equalize response times when a user is not found
 pub fn get_dummy_hash() -> &'static str {
     // A static valid Argon2id hash that doesn't match any real password
-    // Generated with: echo -n "dummy" | argon2 somesalt with our parameters
-    "$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQ$cJJwJcJfIPZ1zCMLjDxXfnTYHFu6sLG2bKvBCxSNF4A"
+    // Using m=19456,t=2,p=1 to match the parameters in create_argon2()
+    "$argon2id$v=19$m=19456,t=2,p=1$dHlwaWNhbHNhbHQ$GvIkHHfKCGGlPnBbFx2v7g+oL1wP0TG1+Ck0gT7gMxA"
 }
 
 #[cfg(test)]

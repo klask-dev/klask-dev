@@ -69,6 +69,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -130,6 +131,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -174,6 +176,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -225,6 +228,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -276,6 +280,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -339,6 +344,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -404,6 +410,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -475,6 +482,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -528,6 +536,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();
@@ -550,6 +559,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let old_results = service.search(old_query).await.unwrap();
@@ -603,6 +613,7 @@ mod search_repository_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         };
 
         let results = service.search(query).await.unwrap();

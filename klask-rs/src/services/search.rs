@@ -95,6 +95,11 @@ pub struct SearchResult {
     pub extension: String,
     pub score: f32,
     pub line_number: Option<u32>,
+    /// Which engine(s) this result matched in (hybrid/semantic only). `None` for
+    /// keyword results — the keyword path never sets it, keeping its output
+    /// unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_source: Option<MatchSource>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +109,25 @@ pub struct SearchResultsWithTotal {
     pub facets: Option<SearchFacets>,
 }
 
+/// A stored document read back from the Tantivy index, used to re-feed the
+/// semantic backfill (Phase 3) without re-crawling: Tantivy is the source of
+/// truth for *what is searchable* (already filtered by the crawler), so the
+/// vector index it produces stays consistent with the keyword index.
+///
+/// Only consumed when the `semantic-search` feature is built; allow it to be
+/// unused otherwise so the default build stays warning-free.
+#[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+#[derive(Debug, Clone)]
+pub struct IndexedDocument {
+    pub file_id: Uuid,
+    pub repository: String,
+    pub project: String,
+    pub version: String,
+    pub path: String,
+    pub extension: String,
+    pub content: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchFacets {
     pub repositories: Vec<(String, u64)>,
@@ -111,6 +135,44 @@ pub struct SearchFacets {
     pub versions: Vec<(String, u64)>,
     pub extensions: Vec<(String, u64)>,
     pub size_ranges: Vec<(String, u64)>,
+}
+
+/// Which engine(s) a search runs against (plan §3.4 / §5).
+///
+/// `Keyword` is the default and the only mode without the semantic backend, so
+/// behaviour is unchanged when semantic search is off. `Semantic` queries the
+/// vector index only; `Hybrid` fuses keyword + vector with RRF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchMode {
+    #[default]
+    Keyword,
+    Semantic,
+    Hybrid,
+}
+
+/// Which engine(s) a *result* matched in, for the hybrid/semantic UI badge
+/// (plan §6). Only meaningful for semantic-aware modes; keyword results leave
+/// `SearchResult::match_source` as `None` so the keyword path and response are
+/// byte-for-byte unchanged. `Both` is set in hybrid mode when a file surfaced
+/// in both the keyword and the vector ranking.
+#[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MatchSource {
+    Keyword,
+    Semantic,
+    Both,
+}
+
+impl SearchMode {
+    /// Whether this mode needs the semantic (vector) backend. `Keyword` never
+    /// does, so it always works; the others degrade to keyword when the backend
+    /// is unavailable. Only consulted by the feature-gated query path.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub fn needs_semantic(self) -> bool {
+        matches!(self, SearchMode::Semantic | SearchMode::Hybrid)
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -129,6 +191,10 @@ pub struct SearchQuery {
     pub regex_search: bool,          // Enable regex search (pattern matching) - default: false
     pub regex_flags: Option<String>, // Regex flags: "i" (case-insensitive), "m" (multiline), "s" (dotall), or combinations like "ims"
     pub case_sensitive: bool,        // Enable case-sensitive search - default: false
+    // keyword (default) | semantic | hybrid. Acted on only by the feature-gated
+    // query path; without the feature it is parsed and stored but unused.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub mode: SearchMode,
 }
 
 impl SearchQuery {
@@ -150,6 +216,7 @@ impl SearchQuery {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: SearchMode::Keyword,
         }
     }
 
@@ -1171,6 +1238,7 @@ impl SearchService {
                     extension,
                     score,
                     line_number,
+                    match_source: None,
                 });
             }
         }
@@ -1340,6 +1408,7 @@ impl SearchService {
                     extension,
                     score: 1.0,
                     line_number: None,
+                    match_source: None,
                 }))
             }
             Err(_) => {
@@ -1429,6 +1498,7 @@ impl SearchService {
                 extension,
                 score: *score,
                 line_number: None,
+                match_source: None,
             }));
         }
 
@@ -1437,11 +1507,91 @@ impl SearchService {
         Ok(None)
     }
 
+    /// Hydrate a list of file_ids into full `SearchResult`s from Tantivy,
+    /// preserving the input order and silently dropping ids no longer in the
+    /// index (the vector store can briefly lag a deletion). Used by the
+    /// semantic/hybrid query path (Phase 4) to turn a fused ranking of file_ids
+    /// back into displayable results. Lookups run concurrently but bounded.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub async fn fetch_results_by_file_ids(&self, file_ids: &[Uuid]) -> Result<Vec<SearchResult>> {
+        use futures::stream::{self, StreamExt};
+        const MAX_CONCURRENT_LOOKUPS: usize = 16;
+
+        let fetched: Vec<(usize, SearchResult)> = stream::iter(file_ids.iter().copied().enumerate())
+            .map(|(idx, id)| async move { self.get_file_by_id(id).await.map(|opt| opt.map(|r| (idx, r))) })
+            .buffer_unordered(MAX_CONCURRENT_LOOKUPS)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        // Restore the requested order (buffer_unordered loses it).
+        let mut ordered = fetched;
+        ordered.sort_by_key(|(idx, _)| *idx);
+        Ok(ordered.into_iter().map(|(_, r)| r).collect())
+    }
+
     pub fn get_document_count(&self) -> Result<u64> {
         // Reload the reader to see the latest changes
         self.reader.reload()?;
         let searcher = self.reader.searcher();
         Ok(searcher.num_docs())
+    }
+
+    /// Iterate every live document in the index, invoking `visit` for each.
+    ///
+    /// Used by the semantic backfill (Phase 3) to re-embed everything that is
+    /// currently searchable. Streams one document at a time (per segment) rather
+    /// than collecting into a `Vec`, so memory stays flat on large indexes; the
+    /// callback decides what to do with each (enqueue for embedding, count,
+    /// stop early). Returning `Err` from `visit` aborts the iteration and the
+    /// error is propagated — the backfill uses this to honour cancellation.
+    ///
+    /// Deleted documents are skipped (only `alive` doc ids are visited), so the
+    /// counts match `get_document_count`.
+    #[cfg_attr(not(feature = "semantic-search"), allow(dead_code))]
+    pub fn iter_documents<F>(&self, mut visit: F) -> Result<u64>
+    where
+        F: FnMut(IndexedDocument) -> Result<()>,
+    {
+        self.reader.reload()?;
+        let searcher = self.reader.searcher();
+        let mut visited: u64 = 0;
+
+        for segment_reader in searcher.segment_readers() {
+            let store_reader = segment_reader.get_store_reader(1)?;
+            // `doc_ids_alive` yields only non-deleted docs in this segment.
+            for doc_id in segment_reader.doc_ids_alive() {
+                let doc: tantivy::TantivyDocument = store_reader.get(doc_id)?;
+
+                let file_id_str = doc
+                    .get_first(self.fields.file_id)
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow!("Missing file_id in stored document"))?;
+                let file_id = Uuid::parse_str(file_id_str)
+                    .map_err(|_| anyhow!("Invalid UUID in stored file_id: {}", file_id_str))?;
+
+                // Metadata fields default to "" if absent (older docs may lack a
+                // stored field); the indexer treats empty strings as empty facets.
+                let get = |field: Field| doc.get_first(field).and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+                visit(IndexedDocument {
+                    file_id,
+                    repository: get(self.fields.repository),
+                    project: get(self.fields.project),
+                    version: get(self.fields.version),
+                    path: get(self.fields.file_path),
+                    extension: get(self.fields.extension),
+                    content: get(self.fields.content),
+                })?;
+                visited += 1;
+            }
+        }
+
+        Ok(visited)
     }
 
     /// Calculate the total size of a directory recursively in bytes
@@ -2782,6 +2932,64 @@ mod regex_term_extraction_tests {
     fn test_extract_simple_terms_from_regex_empty_pattern() {
         let result = extract_simple_terms_from_regex("");
         assert!(result.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod iter_documents_tests {
+    use super::*;
+
+    async fn put(search: &SearchService, path: &str, content: &str) {
+        search
+            .upsert_file(FileData {
+                file_id: Uuid::new_v4(),
+                file_name: path,
+                file_path: path,
+                content,
+                repository: "repo",
+                project: "repo",
+                version: "main",
+                extension: "rs",
+                size: content.len() as u64,
+            })
+            .await
+            .unwrap();
+        search.commit().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_iter_documents_visits_every_live_doc() {
+        let dir = tempfile::tempdir().unwrap();
+        let search = SearchService::new(dir.path()).unwrap();
+        put(&search, "a.rs", "fn a() {}").await;
+        put(&search, "b.rs", "fn b() {}").await;
+
+        let mut paths = Vec::new();
+        let visited = search
+            .iter_documents(|doc| {
+                assert_eq!(doc.repository, "repo");
+                assert!(!doc.content.is_empty());
+                paths.push(doc.path);
+                Ok(())
+            })
+            .unwrap();
+
+        assert_eq!(visited, 2);
+        paths.sort();
+        assert_eq!(paths, vec!["a.rs".to_string(), "b.rs".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_iter_documents_propagates_callback_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let search = SearchService::new(dir.path()).unwrap();
+        put(&search, "a.rs", "fn a() {}").await;
+        put(&search, "b.rs", "fn b() {}").await;
+
+        // A callback that aborts (as the backfill does on cancel) must stop the
+        // iteration and surface the error.
+        let result = search.iter_documents(|_doc| Err(anyhow!("stop")));
+        assert!(result.is_err());
     }
 }
 

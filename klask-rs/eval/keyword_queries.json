@@ -1,0 +1,64 @@
+{
+  "_comment": [
+    "Counterpart to golden_queries.json: the short, identifier-shaped terms",
+    "people actually type into a code search box today, as opposed to the full",
+    "natural-language questions the semantic mode is built for.",
+    "",
+    "Without this set the comparison is rigged. Scoring only NL questions shows",
+    "the vector engine beating BM25 at a game BM25 was never playing, and says",
+    "nothing about the risk that matters operationally: whether turning hybrid",
+    "on degrades the queries that already work."
+  ],
+  "queries": [
+    {
+      "query": "argon2",
+      "expect": ["utils/password.rs", "api/users.rs"],
+      "note": "Literal crate name, present in both files."
+    },
+    {
+      "query": "sql_quote",
+      "expect": ["semantic/store.rs"],
+      "note": "Unique symbol in the codebase."
+    },
+    {
+      "query": "jsonwebtoken",
+      "expect": ["auth/jwt.rs"],
+      "note": "Unique crate reference."
+    },
+    {
+      "query": "delete_project_documents",
+      "expect": ["services/search.rs", "api/repositories.rs", "crawler/service.rs"],
+      "note": "Defined in search.rs, called from the others."
+    },
+    {
+      "query": "ProgressTracker",
+      "expect": ["services/progress.rs", "crawler/service.rs", "crawler/branch_processor.rs"],
+      "note": "Defined in progress.rs, used across the crawler."
+    },
+    {
+      "query": "CancellationToken crawl",
+      "expect": ["crawler/service.rs", "crawler/branch_processor.rs", "crawler/github_crawler.rs"],
+      "note": "Two literal terms, both present."
+    },
+    {
+      "query": "content_detector text confidence",
+      "expect": ["crawler/parsers/content_detector.rs", "crawler/parsers/constants.rs"],
+      "note": "Module name plus the threshold it applies."
+    },
+    {
+      "query": "LanceDB chunks table",
+      "expect": ["semantic/store.rs"],
+      "note": "The store owns the chunks table."
+    },
+    {
+      "query": "camelCase tokenizer",
+      "expect": ["services/tokenizer.rs"],
+      "note": "Code-aware tokenizer splitting identifiers."
+    },
+    {
+      "query": "url_validator private network",
+      "expect": ["utils/url_validator.rs"],
+      "note": "SSRF guard on repository URLs."
+    }
+  ]
+}

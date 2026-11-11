@@ -78,6 +78,10 @@ vi.mock('../components/AutoRefreshToggle', () => ({
   AutoRefreshToggle: () => <div data-testid="refresh-toggle">Auto Refresh</div>,
 }));
 
+vi.mock('../components/SemanticIndexCard', () => ({
+  SemanticIndexCard: () => <div data-testid="semantic-index-card">Semantic Index</div>,
+}));
+
 // Helper function to create mock data
 const createMockStats = (overrides = {}) => ({
   total_documents: 1000,

@@ -150,14 +150,18 @@ impl AppConfig {
                 cache_dir: std::env::var("SEMANTIC_SEARCH_CACHE_DIR").unwrap_or_else(|_| "./models".to_string()),
                 vector_store_dir: std::env::var("SEMANTIC_SEARCH_VECTOR_DIR")
                     .unwrap_or_else(|_| "./vector-index".to_string()),
+                // Sized so a typical code chunk stays within the embedder's
+                // 512-token truncation window (see MAX_SEQUENCE_TOKENS in
+                // semantic::embedder) — lines past that budget are silently
+                // invisible to semantic search.
                 chunk_max_lines: std::env::var("SEMANTIC_SEARCH_CHUNK_MAX_LINES")
-                    .unwrap_or_else(|_| "60".to_string())
+                    .unwrap_or_else(|_| "45".to_string())
                     .parse()
-                    .unwrap_or(60),
+                    .unwrap_or(45),
                 chunk_overlap_lines: std::env::var("SEMANTIC_SEARCH_CHUNK_OVERLAP_LINES")
-                    .unwrap_or_else(|_| "15".to_string())
+                    .unwrap_or_else(|_| "10".to_string())
                     .parse()
-                    .unwrap_or(15),
+                    .unwrap_or(10),
                 batch_size: std::env::var("SEMANTIC_SEARCH_BATCH_SIZE")
                     .unwrap_or_else(|_| "32".to_string())
                     .parse()

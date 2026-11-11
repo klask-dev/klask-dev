@@ -7,7 +7,7 @@ import {
   ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 import { RepositoryBadge } from '../ui/RepositoryBadge';
-import type { SearchResult as SearchResultType } from '../../types';
+import type { SearchResult as SearchResultType, MatchSource } from '../../types';
 
 interface SearchResultProps {
   result: SearchResultType;
@@ -16,6 +16,38 @@ interface SearchResultProps {
   className?: string;
   regexSearch?: boolean;
 }
+
+/** Where a hybrid/semantic result came from, for at-a-glance trust/debugging. */
+const MATCH_SOURCE_BADGE: Record<MatchSource, { label: string; title: string; className: string }> = {
+  keyword: {
+    label: 'Keyword',
+    title: 'Matched by classic full-text (BM25) search.',
+    className: 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200',
+  },
+  semantic: {
+    label: 'Semantic',
+    title: 'Matched by meaning-based vector search.',
+    className: 'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200',
+  },
+  both: {
+    label: 'Both',
+    title: 'Matched by both keyword and semantic search.',
+    className: 'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200',
+  },
+};
+
+const MatchSourceBadge: React.FC<{ source: MatchSource }> = ({ source }) => {
+  const badge = MATCH_SOURCE_BADGE[source];
+  if (!badge) return null;
+  return (
+    <span
+      title={badge.title}
+      className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${badge.className}`}
+    >
+      {badge.label}
+    </span>
+  );
+};
 
 export const SearchResult: React.FC<SearchResultProps> = ({
   result,
@@ -105,6 +137,7 @@ export const SearchResult: React.FC<SearchResultProps> = ({
           
           {/* Right side: Badges and View File button */}
           <div className="flex items-center space-x-2 flex-shrink-0">
+            {result.match_source && <MatchSourceBadge source={result.match_source} />}
             <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">
               {result.extension || 'N/A'}
             </span>

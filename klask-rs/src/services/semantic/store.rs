@@ -40,6 +40,48 @@ pub struct ChunkRecord {
     pub vector: Vec<f32>,
 }
 
+/// Metadata filters applied to a vector search, mirroring the keyword search's
+/// facet filters so both engines see the same filtered universe (plan §5).
+///
+/// Each field is an OR-set of accepted values (e.g. several selected projects);
+/// fields are AND-ed together. An empty/`None` field is "no constraint".
+#[derive(Debug, Clone, Default)]
+pub struct VectorSearchFilters {
+    pub repositories: Vec<String>,
+    pub projects: Vec<String>,
+    pub versions: Vec<String>,
+    pub extensions: Vec<String>,
+}
+
+/// A single vector-search hit: the matched chunk's file plus the metadata
+/// needed to render a result and fuse with keyword hits. Ordered best-first by
+/// the caller (closest distance first).
+///
+/// The query path (Phase 4) fuses on `file_id` and anchors the snippet with
+/// `start_line`; the remaining metadata fields mirror `ChunkRecord` and are
+/// part of the store's contract for the result badges / snippet range coming in
+/// Phase 5, so they are allowed to be unread for now.
+#[derive(Debug, Clone)]
+pub struct VectorHit {
+    pub file_id: Uuid,
+    #[allow(dead_code)]
+    pub repository: String,
+    #[allow(dead_code)]
+    pub project: String,
+    #[allow(dead_code)]
+    pub version: String,
+    #[allow(dead_code)]
+    pub path: String,
+    #[allow(dead_code)]
+    pub extension: String,
+    pub start_line: u32,
+    #[allow(dead_code)]
+    pub end_line: u32,
+    /// Cosine distance (0 = identical); smaller is closer. Kept for logging and
+    /// potential score-based fusion; RRF itself uses only the rank order.
+    pub distance: f32,
+}
+
 /// Persistent vector store abstraction.
 ///
 /// A trait (like [`super::EmbeddingProvider`]) so the indexer and future query
@@ -47,10 +89,33 @@ pub struct ChunkRecord {
 /// to swap in an in-memory fake and lets the backend change later.
 #[async_trait::async_trait]
 pub trait VectorStore: Send + Sync {
+    /// Nearest-neighbour search over the stored chunk vectors.
+    ///
+    /// Returns up to `limit` hits ordered closest-first (cosine distance),
+    /// restricted to rows matching `filters`. `query_vector` must have length
+    /// [`VectorStore::dimension`]. Phase 4 uses brute-force KNN (no ANN index);
+    /// an IVF_PQ index is a later optimization (plan §6).
+    async fn search(&self, query_vector: &[f32], limit: usize, filters: &VectorSearchFilters)
+    -> Result<Vec<VectorHit>>;
+
     /// Replace all chunks of `file_id` with `records` (delete-then-insert),
     /// mirroring Tantivy's `upsert_file`. `records` may be empty (just deletes).
     /// Every record's `vector` must have length [`VectorStore::dimension`].
     async fn upsert_file_chunks(&self, file_id: Uuid, records: Vec<ChunkRecord>) -> Result<()>;
+
+    /// Append `records` without probing for pre-existing rows.
+    ///
+    /// The caller guarantees that no chunk of these `file_id`s is stored yet.
+    /// Both write paths establish that: a crawl deletes the repository's chunks
+    /// before re-indexing, the backfill clears the whole store, and a `file_id`
+    /// is written at most once per run (it is derived deterministically from
+    /// repository + path + branch). Skipping the delete is what makes bulk
+    /// indexing viable: there is no scalar index on `file_id`, so a per-file
+    /// delete probe scans the table *and* commits a table version per file.
+    ///
+    /// Records from several files may be batched into a single call. Use
+    /// [`VectorStore::upsert_file_chunks`] when a file's chunks may already exist.
+    async fn insert_chunks(&self, records: Vec<ChunkRecord>) -> Result<()>;
 
     /// Delete all chunks of a single file. Returns the number of rows removed.
     /// Part of the lifecycle API for per-file removal (a file deleted from a
@@ -63,8 +128,26 @@ pub trait VectorStore: Send + Sync {
     /// Returns the number of rows removed.
     async fn delete_project_chunks(&self, repository: &str) -> Result<u64>;
 
+    /// Delete every chunk in the store. Returns the number of rows removed.
+    /// Used by the semantic backfill (Phase 3) to start a full rebuild from a
+    /// clean slate so re-running it never leaves stale or duplicated rows.
+    async fn clear(&self) -> Result<u64>;
+
     /// Total number of stored chunks (for the admin index card, phases 3/5).
     async fn count(&self) -> Result<u64>;
+
+    /// Compact fragments, prune superseded versions and (re)build the indexes.
+    ///
+    /// Every write commits a new version and a new fragment, so a crawl leaves
+    /// the table fragmented and carrying one version per write. This also
+    /// creates the indexes the read paths need: a scalar index on `file_id`
+    /// (so a per-file delete is a lookup, not a scan) and an ANN index on
+    /// `vector` (so a search is not a brute-force scan of every chunk).
+    ///
+    /// Called once at the end of a crawl or backfill, never per file. Best
+    /// effort: each step logs and is skipped on failure rather than failing the
+    /// whole call, since none of them affect correctness of the stored data.
+    async fn optimize(&self) -> Result<()>;
 
     /// Embedding dimension the store was opened with. Used by tests and the
     /// query path (phase 4); kept on the trait for backend swappability.
@@ -82,22 +165,55 @@ pub(crate) fn sql_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
+/// Build a LanceDB SQL filter predicate from facet filters, or `None` when no
+/// constraint is set. Each non-empty field becomes a quoted `IN (...)` clause;
+/// clauses are AND-ed. All values pass through [`sql_quote`] so user-controlled
+/// facet values cannot inject into the predicate (mirrors the delete path).
+pub(crate) fn build_filter_predicate(filters: &VectorSearchFilters) -> Option<String> {
+    let mut clauses: Vec<String> = Vec::new();
+    let mut push = |column: &str, values: &[String]| {
+        if !values.is_empty() {
+            let quoted = values.iter().map(|v| sql_quote(v)).collect::<Vec<_>>().join(", ");
+            clauses.push(format!("{column} IN ({quoted})"));
+        }
+    };
+    push("repository", &filters.repositories);
+    push("project", &filters.projects);
+    push("version", &filters.versions);
+    push("extension", &filters.extensions);
+
+    if clauses.is_empty() { None } else { Some(clauses.join(" AND ")) }
+}
+
 pub use lance_store::LanceVectorStore;
 
 mod lance_store {
-    use super::{ChunkRecord, VectorStore, sql_quote};
+    use super::{ChunkRecord, VectorHit, VectorSearchFilters, VectorStore, build_filter_predicate, sql_quote};
     use anyhow::{Context, Result, anyhow};
     use arrow_array::{
-        Array, FixedSizeListArray, RecordBatch, StringArray, UInt32Array,
+        Array, FixedSizeListArray, Float32Array, RecordBatch, StringArray, UInt32Array,
         builder::{FixedSizeListBuilder, Float32Builder},
+        cast::AsArray,
     };
     use arrow_schema::{DataType, Field, Schema, SchemaRef};
-    use lancedb::{Connection, Table, connect};
+    use futures::TryStreamExt;
+    use lancedb::index::Index;
+    use lancedb::index::scalar::BTreeIndexBuilder;
+    use lancedb::query::{ExecutableQuery, QueryBase};
+    use lancedb::table::optimize::OptimizeAction;
+    use lancedb::{Connection, DistanceType, Table, connect};
     use std::path::Path;
     use std::sync::Arc;
+    use tracing::{debug, info, warn};
     use uuid::Uuid;
 
     const TABLE_NAME: &str = "chunks";
+
+    /// Minimum number of stored vectors before building an ANN index.
+    ///
+    /// Under this size a brute-force scan is fast, and IVF partitioning has too
+    /// few samples to train usefully.
+    const MIN_ANN_ROWS: usize = 10_000;
 
     /// LanceDB-backed [`VectorStore`].
     pub struct LanceVectorStore {
@@ -247,6 +363,56 @@ mod lance_store {
             .context("Failed to build Arrow RecordBatch for chunks")
         }
 
+        /// Decode a result `RecordBatch` (with the `_distance` column LanceDB
+        /// adds to vector queries) into `VectorHit`s. Rows are kept in batch
+        /// order, which the query already sorted closest-first.
+        fn batch_to_hits(batch: &RecordBatch) -> Result<Vec<VectorHit>> {
+            let col_str = |name: &str| -> Result<&StringArray> {
+                batch
+                    .column_by_name(name)
+                    .and_then(|c| c.as_any().downcast_ref::<StringArray>())
+                    .ok_or_else(|| anyhow!("vector search result missing string column '{name}'"))
+            };
+            let col_u32 = |name: &str| -> Result<&UInt32Array> {
+                batch
+                    .column_by_name(name)
+                    .and_then(|c| c.as_any().downcast_ref::<UInt32Array>())
+                    .ok_or_else(|| anyhow!("vector search result missing u32 column '{name}'"))
+            };
+
+            let file_id = col_str("file_id")?;
+            let repository = col_str("repository")?;
+            let project = col_str("project")?;
+            let version = col_str("version")?;
+            let path = col_str("path")?;
+            let extension = col_str("extension")?;
+            let start_line = col_u32("start_line")?;
+            let end_line = col_u32("end_line")?;
+            // LanceDB names the similarity column "_distance"; absent only if the
+            // query had no vector clause, which never happens here.
+            let distance: Option<&Float32Array> =
+                batch.column_by_name("_distance").map(|c| c.as_primitive::<arrow_array::types::Float32Type>());
+
+            let mut hits = Vec::with_capacity(batch.num_rows());
+            for row in 0..batch.num_rows() {
+                let raw_id = file_id.value(row);
+                let parsed_id = Uuid::parse_str(raw_id)
+                    .with_context(|| format!("vector store row has invalid file_id '{raw_id}'"))?;
+                hits.push(VectorHit {
+                    file_id: parsed_id,
+                    repository: repository.value(row).to_string(),
+                    project: project.value(row).to_string(),
+                    version: version.value(row).to_string(),
+                    path: path.value(row).to_string(),
+                    extension: extension.value(row).to_string(),
+                    start_line: start_line.value(row),
+                    end_line: end_line.value(row),
+                    distance: distance.map(|d| d.value(row)).unwrap_or(f32::NAN),
+                });
+            }
+            Ok(hits)
+        }
+
         async fn delete_where(&self, predicate: &str) -> Result<u64> {
             let result =
                 self.table.delete(predicate).await.with_context(|| format!("LanceDB delete failed: {predicate}"))?;
@@ -256,6 +422,48 @@ mod lance_store {
 
     #[async_trait::async_trait]
     impl VectorStore for LanceVectorStore {
+        async fn search(
+            &self,
+            query_vector: &[f32],
+            limit: usize,
+            filters: &VectorSearchFilters,
+        ) -> Result<Vec<VectorHit>> {
+            if query_vector.len() != self.dimension {
+                return Err(anyhow!(
+                    "Query vector length {} does not match store dimension {}",
+                    query_vector.len(),
+                    self.dimension
+                ));
+            }
+            if limit == 0 {
+                return Ok(Vec::new());
+            }
+
+            let mut query = self
+                .table
+                .vector_search(query_vector.to_vec())
+                .context("Failed to build vector search query")?
+                .distance_type(DistanceType::Cosine)
+                .limit(limit);
+
+            if let Some(predicate) = build_filter_predicate(filters) {
+                query = query.only_if(predicate);
+            }
+
+            let mut stream = query.execute().await.context("Vector search execution failed")?;
+
+            let mut hits = Vec::new();
+            while let Some(batch) = stream.try_next().await.context("Failed to read vector search results")? {
+                hits.extend(Self::batch_to_hits(&batch)?);
+            }
+            // LanceDB returns rows ordered by distance per batch; with limit it
+            // returns a single sorted batch, but guard ordering explicitly so a
+            // multi-batch backend stays correct.
+            hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
+            hits.truncate(limit);
+            Ok(hits)
+        }
+
         async fn upsert_file_chunks(&self, file_id: Uuid, records: Vec<ChunkRecord>) -> Result<()> {
             // Delete-then-insert: remove any prior chunks of this file first so a
             // re-index never leaves stale rows behind (mirrors Tantivy upsert_file).
@@ -269,12 +477,65 @@ mod lance_store {
             Ok(())
         }
 
+        async fn insert_chunks(&self, records: Vec<ChunkRecord>) -> Result<()> {
+            if records.is_empty() {
+                return Ok(());
+            }
+            let batch = self.records_to_batch(&records)?;
+            self.table.add(batch).execute().await.context("Failed to add chunk vectors to LanceDB")?;
+            Ok(())
+        }
+
+        async fn optimize(&self) -> Result<()> {
+            // Compact and prune first: fewer, larger fragments make the index
+            // builds below cheaper, and pruning reclaims the versions the
+            // indexing writes left behind.
+            match self.table.optimize(OptimizeAction::All).await {
+                Ok(_) => info!("Vector store compacted"),
+                Err(e) => warn!("Vector store compaction failed (index still usable): {e}"),
+            }
+
+            // Scalar index on file_id: turns the per-file delete of an
+            // incremental re-index into a lookup instead of a table scan.
+            // `replace(true)` keeps this idempotent across runs.
+            if let Err(e) = self
+                .table
+                .create_index(&["file_id"], Index::BTree(BTreeIndexBuilder::default()))
+                .replace(true)
+                .execute()
+                .await
+            {
+                warn!("Failed to build scalar index on file_id (deletes stay full scans): {e}");
+            }
+
+            // ANN index on the vector column. Below MIN_ANN_ROWS a brute-force
+            // scan is fast anyway and IVF training has too few samples to
+            // produce sane partitions.
+            let rows = self.table.count_rows(None).await.context("Failed to count rows before indexing")?;
+            if rows >= MIN_ANN_ROWS {
+                match self.table.create_index(&["vector"], Index::Auto).replace(true).execute().await {
+                    Ok(()) => info!("ANN index built over {rows} chunk vectors"),
+                    Err(e) => warn!("Failed to build ANN index (searches stay brute-force scans): {e}"),
+                }
+            } else {
+                debug!("Skipping ANN index: {rows} chunks is below the {MIN_ANN_ROWS} threshold");
+            }
+
+            Ok(())
+        }
+
         async fn delete_file(&self, file_id: Uuid) -> Result<u64> {
             self.delete_where(&format!("file_id = {}", sql_quote(&file_id.to_string()))).await
         }
 
         async fn delete_project_chunks(&self, repository: &str) -> Result<u64> {
             self.delete_where(&format!("repository = {}", sql_quote(repository))).await
+        }
+
+        async fn clear(&self) -> Result<u64> {
+            // `true` is a constant predicate matching every row — no
+            // user-controlled input, so no injection surface.
+            self.delete_where("true").await
         }
 
         async fn count(&self) -> Result<u64> {
@@ -330,6 +591,55 @@ mod lance_store {
         }
 
         #[tokio::test]
+        async fn test_insert_chunks_appends_without_probing() {
+            let (_dir, store) = temp_store(8).await;
+            let a = Uuid::new_v4();
+            let b = Uuid::new_v4();
+            // One call carrying several files' chunks: this is the batched write
+            // path the indexer uses during a crawl.
+            store
+                .insert_chunks(vec![
+                    record(a, "repo-a", 1, 8),
+                    record(a, "repo-a", 7, 8),
+                    record(b, "repo-b", 1, 8),
+                ])
+                .await
+                .unwrap();
+            assert_eq!(store.count().await.unwrap(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_insert_chunks_empty_is_noop() {
+            let (_dir, store) = temp_store(8).await;
+            store.insert_chunks(Vec::new()).await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 0);
+        }
+
+        #[tokio::test]
+        async fn test_optimize_succeeds_and_keeps_rows() {
+            let (_dir, store) = temp_store(8).await;
+            let fid = Uuid::new_v4();
+            // Several small writes leave several fragments — what a crawl produces.
+            for i in 0..3 {
+                store.insert_chunks(vec![record(fid, "repo-a", i * 10 + 1, 8)]).await.unwrap();
+            }
+            // Below the ANN threshold the vector index is skipped, but compaction
+            // and the scalar index still run, and no row may be lost.
+            store.optimize().await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 3);
+            // Idempotent: indexes are created with replace(true).
+            store.optimize().await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 3);
+        }
+
+        #[tokio::test]
+        async fn test_optimize_on_empty_store_is_ok() {
+            let (_dir, store) = temp_store(8).await;
+            store.optimize().await.unwrap();
+            assert_eq!(store.count().await.unwrap(), 0);
+        }
+
+        #[tokio::test]
         async fn test_upsert_same_file_replaces_no_duplicates() {
             let (_dir, store) = temp_store(8).await;
             let fid = Uuid::new_v4();
@@ -371,6 +681,19 @@ mod lance_store {
             store.upsert_file_chunks(b, vec![record(b, "repo-b", 1, 8)]).await.unwrap();
             assert_eq!(store.delete_project_chunks("repo-a").await.unwrap(), 1);
             assert_eq!(store.count().await.unwrap(), 1);
+        }
+
+        #[tokio::test]
+        async fn test_clear_removes_everything() {
+            let (_dir, store) = temp_store(8).await;
+            let a = Uuid::new_v4();
+            let b = Uuid::new_v4();
+            store.upsert_file_chunks(a, vec![record(a, "repo-a", 1, 8)]).await.unwrap();
+            store.upsert_file_chunks(b, vec![record(b, "repo-b", 1, 8)]).await.unwrap();
+            assert_eq!(store.clear().await.unwrap(), 2);
+            assert_eq!(store.count().await.unwrap(), 0);
+            // Clearing an empty store removes nothing and does not error.
+            assert_eq!(store.clear().await.unwrap(), 0);
         }
 
         #[tokio::test]
@@ -416,6 +739,104 @@ mod lance_store {
             // Deleting the real (quoted) name removes exactly its row.
             assert_eq!(store.delete_project_chunks(nasty).await.unwrap(), 1);
         }
+
+        /// A chunk record carrying a caller-chosen vector (the default `record`
+        /// uses a constant one, which is fine for write tests but useless for
+        /// nearest-neighbour assertions).
+        fn record_vec(file_id: Uuid, repository: &str, start: u32, vector: Vec<f32>) -> ChunkRecord {
+            ChunkRecord {
+                file_id,
+                repository: repository.to_string(),
+                project: repository.to_string(),
+                version: "main".to_string(),
+                path: "src/lib.rs".to_string(),
+                extension: "rs".to_string(),
+                start_line: start,
+                end_line: start + 5,
+                vector,
+            }
+        }
+
+        #[tokio::test]
+        async fn test_search_returns_nearest_first() {
+            let (_dir, store) = temp_store(3).await;
+            let near = Uuid::new_v4();
+            let far = Uuid::new_v4();
+            // Query will be [1,0,0]; `near` points the same way, `far` is opposite.
+            store.upsert_file_chunks(near, vec![record_vec(near, "r", 1, vec![1.0, 0.0, 0.0])]).await.unwrap();
+            store.upsert_file_chunks(far, vec![record_vec(far, "r", 1, vec![-1.0, 0.0, 0.0])]).await.unwrap();
+
+            let hits = store.search(&[1.0, 0.0, 0.0], 10, &VectorSearchFilters::default()).await.unwrap();
+            assert_eq!(hits.len(), 2);
+            assert_eq!(hits[0].file_id, near, "closest vector must rank first");
+            assert!(
+                hits[0].distance <= hits[1].distance,
+                "hits must be ordered by ascending distance"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_search_honors_limit() {
+            let (_dir, store) = temp_store(3).await;
+            for i in 0..5u32 {
+                let fid = Uuid::new_v4();
+                store.upsert_file_chunks(fid, vec![record_vec(fid, "r", 1, vec![i as f32, 1.0, 0.0])]).await.unwrap();
+            }
+            let hits = store.search(&[1.0, 1.0, 0.0], 2, &VectorSearchFilters::default()).await.unwrap();
+            assert_eq!(hits.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn test_search_applies_filters() {
+            let (_dir, store) = temp_store(3).await;
+            let a = Uuid::new_v4();
+            let b = Uuid::new_v4();
+            store.upsert_file_chunks(a, vec![record_vec(a, "repo-a", 1, vec![1.0, 0.0, 0.0])]).await.unwrap();
+            store.upsert_file_chunks(b, vec![record_vec(b, "repo-b", 1, vec![1.0, 0.0, 0.0])]).await.unwrap();
+
+            let filters = VectorSearchFilters { repositories: vec!["repo-a".to_string()], ..Default::default() };
+            let hits = store.search(&[1.0, 0.0, 0.0], 10, &filters).await.unwrap();
+            assert_eq!(hits.len(), 1);
+            assert_eq!(hits[0].file_id, a, "filter must restrict to repo-a");
+        }
+
+        #[tokio::test]
+        async fn test_search_filter_value_with_quote_is_safe() {
+            // A filter value containing a single quote must not break the
+            // predicate (injection guard, mirroring the delete path).
+            let (_dir, store) = temp_store(3).await;
+            let fid = Uuid::new_v4();
+            let nasty = "repo' OR '1'='1";
+            store.upsert_file_chunks(fid, vec![record_vec(fid, nasty, 1, vec![1.0, 0.0, 0.0])]).await.unwrap();
+
+            // Filtering on a different (quoted) value matches nothing.
+            let other = VectorSearchFilters { repositories: vec!["other".to_string()], ..Default::default() };
+            assert_eq!(store.search(&[1.0, 0.0, 0.0], 10, &other).await.unwrap().len(), 0);
+            // Filtering on the real quoted value matches exactly its row.
+            let real = VectorSearchFilters { repositories: vec![nasty.to_string()], ..Default::default() };
+            assert_eq!(store.search(&[1.0, 0.0, 0.0], 10, &real).await.unwrap().len(), 1);
+        }
+
+        #[tokio::test]
+        async fn test_search_empty_store_is_ok() {
+            let (_dir, store) = temp_store(3).await;
+            let hits = store.search(&[1.0, 0.0, 0.0], 10, &VectorSearchFilters::default()).await.unwrap();
+            assert!(hits.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_search_wrong_dimension_errors() {
+            let (_dir, store) = temp_store(3).await;
+            assert!(store.search(&[1.0, 0.0], 10, &VectorSearchFilters::default()).await.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_search_zero_limit_returns_empty() {
+            let (_dir, store) = temp_store(3).await;
+            let fid = Uuid::new_v4();
+            store.upsert_file_chunks(fid, vec![record_vec(fid, "r", 1, vec![1.0, 0.0, 0.0])]).await.unwrap();
+            assert!(store.search(&[1.0, 0.0, 0.0], 0, &VectorSearchFilters::default()).await.unwrap().is_empty());
+        }
     }
 }
 
@@ -428,5 +849,43 @@ mod tests {
         assert_eq!(sql_quote("repo"), "'repo'");
         assert_eq!(sql_quote("a'b"), "'a''b'");
         assert_eq!(sql_quote("' OR '1'='1"), "''' OR ''1''=''1'");
+    }
+
+    #[test]
+    fn test_build_filter_predicate_empty_is_none() {
+        assert_eq!(build_filter_predicate(&VectorSearchFilters::default()), None);
+    }
+
+    #[test]
+    fn test_build_filter_predicate_single_field() {
+        let filters = VectorSearchFilters { extensions: vec!["rs".to_string()], ..Default::default() };
+        assert_eq!(
+            build_filter_predicate(&filters),
+            Some("extension IN ('rs')".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_filter_predicate_multiple_fields_and_values() {
+        let filters = VectorSearchFilters {
+            repositories: vec!["a".to_string(), "b".to_string()],
+            extensions: vec!["rs".to_string()],
+            ..Default::default()
+        };
+        // Fields AND-ed; values within a field OR-ed via IN(...).
+        assert_eq!(
+            build_filter_predicate(&filters),
+            Some("repository IN ('a', 'b') AND extension IN ('rs')".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_filter_predicate_escapes_values() {
+        let filters = VectorSearchFilters { projects: vec!["x' OR '1'='1".to_string()], ..Default::default() };
+        // The single quotes are doubled, so the value cannot break out of IN(...).
+        assert_eq!(
+            build_filter_predicate(&filters),
+            Some("project IN ('x'' OR ''1''=''1')".to_string())
+        );
     }
 }

@@ -25,6 +25,7 @@ import { CacheStatsChart } from './components/CacheStatsChart';
 import { HealthIndicator } from './components/HealthIndicator';
 import { TuningPanel } from './components/TuningPanel';
 import { AutoRefreshToggle } from './components/AutoRefreshToggle';
+import { SemanticIndexCard } from './components/SemanticIndexCard';
 
 interface IndexResetResponse {
   success: boolean;
@@ -256,6 +257,9 @@ export const IndexManagement: React.FC = () => {
 
         {/* Right Column - Detailed Metrics */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Semantic (vector) index — only renders when enabled on the server */}
+          <SemanticIndexCard />
+
           {/* Segments */}
           {stats && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow">

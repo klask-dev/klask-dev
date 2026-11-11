@@ -15,6 +15,7 @@ use sqlx::{PgPool, Row};
 use tracing::{debug, error, info};
 
 pub mod search;
+pub mod semantic;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemStats {
@@ -144,7 +145,8 @@ pub async fn create_router() -> Result<Router<AppState>> {
         .route("/seed/clear", post(clear_seed_data))
         .route("/seed/stats", get(get_seed_stats))
         .route("/search/reset-index", post(reset_search_index))
-        .nest("/search", search::create_router().await?);
+        .nest("/search", search::create_router().await?)
+        .nest("/semantic", semantic::create_router().await?);
 
     Ok(router)
 }

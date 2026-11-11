@@ -203,6 +203,15 @@ async fn login(
     // Clear rate limit on successful login
     app_state.login_rate_limiter.write().await.remove(&username);
 
+    // Re-hash password if it uses old parameters (m=65536,t=3,p=2) for automatic migration
+    let mut user = user;
+    if user.password_hash.contains("m=65536,t=3,p=2")
+        && let Ok(new_hash) = hash_password(&req.password)
+        && let Ok(updated_user) = user_repo.update_user_password(user.id, &new_hash).await
+    {
+        user = updated_user;
+    }
+
     // Update last_login and last_activity timestamps
     let user = user_repo.update_last_login(user.id).await.map_err(|e| AuthError::DatabaseError(e.to_string()))?;
 

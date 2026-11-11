@@ -110,13 +110,6 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state?.user) {
-          // Validate the session by refreshing user data from the server.
-          // The HttpOnly cookie is sent automatically by the browser.
-          state.refreshUser();
-        }
-      },
     }
   )
 );

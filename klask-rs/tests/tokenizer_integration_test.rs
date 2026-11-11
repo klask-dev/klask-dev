@@ -34,6 +34,7 @@ mod tokenizer_integration_tests {
             regex_search: false,
             regex_flags: None,
             case_sensitive: false,
+            mode: Default::default(),
         }
     }
 

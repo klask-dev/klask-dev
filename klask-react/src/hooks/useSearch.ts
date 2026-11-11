@@ -1,23 +1,21 @@
 import React from 'react';
 import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
+import { useAuthStore } from '../stores/auth-store';
 import type {
   SearchQuery,
+  SearchMode,
   FacetResponseItem,
   FacetsApiResponse,
 } from '../types';
 
-// Helper function to add auth token to fetch requests
+// Helper function for authenticated fetch requests
+// Note: HttpOnly cookie (auth_token) is sent automatically by the browser
 const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem('authToken');
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   } as Record<string, string>;
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   // Use absolute URL with API_BASE_URL if url is relative
   const fullUrl = url.startsWith('http') ? url : `${window.API_BASE_URL}${url}`;
@@ -40,6 +38,7 @@ export const useSearch = (
   query: SearchQuery,
   options: UseSearchOptions = {}
 ) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const {
     enabled = true,
     refetchOnWindowFocus = false,
@@ -49,7 +48,7 @@ export const useSearch = (
   return useQuery({
     queryKey: ['search', query],
     queryFn: () => apiClient.search(query),
-    enabled: enabled && !!query.query?.trim(),
+    enabled: enabled && !!query.query?.trim() && isAuthenticated,
     refetchOnWindowFocus,
     staleTime,
     retry: (failureCount, error) => {
@@ -69,6 +68,7 @@ export const useInfiniteSearch = (
   baseQuery: Omit<SearchQuery, 'maxResults'>,
   options: UseSearchOptions = {}
 ) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const {
     enabled = true,
     refetchOnWindowFocus = false,
@@ -87,7 +87,7 @@ export const useInfiniteSearch = (
       };
       return apiClient.search(query);
     },
-    enabled: enabled && !!baseQuery.query?.trim(),
+    enabled: enabled && !!baseQuery.query?.trim() && isAuthenticated,
     refetchOnWindowFocus,
     staleTime,
     getNextPageParam: (lastPage, allPages) => {
@@ -108,6 +108,8 @@ export const useInfiniteSearch = (
 };
 
 export const useSearchFilters = (options?: { enabled?: boolean }) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   return useQuery({
     queryKey: ['search', 'static-filters'],
     queryFn: async () => {
@@ -123,7 +125,7 @@ export const useSearchFilters = (options?: { enabled?: boolean }) => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 3,
-    enabled: options?.enabled ?? false, // Disabled by default to avoid slow queries on every page load
+    enabled: (options?.enabled ?? false) && isAuthenticated, // Disabled by default to avoid slow queries on every page load
   });
 };
 
@@ -136,8 +138,11 @@ export const useMultiSelectSearch = (
   fuzzySearch: boolean = false,
   regexSearch: boolean = false,
   regexFlags?: string,  // Regex flags: "i", "m", "s", or combinations like "ims"
-  caseSensitive: boolean = false
+  caseSensitive: boolean = false,
+  mode: SearchMode = 'keyword'  // keyword (default) | semantic | hybrid
 ) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   const {
     enabled = true,
     refetchOnWindowFocus = false,
@@ -147,7 +152,7 @@ export const useMultiSelectSearch = (
   const pageSize = 20;
 
   return useQuery({
-    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, regexFlags, caseSensitive],
+    queryKey: ['search', 'multiselect', query, filters, currentPage, fuzzySearch, regexSearch, regexFlags, caseSensitive, mode],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
 
@@ -203,6 +208,10 @@ export const useMultiSelectSearch = (
       if (caseSensitive) {
         searchParams.set('case_sensitive', 'true');
       }
+      // Only send a non-default mode; absent means keyword (backward compatible).
+      if (mode && mode !== 'keyword') {
+        searchParams.set('mode', mode);
+      }
 
       const response = await fetchWithAuth(`/api/search?${searchParams.toString()}`);
       if (!response.ok) {
@@ -211,7 +220,7 @@ export const useMultiSelectSearch = (
 
       return response.json();
     },
-    enabled: enabled && !!query.trim(),
+    enabled: enabled && !!query.trim() && isAuthenticated,
     refetchOnWindowFocus,
     staleTime,
     // Keep previous data while fetching to prevent flickering counters during page refresh or filter changes
@@ -281,8 +290,9 @@ export const usePaginatedSearch = (
   page: number = 1,
   options: UseSearchOptions = {}
 ) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const pageSize = 20;
-  
+
   // Create search query object
   const searchQuery: SearchQuery = {
     query: query.trim(),
@@ -296,7 +306,7 @@ export const usePaginatedSearch = (
   return useQuery({
     queryKey: ['search', 'paginated', searchQuery, page],
     queryFn: () => apiClient.search(searchQuery),
-    enabled: options.enabled !== false && !!query.trim(),
+    enabled: options.enabled !== false && !!query.trim() && isAuthenticated,
     refetchOnWindowFocus: options.refetchOnWindowFocus || false,
     staleTime: options.staleTime || 30000,
     retry: (failureCount, error) => {
@@ -316,18 +326,19 @@ export const useSearchSuggestions = (
   query: string,
   options: { enabled?: boolean; limit?: number } = {}
 ) => {
-  const { enabled = true } = options;
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { enabled = true, limit = 5 } = options;
 
   return useQuery({
     queryKey: ['search', 'suggestions', query],
     queryFn: async () => {
       if (!query.trim()) return [];
-      
+
       // For now, return empty suggestions
       // In the future, this could call a dedicated suggestions endpoint
       return [];
     },
-    enabled: enabled && query.length >= 2,
+    enabled: enabled && query.length >= 2 && isAuthenticated,
     staleTime: 60000, // 1 minute
     retry: false,
   });
@@ -486,6 +497,7 @@ export const useFacetsWithFilters = (
   query: string = '',
   options: UseSearchOptions = {}
 ) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const {
     enabled = true,
     refetchOnWindowFocus = false,
@@ -567,7 +579,7 @@ export const useFacetsWithFilters = (
     },
     // Query when enabled, regardless of filters
     // Even without active filters, we need facets for display
-    enabled: enabled,
+    enabled: enabled && isAuthenticated,
     refetchOnWindowFocus,
     staleTime,
     // Keep previous data while fetching new facets to avoid flickering counters

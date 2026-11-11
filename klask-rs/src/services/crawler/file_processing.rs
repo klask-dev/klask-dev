@@ -194,6 +194,10 @@ impl FileProcessor {
                 path: relative_path.to_string(),
                 extension: extension.clone(),
                 content: content.clone(),
+                // The repository's chunks were deleted when the crawl started
+                // and each file_id is produced once per crawl, so the worker can
+                // batch these inserts instead of probing per file.
+                mode: crate::services::semantic::WriteMode::Append,
             };
             if let Err(e) = indexer.index_file(job).await {
                 warn!("Failed to enqueue {} for semantic indexing: {}", relative_path, e);

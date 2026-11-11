@@ -11,6 +11,7 @@ import {
   useFacetsWithFilters,
 } from '../useSearch';
 import { apiClient } from '../../lib/api';
+import { useAuthStore } from '../../stores/auth-store';
 
 // Mock fetch for useFacetsWithFilters
 const mockFetch = vi.fn();
@@ -37,6 +38,9 @@ describe('useSearch', () => {
       },
     });
     vi.clearAllMocks();
+    // Search hooks are gated on auth (HttpOnly cookie); mark the store
+    // authenticated so the queries actually run in tests.
+    useAuthStore.setState({ isAuthenticated: true });
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -306,6 +310,9 @@ describe('useSearchHistory hook', () => {
     };
     vi.stubGlobal('sessionStorage', sessionStorageMock);
     vi.clearAllMocks();
+    // Search hooks are gated on auth (HttpOnly cookie); mark the store
+    // authenticated so the queries actually run in tests.
+    useAuthStore.setState({ isAuthenticated: true });
   });
 
   it('should initialize with empty history', () => {
@@ -443,6 +450,9 @@ describe('useFacetsWithFilters hook', () => {
     mockFetch = vi.fn();
     global.fetch = mockFetch;
     vi.clearAllMocks();
+    // Search hooks are gated on auth (HttpOnly cookie); mark the store
+    // authenticated so the queries actually run in tests.
+    useAuthStore.setState({ isAuthenticated: true });
   });
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     React.createElement(QueryClientProvider, { client: queryClient }, children)

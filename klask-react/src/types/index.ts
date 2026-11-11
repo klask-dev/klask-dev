@@ -149,6 +149,15 @@ export interface File {
 }
 
 // Search Types - matching Rust backend
+// Search engine selection. 'keyword' (default) is unchanged BM25; 'semantic'
+// is vector ANN only; 'hybrid' fuses both via RRF. Requires the backend to be
+// built with semantic search enabled — otherwise the API degrades to keyword.
+export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
+
+// Which engine(s) a result matched in, for the hybrid/semantic result badge.
+// Absent on keyword results. Mirrors the backend `MatchSource`.
+export type MatchSource = 'keyword' | 'semantic' | 'both';
+
 export interface SearchQuery {
   query: string;
   project?: string;
@@ -158,6 +167,7 @@ export interface SearchQuery {
   offset?: number;
   fuzzySearch?: boolean; // Enable fuzzy search (1 char edit distance) - default: false
   regexSearch?: boolean; // Enable regex pattern matching - default: false
+  mode?: SearchMode; // Search mode: keyword (default) | semantic | hybrid
 }
 
 export interface SearchResult {
@@ -172,6 +182,7 @@ export interface SearchResult {
   score: number;
   line_number?: number;
   repository_name?: string; // Repository name from backend
+  match_source?: MatchSource; // Which engine(s) matched (hybrid/semantic only)
 }
 
 export interface FacetValue {

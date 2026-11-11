@@ -1,0 +1,128 @@
+{
+  "_comment": [
+    "Golden set for `cargo run --features semantic-search --bin semantic-recall`.",
+    "Each entry is a question a developer could plausibly type, paired with the",
+    "file paths that legitimately answer it. A query scores a hit when any",
+    "expected path appears in the top 10. `expect` values are matched as path",
+    "suffixes, so they must be long enough to be unambiguous.",
+    "",
+    "The set deliberately mixes two kinds of query: those whose wording overlaps",
+    "the identifiers in the code (BM25 should win or tie) and those phrased in",
+    "pure intent with no shared vocabulary (only the vector side can find them).",
+    "That mix is the point: it shows where the semantic engine earns its cost.",
+    "",
+    "Review rule: never add an entry whose expected file you have not opened."
+  ],
+  "queries": [
+    {
+      "query": "where do we check that a login token has not expired",
+      "expect": ["auth/jwt.rs", "auth/extractors.rs"],
+      "note": "JWT decoding and expiry validation, plus the request-side extractor."
+    },
+    {
+      "query": "how is a user password stored so nobody can read it back",
+      "expect": ["utils/password.rs"],
+      "note": "Argon2 hashing helpers."
+    },
+    {
+      "query": "what decides whether a file is text or binary",
+      "expect": ["crawler/parsers/content_detector.rs"],
+      "note": "Text confidence heuristic over the first bytes."
+    },
+    {
+      "query": "remove every document of a repository from the search index",
+      "expect": ["services/search.rs"],
+      "note": "delete_project_documents; api/repositories.rs only calls it."
+    },
+    {
+      "query": "split a source file into pieces before computing embeddings",
+      "expect": ["semantic/chunker.rs"],
+      "note": "Line-window chunker with overlap."
+    },
+    {
+      "query": "combine two rankings produced by different search engines",
+      "expect": ["semantic/fusion.rs"],
+      "note": "Reciprocal rank fusion. Query avoids the words rank and fusion."
+    },
+    {
+      "query": "stop a crawl that is currently running",
+      "expect": ["crawler/service.rs", "api/repositories.rs"],
+      "note": "Cancellation tokens held per repository, and the endpoint firing them."
+    },
+    {
+      "query": "background task that turns source code into vectors",
+      "expect": ["semantic/indexer.rs"],
+      "note": "The embedding worker."
+    },
+    {
+      "query": "apply database schema changes when the server starts",
+      "expect": ["src/database.rs"],
+      "note": "sqlx migrations run at startup."
+    },
+    {
+      "query": "extract readable text out of a PDF document",
+      "expect": ["crawler/parsers/pdf.rs"],
+      "note": "PDF parser behind the pdf-parser feature."
+    },
+    {
+      "query": "report how far along a long running indexing job is",
+      "expect": ["services/progress.rs"],
+      "note": "ProgressTracker."
+    },
+    {
+      "query": "discover the list of branches of a git repository",
+      "expect": ["crawler/branch_processor.rs", "crawler/git_operations.rs"],
+      "note": "Branch enumeration via gix."
+    },
+    {
+      "query": "escape a value before putting it into a filter expression",
+      "expect": ["semantic/store.rs"],
+      "note": "sql_quote guards LanceDB predicates against injection."
+    },
+    {
+      "query": "create the very first administrator account on a fresh install",
+      "expect": ["services/seeding.rs"],
+      "note": "Initial admin seeding."
+    },
+    {
+      "query": "encrypt an access token before saving it in the database",
+      "expect": ["services/encryption.rs"],
+      "note": "Token encryption service."
+    },
+    {
+      "query": "run crawls automatically on a repeating timetable",
+      "expect": ["services/scheduler.rs"],
+      "note": "Scheduled crawl loop. Query avoids the words schedule and cron."
+    },
+    {
+      "query": "keep the signed in user across a page reload",
+      "expect": ["stores/auth-store.ts"],
+      "note": "Zustand persisted auth store on the frontend."
+    },
+    {
+      "query": "list the projects that belong to a GitLab group",
+      "expect": ["services/gitlab.rs"],
+      "note": "GitLab API client."
+    },
+    {
+      "query": "how are search results split into pages",
+      "expect": ["services/search.rs"],
+      "note": "limit and offset handling in the Tantivy query path."
+    },
+    {
+      "query": "compute a stable identifier for a file so it is not indexed twice",
+      "expect": ["crawler/file_processing.rs"],
+      "note": "Deterministic file id from repository, path and branch."
+    },
+    {
+      "query": "break an identifier written in camel case into separate words",
+      "expect": ["services/tokenizer.rs"],
+      "note": "Code-aware Tantivy tokenizer."
+    },
+    {
+      "query": "refuse a repository address that points at an internal network",
+      "expect": ["utils/url_validator.rs"],
+      "note": "SSRF protection on repository URLs."
+    }
+  ]
+}
