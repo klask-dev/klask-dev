@@ -55,7 +55,8 @@ shared address cannot lock out the whole instance.
 client address, so the backend must know which proxies to trust. Count only the
 proxies a request really goes through before reaching the backend. In the
 compose stack the browser calls the backend on its published port, with no proxy
-in between: the value is `0`. In Kubernetes the ingress or gateway routes `/api`
+in between: the value is `0`. When requests go through the frontend nginx
+(`BACKEND_BASE_URL` empty), that is one hop. In Kubernetes the ingress or gateway routes `/api`
 straight to the backend, which is one hop: the chart sets `1` when the ingress,
 the Gateway API route or Istio is enabled. Add one for each extra proxy or load
 balancer in front. A value higher than the real number of proxies lets a client
@@ -96,6 +97,31 @@ the setting, `file://` URLs, the git `ext::` transport and URLs starting with
 | `KLASK_GITHUB_EXCLUDED_REPOSITORIES` | empty | Comma-separated `owner/repo` names never imported from GitHub. |
 | `KLASK_GITHUB_EXCLUDED_PATTERNS` | empty | Comma-separated patterns (`*` is a wildcard) matched against `owner/repo`. |
 
+### Git operations
+
+| Variable | Default | Description |
+|---|---|---|
+| `KLASK_GIT_FETCH_TIMEOUT_SECS` | `1800` | Maximum duration of a fetch into an existing clone. |
+| `KLASK_GIT_CLONE_TIMEOUT_SECS` | `3600` | Maximum duration of a first clone. |
+
+### Sensitive files
+
+Files that usually hold secrets are not indexed, whatever the repository:
+`.env` and `.env.*` (templates such as `.env.example` or `.env.sample` are
+kept), `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`, `.git-credentials`,
+`.htpasswd`, SSH private keys (`id_rsa`, `id_ed25519`, ...; `.pub` files are
+kept), `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.kdbx`,
+`.docker/config.json`, `.aws/credentials` and `.kube/config`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `KLASK_EXCLUDED_FILE_PATTERNS` | empty | Extra comma-separated patterns to exclude (`*` is a wildcard): a file name, or a trailing path such as `.kube/config`. |
+| `KLASK_INDEX_SENSITIVE_FILES` | `false` | `true` indexes the built-in list above too. Not recommended: anyone who can search can then read those files. |
+
+This is a filter on file names, not a secret scanner: a password committed in a
+source file is still indexed. A change applies at the next crawl of each
+repository.
+
 ## Semantic search
 
 Only effective with a backend built with `--features semantic-search`; see
@@ -116,7 +142,9 @@ Only effective with a backend built with `--features semantic-search`; see
 
 | Variable | Default | Description |
 |---|---|---|
-| `BACKEND_BASE_URL` | `http://localhost:3000` | URL of the backend API **as seen by the browser**. Read when the container starts (written to `runtime-config.js`), so changing it does not require rebuilding the image. |
+| `BACKEND_BASE_URL` | `http://localhost:3000` | URL of the backend **as seen by the browser**, without the `/api` suffix. Set but empty means *same origin*: the browser calls `/api` on the host that serves the interface. Read when the container starts (written to `runtime-config.js`), so changing it does not require rebuilding the image. |
+| `BACKEND_UPSTREAM` | `klask-backend:3000` | `host:port` of the backend **as seen by the frontend container**. Its nginx relays `/api` and `/mcp` there, which is what serves same-origin requests when no ingress or gateway routes them. The name is resolved at request time without search domains: in Kubernetes use the full service name (the chart does). |
+| `NGINX_RESOLVERS` | from `/etc/resolv.conf` | DNS servers used to resolve `BACKEND_UPSTREAM`, space-separated. |
 
 When running the frontend with `npm run dev`, the API URL comes from
 `VITE_API_BASE_URL` (default `http://localhost:3000`).
