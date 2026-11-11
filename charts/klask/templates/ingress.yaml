@@ -40,7 +40,7 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
-          {{/* Backend API paths */}}
+          {{/* Backend paths: REST API and MCP endpoint */}}
           {{- if $.Values.backend.enabled }}
           - path: /api
             {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion }}
@@ -56,9 +56,23 @@ spec:
               serviceName: {{ $fullName }}-backend
               servicePort: {{ $backendSvcPort }}
               {{- end }}
+          - path: /mcp
+            {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion }}
+            pathType: Exact
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}-backend
+                port:
+                  number: {{ $backendSvcPort }}
+              {{- else }}
+              serviceName: {{ $fullName }}-backend
+              servicePort: {{ $backendSvcPort }}
+              {{- end }}
           {{- end }}
-          
-          {{/* Paths existants pour le frontend */}}
+
+          {{/* Frontend paths */}}
           {{- range .paths }}
           - path: {{ .path }}
             {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}

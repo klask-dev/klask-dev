@@ -20,6 +20,8 @@ spec:
     - match:
         - uri:
             prefix: /api
+        - uri:
+            exact: /mcp
       route:
         - destination:
             host: {{ include "klask.fullname" . }}-backend.{{ .Values.istio.virtualService.namespace }}.svc.cluster.local

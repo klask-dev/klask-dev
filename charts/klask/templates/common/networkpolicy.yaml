@@ -36,8 +36,8 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.backend.service.targetPort }}
-    {{- if .Values.ingress.enabled }}
-    # Allow from ingress controller
+    {{- if or .Values.ingress.enabled .Values.httpRoute.enabled }}
+    # Allow from the ingress controller or the gateway
     - from:
         - namespaceSelector:
             matchLabels:
@@ -107,8 +107,8 @@ spec:
         - protocol: TCP
           port: {{ .Values.frontend.service.targetPort }}
     {{- end }}
-    {{- if .Values.ingress.enabled }}
-    # Allow from ingress controller
+    {{- if or .Values.ingress.enabled .Values.httpRoute.enabled }}
+    # Allow from the ingress controller or the gateway
     - from:
         - namespaceSelector:
             matchLabels:

@@ -74,8 +74,14 @@ spec:
               containerPort: {{ .Values.frontend.service.targetPort }}
               protocol: TCP
           env:
+            # Empty = same origin: the browser calls /api on the host that serves
+            # the interface (ingress, gateway, or the nginx of this container).
             - name: BACKEND_BASE_URL
-              value: {{ if .Values.frontend.env.api.baseUrl }}{{ .Values.frontend.env.api.baseUrl | quote }}{{ else }}"http://{{ index .Values.ingress.hosts 0 "host" }}/api"{{ end }}
+              value: {{ .Values.frontend.env.api.baseUrl | default "" | quote }}
+            # Backend address used by the frontend nginx to relay /api and /mcp.
+            # Fully qualified: the nginx resolver does not apply search domains.
+            - name: BACKEND_UPSTREAM
+              value: "{{ include "klask.fullname" . }}-backend.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain | default "cluster.local" }}:{{ .Values.backend.service.port }}"
             {{- range $key, $value := .Values.frontend.env.customVars }}
             - name: {{ $key }}
               value: {{ $value | quote }}

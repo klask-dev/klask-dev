@@ -44,6 +44,45 @@ ingress:
           pathType: Prefix
 ```
 
+## Exposing Klask
+
+The interface, the REST API (`/api`) and the MCP endpoint (`/mcp`) are served
+from one host name. Pick one of:
+
+- **Ingress** (`ingress.enabled`), as in the example above. Works with any
+  ingress controller; set `ingress.className`.
+- **Gateway API** (`httpRoute.enabled`): the chart creates an `HTTPRoute`
+  attached to a Gateway you already run. It does not create the Gateway, its
+  listeners or its certificates, and the Gateway must accept routes from the
+  namespace of the release (`allowedRoutes`).
+
+  ```yaml
+  httpRoute:
+    enabled: true
+    parentRefs:
+      - name: shared-gateway
+        namespace: gateway-system
+    hostnames:
+      - klask.example.com
+  ```
+
+- **Istio** (`istio.enabled`): a `Gateway` and a `VirtualService`.
+- **None of them**: reach the frontend service (port-forward, NodePort or
+  LoadBalancer). Its nginx relays `/api` and `/mcp` to the backend.
+
+In the first three cases `/api` and `/mcp` go straight to the backend service,
+and the chart sets `TRUSTED_PROXY_HOPS=1` for the login rate limit; raise
+`backend.config.trustedProxyHops` if more proxies sit in front (see
+[Configuration](configuration.md#authentication-and-cors)). Set
+`backend.config.cookieSecure: true` when the site is served over HTTPS.
+
+With `networkPolicy.enabled` (the default), the pods of the ingress controller
+or of the gateway must be allowed in: set
+`networkPolicy.ingress.namespaceSelector` to their namespace (default
+`ingress-nginx`).
+
+## Secrets and other settings
+
 Secrets can also come from an existing Kubernetes Secret
 (`backend.existingAuthSecret`, `backend.existingSecret`,
 `postgresql.auth.existingSecret`). Backend settings that are not secret go under

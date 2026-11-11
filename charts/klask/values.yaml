@@ -46,6 +46,9 @@ podLabels: {}
 ## @param extraLabels Extra labels to add to all resources
 extraLabels: {}
 
+## @param clusterDomain DNS domain of the cluster, used to build fully qualified service names
+clusterDomain: cluster.local
+
 ## @param podSecurityContext Configure Pod security context
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
 podSecurityContext:
@@ -271,7 +274,7 @@ backend:
     allowRegistration: false
     ## @param backend.config.cookieSecure Add the Secure flag to the auth cookie (COOKIE_SECURE). Enable when the site is served over HTTPS
     cookieSecure: false
-    ## @param backend.config.trustedProxyHops Number of proxies appending to X-Forwarded-For in front of the backend (TRUSTED_PROXY_HOPS). "auto" = 1 when ingress or istio is enabled (the gateway routes /api straight to the backend service), otherwise 0 (header ignored). Raise it if more proxies sit in front of the gateway
+    ## @param backend.config.trustedProxyHops Number of proxies appending to X-Forwarded-For in front of the backend (TRUSTED_PROXY_HOPS). "auto" = 1 when ingress, httpRoute or istio is enabled (the gateway routes /api straight to the backend service), otherwise 0 (header ignored). Raise it if more proxies sit in front of the gateway
     trustedProxyHops: "auto"
     ## @param backend.config.filesystemAllowedRoots Comma-separated directories FileSystem repositories may index (FILESYSTEM_ALLOWED_ROOTS). Empty disables FileSystem repositories
     filesystemAllowedRoots: ""
@@ -431,8 +434,12 @@ frontend:
   env:
     ## API configuration
     api:
-      ## @param frontend.env.api.baseUrl API base URL (leave empty for auto-configuration via ingress)
-      ## Example: "https://api.example.com"
+      ## @param frontend.env.api.baseUrl URL of the backend as seen by the browser, without the /api suffix
+      ## Leave empty (recommended): the browser then calls /api on the host that serves the interface,
+      ## which the ingress, the HTTPRoute or Istio route to the backend. Without any of them (port-forward,
+      ## NodePort, LoadBalancer on the frontend service) the frontend nginx relays /api and /mcp itself.
+      ## Set it only when the API is served from another origin, e.g. "https://api.example.com"
+      ## (that origin must then be listed in the backend ALLOWED_ORIGINS).
       baseUrl: ""
 
     ## Additional custom variables
@@ -628,9 +635,10 @@ networkPolicy:
   ## @param networkPolicy.enabled Enable NetworkPolicy
   enabled: true
 
-  ## @param networkPolicy.ingress Ingress controller configuration for NetworkPolicy
+  ## @param networkPolicy.ingress Ingress controller (or Gateway API data plane) allowed to reach Klask
+  ## With httpRoute.enabled, set the namespace of the pods that implement the Gateway.
   ingress:
-    ## @param networkPolicy.ingress.namespaceSelector Namespace selector for ingress controller
+    ## @param networkPolicy.ingress.namespaceSelector Namespace selector for the ingress controller or gateway
     namespaceSelector:
       kubernetes.io/metadata.name: ingress-nginx
     ## @param networkPolicy.ingress.podSelector Pod selector for ingress controller
@@ -659,6 +667,29 @@ networkPolicy:
     ## healthCheckSources:
     ##   - ipBlock:
     ##       cidr: 10.0.2.0/24
+
+## @section Gateway API parameters
+
+## Expose Klask through the Kubernetes Gateway API instead of an Ingress.
+## The chart creates an HTTPRoute attached to a Gateway that you (or your
+## platform team) already run; it does not create the Gateway, its listeners
+## or its TLS certificates. Requires the Gateway API CRDs (gateway.networking.k8s.io/v1).
+## Enable either ingress or httpRoute, not both, for a given hostname.
+httpRoute:
+  ## @param httpRoute.enabled Create an HTTPRoute for Klask
+  enabled: false
+  ## @param httpRoute.annotations Additional annotations for the HTTPRoute
+  annotations: {}
+  ## @param httpRoute.parentRefs Gateways (and optionally listeners) the route attaches to
+  ## Example:
+  ## parentRefs:
+  ##   - name: shared-gateway
+  ##     namespace: gateway-system
+  ##     sectionName: https
+  parentRefs: []
+  ## @param httpRoute.hostnames Hostnames matched by the route
+  hostnames:
+    - klask.local
 
 ## @section Metrics parameters
 
