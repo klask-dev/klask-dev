@@ -83,8 +83,12 @@ Enable the **regex** option to search with a regular expression.
 
 ## Phrases
 
-Searching for an exact sequence of words in quotes is **not supported** yet:
-quote characters act as separators and the words are searched independently.
+Put words between double quotes to search for them as an exact sequence:
+`"connection pool"` only matches files where the two words follow each other.
+A phrase can be mixed with plain words (`"connection pool" timeout`). It is
+case-insensitive unless the case-sensitive option is on, and it is never fuzzy.
+An unclosed quote is ignored. One known limit: `"bar baz"` does not match
+`fooBar baz`, because of the way camelCase identifiers are split.
 
 ## Semantic and hybrid modes
 

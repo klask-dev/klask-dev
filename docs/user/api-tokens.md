@@ -32,5 +32,7 @@ curl -H "Authorization: Bearer klask_pat_..." \
 
 Revoked, expired and disabled-user tokens are rejected with `401`.
 
-Tokens are created with the `read-only` scope. The same token also
-authenticates requests to the [MCP server](mcp-server.md).
+Tokens are created with the `read-only` scope unless `scope: "read-write"` is
+requested. A read-only token is refused on every request that modifies data and
+on every admin endpoint; it still authenticates requests to the
+[MCP server](mcp-server.md). Changing your password revokes all your tokens.
