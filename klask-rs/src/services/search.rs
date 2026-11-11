@@ -1,16 +1,15 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{BooleanQuery, PhraseQuery, Query, QueryParser, RegexQuery, TermQuery};
+use tantivy::query::{BooleanQuery, PhraseQuery, Query, RegexQuery, TermQuery};
 use tantivy::schema::{
     FAST, Field, IndexRecordOption, STORED, STRING, Schema, TEXT, TextFieldIndexing, TextOptions, Value,
 };
-use tantivy::snippet::SnippetGenerator;
 use tantivy::tokenizer::{TokenStream, Tokenizer};
 use tantivy::{Index, IndexReader, IndexWriter, Term, doc};
 use tokio::sync::RwLock;
@@ -25,6 +24,25 @@ use crate::services::tokenizer::{
 // Search timeout: maximum time allowed for a single search query (30 seconds)
 // This prevents heavy regex queries (e.g., .*pattern) from blocking other requests
 const SEARCH_TIMEOUT: Duration = Duration::from_secs(30);
+
+// Largest result window (offset + limit) a search may request. Tantivy reserves memory
+// proportional to offset + limit, so an unbounded page would exhaust memory.
+pub const MAX_RESULT_WINDOW: usize = 10_000;
+
+/// Offset of the first result of a 1-based page.
+///
+/// Returns `None` when the page or the limit is zero, or when the requested window
+/// exceeds [`MAX_RESULT_WINDOW`].
+pub fn result_window_offset(page: u32, limit: u32) -> Option<usize> {
+    if page == 0 || limit == 0 {
+        return None;
+    }
+    let offset = (page as u64 - 1) * limit as u64;
+    if offset + limit as u64 > MAX_RESULT_WINDOW as u64 {
+        return None;
+    }
+    Some(offset as usize)
+}
 
 const SIZE_BUCKETS: &[(&str, Option<u64>, Option<u64>)] = &[
     ("< 1 KB", None, Some(1024)),
@@ -728,6 +746,13 @@ impl SearchService {
             }
         }
 
+        if search_query.offset.saturating_add(search_query.limit) > MAX_RESULT_WINDOW {
+            return Err(anyhow!(
+                "Requested page is too deep: at most {} results can be paged through",
+                MAX_RESULT_WINDOW
+            ));
+        }
+
         // Clone self to move into spawn_blocking (SearchService is Clone)
         let service = self.clone();
 
@@ -748,23 +773,7 @@ impl SearchService {
 
     // Blocking search implementation - runs in a dedicated thread pool
     fn search_blocking(&self, search_query: SearchQuery) -> Result<SearchResultsWithTotal> {
-        // Ensure custom tokenizers are registered on the index
-        // This is critical because the tokenizers must be available when QueryParser is created
-        {
-            let tokenizer_manager = self.index.tokenizers();
-            if tokenizer_manager.get("code_tokenizer").is_none() {
-                tokenizer_manager.register("code_tokenizer", CodeTokenizer::new());
-            }
-            if tokenizer_manager.get("case_sensitive_code").is_none() {
-                tokenizer_manager.register("case_sensitive_code", CaseSensitiveCodeTokenizer::new());
-            }
-            if tokenizer_manager.get("query_tokenizer").is_none() {
-                tokenizer_manager.register("query_tokenizer", QueryTokenizer::new());
-            }
-            if tokenizer_manager.get("query_tokenizer_case_sensitive").is_none() {
-                tokenizer_manager.register("query_tokenizer_case_sensitive", QueryTokenizerCaseSensitive::new());
-            }
-        }
+        // Tokenizers are registered when the index is opened (see `new`); nothing to do here.
 
         let searcher = self.reader.searcher();
 
@@ -774,56 +783,11 @@ impl SearchService {
         // - SnippetGenerator doesn't work well with RegexQuery (uses fallback query)
         // - Regex patterns must be valid Rust regex syntax (e.g., ^pattern$, .*test.*)
 
-        // Build the base query - choose between TermQuery (case-sensitive or insensitive) or RegexQuery
+        // Build the text part of the query: plain words and exact phrases (double quotes),
+        // or a regex pattern. Case-sensitive search takes precedence over regex, as before.
         let base_query: Box<dyn tantivy::query::Query> = if search_query.case_sensitive {
-            // Mode CASE-SENSITIVE: Use TermQuery with case-preserving tokenizer on _raw fields
-            // The _raw fields are indexed with CaseSensitiveCodeTokenizer (splits camelCase, preserves case)
-            // So we tokenize the query with QueryTokenizerCaseSensitive (NO split, preserves case)
             debug!("Using case-sensitive search mode for query: {}", search_query.query);
-
-            let mut query_tokenizer = QueryTokenizerCaseSensitive::new();
-            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
-            let mut query_tokens: Vec<String> = Vec::new();
-            while token_stream.advance() {
-                query_tokens.push(token_stream.token().text.clone());
-            }
-
-            if query_tokens.is_empty() {
-                Box::new(tantivy::query::EmptyQuery)
-            } else {
-                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
-
-                for token_text in &query_tokens {
-                    let mut field_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
-
-                    // Search in content_raw (case-preserving field)
-                    let content_term = Term::from_field_text(self.fields.content_raw, token_text);
-                    field_clauses.push((
-                        tantivy::query::Occur::Should,
-                        Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
-                    ));
-
-                    // Search in file_name_raw (case-preserving field)
-                    let file_name_term = Term::from_field_text(self.fields.file_name_raw, token_text);
-                    field_clauses.push((
-                        tantivy::query::Occur::Should,
-                        Box::new(TermQuery::new(file_name_term, IndexRecordOption::WithFreqsAndPositions)),
-                    ));
-
-                    // Search in file_path_raw (case-preserving field)
-                    let file_path_term = Term::from_field_text(self.fields.file_path_raw, token_text);
-                    field_clauses.push((
-                        tantivy::query::Occur::Should,
-                        Box::new(TermQuery::new(file_path_term, IndexRecordOption::WithFreqsAndPositions)),
-                    ));
-
-                    // This token must match in at least one field
-                    let field_query = BooleanQuery::new(field_clauses);
-                    token_clauses.push((tantivy::query::Occur::Must, Box::new(field_query)));
-                }
-
-                Box::new(BooleanQuery::new(token_clauses))
-            }
+            self.build_keyword_query(&search_query.query, TextMode::CaseSensitive, false)
         } else if search_query.regex_search {
             // Mode REGEX: Use RegexQuery for pattern matching (mutually exclusive with fuzzy)
             debug!("Using regex search mode with pattern: {}", search_query.query);
@@ -883,168 +847,11 @@ impl SearchService {
 
             Box::new(BooleanQuery::new(regex_clauses))
         } else {
-            // Mode NORMAL/FUZZY: Use TermQuery with query tokenizer (NO camelCase splitting)
-            // This ensures "vlanID" query matches "vlanid" token in index (complete match)
-            // NOT split into ["vlan", "id"] which would require phrase matching
-
-            // Tokenize the query WITHOUT camelCase splitting, just lowercase
-            let mut query_tokenizer = QueryTokenizer::new();
-            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
-            let mut query_tokens: Vec<String> = Vec::new();
-            while token_stream.advance() {
-                query_tokens.push(token_stream.token().text.clone());
-            }
-
-            if query_tokens.is_empty() {
-                // No valid tokens in query
-                Box::new(tantivy::query::EmptyQuery)
-            } else {
-                // Build a BooleanQuery with TermQuery for each token
-                // Each token should match in content, file_name, or file_path (Should)
-                // All tokens must match (implicit AND between tokens)
-                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
-
-                for token_text in &query_tokens {
-                    // For each token, create a Should query across all searchable fields
-                    let mut field_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
-
-                    // Search in content field
-                    let content_term = Term::from_field_text(self.fields.content, token_text);
-                    if search_query.fuzzy_search {
-                        // Use FuzzyTermQuery for fuzzy search
-                        let fuzzy_q = tantivy::query::FuzzyTermQuery::new(content_term, 1, true);
-                        field_clauses.push((tantivy::query::Occur::Should, Box::new(fuzzy_q)));
-                    } else {
-                        field_clauses.push((
-                            tantivy::query::Occur::Should,
-                            Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
-                        ));
-                    }
-
-                    // Search in file_name field
-                    let file_name_term = Term::from_field_text(self.fields.file_name, token_text);
-                    if search_query.fuzzy_search {
-                        let fuzzy_q = tantivy::query::FuzzyTermQuery::new(file_name_term, 1, true);
-                        field_clauses.push((tantivy::query::Occur::Should, Box::new(fuzzy_q)));
-                    } else {
-                        field_clauses.push((
-                            tantivy::query::Occur::Should,
-                            Box::new(TermQuery::new(file_name_term, IndexRecordOption::WithFreqsAndPositions)),
-                        ));
-                    }
-
-                    // Search in file_path field
-                    let file_path_term = Term::from_field_text(self.fields.file_path, token_text);
-                    if search_query.fuzzy_search {
-                        let fuzzy_q = tantivy::query::FuzzyTermQuery::new(file_path_term, 1, true);
-                        field_clauses.push((tantivy::query::Occur::Should, Box::new(fuzzy_q)));
-                    } else {
-                        field_clauses.push((
-                            tantivy::query::Occur::Should,
-                            Box::new(TermQuery::new(file_path_term, IndexRecordOption::WithFreqsAndPositions)),
-                        ));
-                    }
-
-                    // This token must match in at least one field
-                    let field_query = BooleanQuery::new(field_clauses);
-                    token_clauses.push((tantivy::query::Occur::Must, Box::new(field_query)));
-                }
-
-                Box::new(BooleanQuery::new(token_clauses))
-            }
+            self.build_keyword_query(&search_query.query, TextMode::Insensitive, search_query.fuzzy_search)
         };
 
-        // Create a separate query for snippet highlighting
-        // (SnippetGenerator doesn't work well with FuzzyTermQuery or RegexQuery - tantivy issue #867)
-        // For regex mode, extract simple terms from the pattern for snippet generation
-        let (base_query_for_snippet, snippet_field) = if search_query.case_sensitive {
-            // For case-sensitive search, we use content (lowercased) for snippets
-            // because SnippetGenerator doesn't work well with our case-preserving tokenization
-            // The search still works correctly on content_raw, but snippets will be lowercased
-            // TODO: Implement custom highlighting that preserves case
-            let mut query_tokenizer = QueryTokenizer::new(); // Use lowercase tokenizer for snippets
-            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
-            let mut query_tokens: Vec<String> = Vec::new();
-            while token_stream.advance() {
-                query_tokens.push(token_stream.token().text.clone());
-            }
-
-            let query = if query_tokens.is_empty() {
-                Box::new(tantivy::query::AllQuery) as Box<dyn tantivy::query::Query>
-            } else {
-                // Build BooleanQuery with TermQuery for each token (for content field)
-                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
-                for token_text in &query_tokens {
-                    let content_term = Term::from_field_text(self.fields.content, token_text);
-                    token_clauses.push((
-                        tantivy::query::Occur::Must,
-                        Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
-                    ));
-                }
-                Box::new(BooleanQuery::new(token_clauses)) as Box<dyn tantivy::query::Query>
-            };
-            (query, self.fields.content) // Use normal content field for snippets
-        } else if search_query.regex_search {
-            // For regex, extract alphanumeric terms from pattern for highlighting
-            let simple_terms = extract_simple_terms_from_regex(&search_query.query);
-
-            let query = if !simple_terms.is_empty() {
-                // Try to parse extracted terms with OR for better highlighting
-                let terms_query = simple_terms.join(" OR ");
-                let query_parser_for_snippet = QueryParser::for_index(
-                    &self.index,
-                    vec![self.fields.content, self.fields.file_name, self.fields.file_path],
-                );
-
-                match query_parser_for_snippet.parse_query(&terms_query) {
-                    Ok(q) => {
-                        debug!("Using extracted terms for snippet: {}", terms_query);
-                        q
-                    }
-                    Err(_) => {
-                        // Fallback if extraction fails
-                        debug!("Failed to parse extracted terms, using AllQuery");
-                        Box::new(tantivy::query::AllQuery)
-                    }
-                }
-            } else {
-                // No terms extracted - use AllQuery
-                debug!("No simple terms extracted from regex pattern, using AllQuery");
-                Box::new(tantivy::query::AllQuery)
-            };
-            (query, self.fields.content)
-        } else {
-            // For normal/fuzzy search, build TermQuery manually to avoid QueryParser splitting camelCase
-            let mut query_tokenizer = QueryTokenizer::new();
-            let mut token_stream = query_tokenizer.token_stream(&search_query.query);
-            let mut query_tokens: Vec<String> = Vec::new();
-            while token_stream.advance() {
-                query_tokens.push(token_stream.token().text.clone());
-            }
-
-            let query = if query_tokens.is_empty() {
-                Box::new(tantivy::query::AllQuery) as Box<dyn tantivy::query::Query>
-            } else {
-                // Build BooleanQuery with TermQuery for each token (for content only, since snippets are from content)
-                let mut token_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
-                for token_text in &query_tokens {
-                    let content_term = Term::from_field_text(self.fields.content, token_text);
-                    token_clauses.push((
-                        tantivy::query::Occur::Must,
-                        Box::new(TermQuery::new(content_term, IndexRecordOption::WithFreqsAndPositions)),
-                    ));
-                }
-                Box::new(BooleanQuery::new(token_clauses)) as Box<dyn tantivy::query::Query>
-            };
-            (query, self.fields.content)
-        };
-
-        // Create snippet generator once for the entire search (using non-fuzzy query)
-        let snippet_generator = if search_query.limit > 0 {
-            Some(self.create_snippet_generator(&searcher, &*base_query_for_snippet, snippet_field)?)
-        } else {
-            None
-        };
+        // Renders the highlighted excerpt of each result from its stored content
+        let highlighter = SnippetHighlighter::new(&search_query);
 
         // Build filter queries if filters are provided
         let mut filter_queries = Vec::new();
@@ -1169,17 +976,16 @@ impl SearchService {
             base_query
         };
 
-        // For performance with large indices, use Count collector for total
-        let total = searcher.search(&final_query, &Count)? as u64;
-
-        // Ensure limit is at least 1 to avoid Tantivy panic
+        // Count all matches and fetch the requested page in a single pass
         let effective_limit = if search_query.limit == 0 { 1 } else { search_query.limit };
-
-        // Execute search with pagination
-        let top_docs = searcher.search(
+        let (total, top_docs) = searcher.search(
             &final_query,
-            &TopDocs::with_limit(effective_limit).and_offset(search_query.offset),
+            &(
+                Count,
+                TopDocs::with_limit(effective_limit).and_offset(search_query.offset),
+            ),
         )?;
+        let total = total as u64;
 
         let mut results = Vec::new();
 
@@ -1216,12 +1022,12 @@ impl SearchService {
 
                 // No need for post-query filtering anymore since we're using query-time filters
 
-                // Generate content snippet and extract line number
-                let (content_snippet, line_number) = if let Some(ref generator) = snippet_generator {
-                    self.generate_optimized_snippet(generator, &search_query.query, &retrieved_doc)?
-                } else {
-                    ("".to_string(), None)
-                };
+                // Highlighted excerpt and line of its first match
+                let (content_snippet, line_number) =
+                    match retrieved_doc.get_first(self.fields.content).and_then(|v| v.as_str()) {
+                        Some(content) => highlighter.render(content),
+                        None => (String::new(), None),
+                    };
 
                 // Format DocAddress as "segment_ord:doc_id"
                 let doc_address_str = format!("{}:{}", doc_address.segment_ord, doc_address.doc_id);
@@ -1253,71 +1059,48 @@ impl SearchService {
         Ok(SearchResultsWithTotal { results, total, facets })
     }
 
-    fn create_snippet_generator(
-        &self,
-        searcher: &tantivy::Searcher,
-        query: &dyn tantivy::query::Query,
-        content_field: Field,
-    ) -> Result<SnippetGenerator> {
-        let mut snippet_generator = SnippetGenerator::create(searcher, query, content_field)?;
-        snippet_generator.set_max_num_chars(300);
-        Ok(snippet_generator)
-    }
+    /// Builds the keyword query: plain words (ANDed, fuzzy when requested) and exact phrases.
+    ///
+    /// A phrase matches only when its tokens occur at consecutive positions. It is tokenized
+    /// with the same tokenizer as the indexed field, so the positions line up with the index.
+    /// Phrases are never fuzzy.
+    fn build_keyword_query(&self, query: &str, mode: TextMode, fuzzy: bool) -> Box<dyn tantivy::query::Query> {
+        let fields = mode.searchable_fields(&self.fields);
+        let mut clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
 
-    fn generate_optimized_snippet(
-        &self,
-        generator: &SnippetGenerator,
-        query: &str,
-        doc: &tantivy::TantivyDocument,
-    ) -> Result<(String, Option<u32>)> {
-        // Generate the snippet with HTML highlighting using Tantivy's SnippetGenerator
-        // The snippet generator uses the non-fuzzy query, so it can properly highlight matches
-        let snippet = generator.snippet_from_doc(doc);
-        let highlighted_html = snippet.to_html();
-
-        // Extract clean search terms from query for line number calculation (remove fuzzy/wildcard chars)
-        let clean_terms: Vec<String> = query
-            .split_whitespace()
-            .map(|term| {
-                term.trim_end_matches(|c: char| c == '*' || c == '?' || c == '~' || c.is_numeric())
-                    .trim_matches(|c: char| c == '"' || c == '(')
-                    .trim_end_matches(')')
-                    .to_lowercase()
-            })
-            .filter(|t| !t.is_empty())
-            .collect();
-
-        // If snippet is empty (no matches found by generator), fallback to raw content excerpt
-        if highlighted_html.trim().is_empty()
-            && let Some(content) = doc.get_first(self.fields.content).and_then(|v| v.as_str())
-        {
-            // Return first 400 chars without HTML highlighting (better than nothing)
-            // Use chars() to properly handle UTF-8 multi-byte characters (e.g., é, ü, 中)
-            let excerpt = if content.chars().count() > 400 {
-                let truncated: String = content.chars().take(400).collect();
-                format!("{}...", truncated.replace('<', "&lt;").replace('>', "&gt;"))
-            } else {
-                content.replace('<', "&lt;").replace('>', "&gt;")
-            };
-            return Ok((excerpt, None));
+        for segment in split_query_segments(query) {
+            match segment {
+                QuerySegment::Words(text) => {
+                    for token in mode.query_words(text) {
+                        // This token must match in at least one field
+                        let field_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = fields
+                            .iter()
+                            .map(|&field| {
+                                let term = Term::from_field_text(field, &token);
+                                let term_query: Box<dyn tantivy::query::Query> = if fuzzy {
+                                    Box::new(tantivy::query::FuzzyTermQuery::new(term, 1, true))
+                                } else {
+                                    Box::new(TermQuery::new(term, IndexRecordOption::WithFreqsAndPositions))
+                                };
+                                (tantivy::query::Occur::Should, term_query)
+                            })
+                            .collect();
+                        clauses.push((tantivy::query::Occur::Must, Box::new(BooleanQuery::new(field_clauses))));
+                    }
+                }
+                QuerySegment::Phrase(text) => {
+                    if let Some(phrase_query) = phrase_query(&fields, &mode.phrase_tokens(text)) {
+                        clauses.push((tantivy::query::Occur::Must, phrase_query));
+                    }
+                }
+            }
         }
 
-        // For line number, use a simple approach to avoid scanning the entire content
-        let line_number = if let Some(content) = doc.get_first(self.fields.content).and_then(|v| v.as_str()) {
-            if let Some(first_term) = clean_terms.first() {
-                // Search for first term (case-insensitive)
-                content
-                    .to_lowercase()
-                    .find(first_term)
-                    .map(|pos| content[..pos].chars().filter(|&c| c == '\n').count() as u32 + 1)
-            } else {
-                None
-            }
+        if clauses.is_empty() {
+            Box::new(tantivy::query::EmptyQuery)
         } else {
-            None
-        };
-
-        Ok((highlighted_html, line_number))
+            Box::new(BooleanQuery::new(clauses))
+        }
     }
 
     #[allow(dead_code)]
@@ -2868,6 +2651,289 @@ fn extract_simple_terms_from_regex(pattern: &str) -> Vec<String> {
     terms
 }
 
+/// Text matching mode: insensitive (lowercased tokens) or case-sensitive (case-preserving tokens).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TextMode {
+    Insensitive,
+    CaseSensitive,
+}
+
+impl TextMode {
+    /// Fields searched for keyword matches in this mode
+    fn searchable_fields(self, fields: &SearchFields) -> [Field; 3] {
+        match self {
+            TextMode::Insensitive => [fields.content, fields.file_name, fields.file_path],
+            TextMode::CaseSensitive => [fields.content_raw, fields.file_name_raw, fields.file_path_raw],
+        }
+    }
+
+    /// Tokens of plain query words (no camelCase split)
+    fn query_words(self, text: &str) -> Vec<String> {
+        match self {
+            TextMode::Insensitive => tokenize_texts(&mut QueryTokenizer::new(), text),
+            TextMode::CaseSensitive => tokenize_texts(&mut QueryTokenizerCaseSensitive::new(), text),
+        }
+    }
+
+    /// Tokens of a phrase, split exactly as the indexed fields are
+    fn phrase_tokens(self, text: &str) -> Vec<String> {
+        match self {
+            TextMode::Insensitive => tokenize_texts(&mut CodeTokenizer::new(), text),
+            TextMode::CaseSensitive => tokenize_texts(&mut CaseSensitiveCodeTokenizer::new(), text),
+        }
+    }
+
+    /// Tokens of a stored content as (start byte, end byte, text), in stream order
+    fn content_tokens(self, content: &str) -> Vec<(usize, usize, String)> {
+        match self {
+            TextMode::Insensitive => collect_token_spans(&mut CodeTokenizer::new(), content),
+            TextMode::CaseSensitive => collect_token_spans(&mut CaseSensitiveCodeTokenizer::new(), content),
+        }
+    }
+}
+
+fn tokenize_texts<T: Tokenizer>(tokenizer: &mut T, text: &str) -> Vec<String> {
+    let mut stream = tokenizer.token_stream(text);
+    let mut tokens = Vec::new();
+    while stream.advance() {
+        tokens.push(stream.token().text.clone());
+    }
+    tokens
+}
+
+fn collect_token_spans<T: Tokenizer>(tokenizer: &mut T, text: &str) -> Vec<(usize, usize, String)> {
+    let mut stream = tokenizer.token_stream(text);
+    let mut tokens = Vec::new();
+    while stream.advance() {
+        let token = stream.token();
+        tokens.push((token.offset_from, token.offset_to, token.text.clone()));
+    }
+    tokens
+}
+
+/// Piece of a query: text between quotes is an exact phrase, the rest is plain words
+#[derive(Debug, PartialEq, Eq)]
+enum QuerySegment<'a> {
+    Words(&'a str),
+    Phrase(&'a str),
+}
+
+/// Splits a query on double quotes. An unclosed quote is ignored: the text after it is
+/// plain words, since quotes are token separators. An empty phrase `""` yields no tokens.
+fn split_query_segments(query: &str) -> Vec<QuerySegment<'_>> {
+    let mut segments = Vec::new();
+    let mut rest = query;
+    while let Some(open) = rest.find('"') {
+        let after_open = &rest[open + 1..];
+        let Some(close) = after_open.find('"') else {
+            break;
+        };
+        segments.push(QuerySegment::Words(&rest[..open]));
+        segments.push(QuerySegment::Phrase(&after_open[..close]));
+        rest = &after_open[close + 1..];
+    }
+    segments.push(QuerySegment::Words(rest));
+    segments
+}
+
+/// Query matching `tokens` as an exact phrase in any of `fields` (one token: a plain term).
+fn phrase_query(fields: &[Field], tokens: &[String]) -> Option<Box<dyn tantivy::query::Query>> {
+    if tokens.is_empty() {
+        return None;
+    }
+    let field_clauses: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = fields
+        .iter()
+        .map(|&field| {
+            let mut terms: Vec<Term> = tokens.iter().map(|token| Term::from_field_text(field, token)).collect();
+            let field_query: Box<dyn tantivy::query::Query> = if terms.len() == 1 {
+                let term = terms.remove(0);
+                Box::new(TermQuery::new(term, IndexRecordOption::WithFreqsAndPositions))
+            } else {
+                Box::new(PhraseQuery::new(terms))
+            };
+            (tantivy::query::Occur::Should, field_query)
+        })
+        .collect();
+    Some(Box::new(BooleanQuery::new(field_clauses)))
+}
+
+/// Number of characters in an excerpt (one match window)
+const SNIPPET_MAX_CHARS: usize = 300;
+/// Bytes of context shown before the first match of a window
+const SNIPPET_LEAD_BYTES: usize = 80;
+/// Characters of content shown when no term matches
+const FALLBACK_EXCERPT_CHARS: usize = 400;
+
+/// Renders the excerpt shown for a result, with matches wrapped in `<b>` tags.
+///
+/// Matches come from the tokenizer's byte offsets on the stored content, so every slice is cut
+/// at a character boundary and nothing is lowercased copy-wise. Text is HTML-escaped here.
+/// A phrase is highlighted as one span, from its first token to its last.
+struct SnippetHighlighter {
+    mode: TextMode,
+    terms: HashSet<String>,
+    phrases: Vec<Vec<String>>,
+}
+
+impl SnippetHighlighter {
+    fn new(search_query: &SearchQuery) -> Self {
+        let query = search_query.query.as_str();
+        let mode = if search_query.case_sensitive {
+            TextMode::CaseSensitive
+        } else {
+            TextMode::Insensitive
+        };
+        let mut highlighter = Self { mode, terms: HashSet::new(), phrases: Vec::new() };
+
+        if mode == TextMode::Insensitive && search_query.regex_search {
+            // Regex mode: highlight the literal terms of the pattern
+            for term in extract_simple_terms_from_regex(query) {
+                highlighter.terms.extend(tokenize_texts(&mut CodeTokenizer::new(), &term));
+            }
+            return highlighter;
+        }
+
+        for segment in split_query_segments(query) {
+            match segment {
+                QuerySegment::Words(text) => highlighter.terms.extend(mode.query_words(text)),
+                QuerySegment::Phrase(text) => {
+                    let tokens = mode.phrase_tokens(text);
+                    match tokens.len() {
+                        0 => {}
+                        1 => highlighter.terms.extend(tokens),
+                        _ => highlighter.phrases.push(tokens),
+                    }
+                }
+            }
+        }
+        highlighter
+    }
+
+    /// Returns the HTML excerpt and the 1-based line of its first highlighted match.
+    /// Without any match, the first characters of the content are returned unhighlighted.
+    fn render(&self, content: &str) -> (String, Option<u32>) {
+        let tokens = self.mode.content_tokens(content);
+
+        let mut matches: Vec<(usize, usize)> = Vec::new();
+        for (index, (start, end, text)) in tokens.iter().enumerate() {
+            if self.terms.contains(text) {
+                matches.push((*start, *end));
+            }
+            for phrase in &self.phrases {
+                let phrase_end = index + phrase.len();
+                if phrase_end <= tokens.len()
+                    && tokens[index..phrase_end].iter().zip(phrase).all(|(token, expected)| token.2 == *expected)
+                {
+                    matches.push((*start, tokens[phrase_end - 1].1));
+                }
+            }
+        }
+
+        if matches.is_empty() {
+            return fallback_excerpt(content);
+        }
+
+        // Merge overlapping or adjacent spans into sorted, disjoint ranges
+        matches.sort_unstable();
+        let mut ranges: Vec<(usize, usize)> = Vec::with_capacity(matches.len());
+        for (start, end) in matches {
+            match ranges.last_mut() {
+                Some(last) if start <= last.1 => last.1 = last.1.max(end),
+                _ => ranges.push((start, end)),
+            }
+        }
+
+        let (window_start, window_end) = best_window(content, &ranges);
+
+        let mut html = String::new();
+        let mut position = window_start;
+        let mut first_match: Option<usize> = None;
+        for &(start, end) in &ranges {
+            if end <= window_start || start >= window_end {
+                continue;
+            }
+            let from = start.max(window_start).max(position);
+            let to = end.min(window_end);
+            if from >= to {
+                continue;
+            }
+            html.push_str(&escape_html(slice(content, position, from)));
+            html.push_str("<b>");
+            html.push_str(&escape_html(slice(content, from, to)));
+            html.push_str("</b>");
+            first_match.get_or_insert(from);
+            position = to;
+        }
+        html.push_str(&escape_html(slice(content, position, window_end)));
+
+        (html, first_match.map(|offset| line_number_at(content, offset)))
+    }
+}
+
+/// Window of at most `SNIPPET_MAX_CHARS` characters that holds the most match starts.
+/// `ranges` must be sorted and disjoint. Ties go to the earliest window.
+fn best_window(content: &str, ranges: &[(usize, usize)]) -> (usize, usize) {
+    let mut best = (0usize, 0usize, 0usize); // (match count, window start, window end)
+    for &(match_start, _) in ranges {
+        let start = floor_char_boundary(content, match_start.saturating_sub(SNIPPET_LEAD_BYTES));
+        let end = char_end_after(content, start, SNIPPET_MAX_CHARS);
+        let count = ranges.partition_point(|range| range.0 < end) - ranges.partition_point(|range| range.0 < start);
+        if count > best.0 {
+            best = (count, start, end);
+        }
+    }
+    (best.1, best.2)
+}
+
+fn fallback_excerpt(content: &str) -> (String, Option<u32>) {
+    let excerpt = match content.char_indices().nth(FALLBACK_EXCERPT_CHARS) {
+        Some((cut, _)) => format!("{}...", escape_html(slice(content, 0, cut))),
+        None => escape_html(content),
+    };
+    (excerpt, None)
+}
+
+/// Largest index <= `index` that is a character boundary
+fn floor_char_boundary(text: &str, mut index: usize) -> usize {
+    index = index.min(text.len());
+    while !text.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+/// Byte index after `max_chars` characters starting at `start` (or the end of the text)
+fn char_end_after(text: &str, start: usize, max_chars: usize) -> usize {
+    text.get(start..)
+        .and_then(|rest| rest.char_indices().nth(max_chars).map(|(offset, _)| start + offset))
+        .unwrap_or(text.len())
+}
+
+/// `text[from..to]`, or an empty string when the range is not valid for `text`
+fn slice(text: &str, from: usize, to: usize) -> &str {
+    text.get(from..to).unwrap_or("")
+}
+
+/// 1-based line number of the byte at `offset`
+fn line_number_at(content: &str, offset: usize) -> u32 {
+    slice(content, 0, offset).matches('\n').count() as u32 + 1
+}
+
+fn escape_html(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#x27;"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}
+
 #[cfg(test)]
 mod regex_term_extraction_tests {
     use super::*;
@@ -3008,4 +3074,109 @@ pub struct AdvancedIndexMetrics {
     pub documents_by_repository: HashMap<String, u64>,
     pub top_repositories: Vec<(String, u64)>,
     pub file_types_distribution: HashMap<String, u64>,
+}
+
+#[cfg(test)]
+mod phrase_and_snippet_unit_tests {
+    use super::*;
+
+    #[test]
+    fn test_split_query_segments_plain_words() {
+        assert_eq!(split_query_segments("foo bar"), vec![QuerySegment::Words("foo bar")]);
+    }
+
+    #[test]
+    fn test_split_query_segments_mixed() {
+        assert_eq!(
+            split_query_segments("mot \"fichier tests\" autre"),
+            vec![QuerySegment::Words("mot "), QuerySegment::Phrase("fichier tests"), QuerySegment::Words(" autre"),]
+        );
+    }
+
+    #[test]
+    fn test_split_query_segments_unclosed_quote_is_ignored() {
+        assert_eq!(
+            split_query_segments("\"fichier tests"),
+            vec![QuerySegment::Words("\"fichier tests")]
+        );
+    }
+
+    #[test]
+    fn test_split_query_segments_empty_phrase() {
+        assert_eq!(
+            split_query_segments("\"\""),
+            vec![QuerySegment::Words(""), QuerySegment::Phrase(""), QuerySegment::Words("")]
+        );
+    }
+
+    #[test]
+    fn test_split_query_segments_multibyte_text() {
+        assert_eq!(
+            split_query_segments("é \"ü ö\" ß"),
+            vec![QuerySegment::Words("é "), QuerySegment::Phrase("ü ö"), QuerySegment::Words(" ß"),]
+        );
+    }
+
+    #[test]
+    fn test_phrase_tokens_follow_indexed_layout() {
+        // "fooBar baz" is indexed as foo, bar, foobar, baz: the phrase must use the same sequence
+        let tokens = TextMode::Insensitive.phrase_tokens("fooBar baz");
+        assert_eq!(tokens, vec!["foo", "bar", "foobar", "baz"]);
+    }
+
+    #[test]
+    fn test_result_window_offset_bounds() {
+        assert_eq!(result_window_offset(1, 50), Some(0));
+        assert_eq!(result_window_offset(3, 10), Some(20));
+        assert_eq!(result_window_offset(0, 10), None);
+        assert_eq!(result_window_offset(1, 0), None);
+        assert_eq!(result_window_offset(u32::MAX, 1000), None);
+        assert_eq!(result_window_offset(MAX_RESULT_WINDOW as u32 / 10 + 1, 10), None);
+        assert_eq!(
+            result_window_offset(MAX_RESULT_WINDOW as u32 / 10, 10),
+            Some(MAX_RESULT_WINDOW - 10)
+        );
+    }
+
+    fn render(query: &str, content: &str) -> (String, Option<u32>) {
+        let search_query = SearchQuery::new(query.to_string());
+        SnippetHighlighter::new(&search_query).render(content)
+    }
+
+    #[test]
+    fn test_render_highlights_phrase_span_only() {
+        let (html, line) = render("\"fichier tests\"", "a\nle fichier de tests\nle fichier tests");
+        assert_eq!(html, "a\nle fichier de tests\nle <b>fichier tests</b>");
+        assert_eq!(line, Some(3));
+    }
+
+    #[test]
+    fn test_render_without_match_returns_unhighlighted_excerpt() {
+        let (html, line) = render("absent", "contenu & <b>");
+        assert_eq!(html, "contenu &amp; &lt;b&gt;");
+        assert_eq!(line, None);
+    }
+
+    #[test]
+    fn test_render_long_content_is_bounded() {
+        let content = format!("{} cible {}", "x ".repeat(500), "y ".repeat(500));
+        let (html, line) = render("cible", &content);
+        assert!(html.contains("<b>cible</b>"));
+        assert!(html.chars().count() < 400);
+        assert_eq!(line, Some(1));
+    }
+
+    #[test]
+    fn test_render_non_ascii_match_is_on_character_boundaries() {
+        let (html, _) = render("tests", "İ é ü ß tests ö");
+        assert_eq!(html, "İ é ü ß <b>tests</b> ö");
+    }
+
+    #[test]
+    fn test_floor_char_boundary_and_slice_never_split_characters() {
+        let text = "é";
+        assert_eq!(floor_char_boundary(text, 1), 0);
+        assert_eq!(slice(text, 0, 1), "");
+        assert_eq!(slice(text, 0, 2), "é");
+    }
 }
