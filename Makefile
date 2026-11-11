@@ -15,7 +15,7 @@ help:
 	@echo "  rust-dev-db      - Start only PostgreSQL database"
 	@echo "  rust-dev-full    - Start database + tools (pgAdmin, Redis)"
 	@echo "  rust-test        - Run all Rust tests"
-	@echo "  rust-migrate     - Run database migrations"
+	@echo "  rust-migrate     - Run database migrations by hand (the backend also does it at startup)"
 	@echo "  rust-build       - Build the Rust application"
 	@echo "  rust-clean       - Clean Rust build artifacts"
 	@echo "  rust-docker-up   - Start all Docker services"
@@ -43,19 +43,22 @@ rust-dev:
 	cd klask-rs && cargo run
 
 rust-dev-db:
-	cd klask-rs && docker-compose up -d postgres
+	docker compose -f docker-compose.dev.yml up -d postgres
 
 rust-dev-full:
-	cd klask-rs && docker-compose --profile tools up -d
+	docker compose -f docker-compose.dev.yml --profile tools up -d postgres pgadmin redis
 
 # Rust testing
 rust-test:
 	cd klask-rs && cargo test
 
 # Rust database operations
+# Migrations are applied automatically when the backend starts; this target is
+# only needed to run them without starting the server (requires sqlx-cli and a
+# DATABASE_URL in klask-rs/.env).
 rust-migrate:
 	@echo "Waiting for database to be ready..."
-	@until cd klask-rs && docker-compose exec postgres pg_isready -U klask_user -d klask_dev; do sleep 1; done
+	@until docker compose -f docker-compose.dev.yml exec postgres pg_isready -U klask_user -d klask_dev; do sleep 1; done
 	cd klask-rs && sqlx migrate run
 
 # Rust build commands
@@ -64,21 +67,19 @@ rust-build:
 
 rust-clean:
 	cd klask-rs && cargo clean
-	cd klask-rs && docker-compose down -v
+	docker compose -f docker-compose.dev.yml down -v
 
 # Rust Docker operations
 rust-docker-up:
-	cd klask-rs && docker-compose up -d
+	docker compose -f docker-compose.dev.yml up -d --build
 
 rust-docker-down:
-	cd klask-rs && docker-compose down
+	docker compose -f docker-compose.dev.yml down
 
 # Rust setup for new developers
 rust-setup: rust-dev-db
 	@echo "Waiting for database to be ready..."
 	@sleep 5
-	$(MAKE) rust-migrate
 	@echo ""
 	@echo "Rust setup complete! You can now run 'make rust-dev' to start the server."
-	@echo "Database: postgres://klask:klask@localhost:5432/klask_rs"
-	@echo "pgAdmin: http://localhost:8080 (admin@klask.dev / admin)"
+	@echo "Database: postgres://klask_user:klask_password@localhost:5433/klask_dev"
