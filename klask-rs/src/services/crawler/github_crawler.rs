@@ -75,42 +75,6 @@ impl GitHubCrawler {
         // Mark crawl as started in database
         repo_repo.start_crawl(repository.id, None).await?;
 
-        // Delete all existing documents for this repository before crawling
-        // This ensures no duplicates when re-crawling
-        match self.search_service.delete_project_documents(&repository.name).await {
-            Ok(deleted_count) => {
-                if deleted_count > 0 {
-                    info!(
-                        "Deleted {} existing documents for GitHub repository {} before crawling",
-                        deleted_count, repository.name
-                    );
-                }
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to delete existing documents for GitHub repository {}: {}",
-                    repository.name, e
-                );
-                // Continue anyway - the upsert should handle duplicates
-            }
-        }
-
-        // Mirror the deletion in the semantic vector store (best-effort).
-        #[cfg(feature = "semantic-search")]
-        if let Some(indexer) = &self.semantic_indexer {
-            match indexer.delete_project(&repository.name).await {
-                Ok(n) if n > 0 => info!(
-                    "Deleted {} semantic chunks for GitHub repository {}",
-                    n, repository.name
-                ),
-                Ok(_) => {}
-                Err(e) => warn!(
-                    "Failed to delete semantic chunks for GitHub repository {}: {}",
-                    repository.name, e
-                ),
-            }
-        }
-
         // Extract and decrypt access token from repository
         let encrypted_token =
             repository.access_token.as_ref().ok_or_else(|| anyhow!("GitHub repository missing access token"))?;
@@ -202,6 +166,26 @@ impl GitHubCrawler {
             filtered_repositories.len(),
             repository.name
         );
+
+        // Discovery succeeded: queue the removal of the previous documents. It is applied by the
+        // crawl's final commit, together with the documents indexed by the project loop below.
+        self.search_service.queue_project_deletion(&repository.name).await;
+
+        // Mirror the deletion in the semantic vector store (best-effort).
+        #[cfg(feature = "semantic-search")]
+        if let Some(indexer) = &self.semantic_indexer {
+            match indexer.delete_project(&repository.name).await {
+                Ok(n) if n > 0 => info!(
+                    "Deleted {} semantic chunks for GitHub repository {}",
+                    n, repository.name
+                ),
+                Ok(_) => {}
+                Err(e) => warn!(
+                    "Failed to delete semantic chunks for GitHub repository {}: {}",
+                    repository.name, e
+                ),
+            }
+        }
 
         // Initialize hierarchical progress tracking for GitHub
         self.progress_tracker.set_gitlab_projects_total(repository.id, filtered_repositories.len()).await;

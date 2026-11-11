@@ -555,6 +555,16 @@ impl SearchService {
         Ok(())
     }
 
+    /// Queue the deletion of all documents of `repository` without committing.
+    ///
+    /// The deletion is applied by the next `commit()`. Tantivy only deletes documents added before
+    /// the delete operation, so documents added after this call survive it: a crawl can queue the
+    /// purge, index its new documents, and make both visible with a single commit.
+    pub async fn queue_project_deletion(&self, repository: &str) {
+        let writer = self.writer.write().await;
+        writer.delete_term(tantivy::Term::from_field_text(self.fields.repository, repository));
+    }
+
     /// Delete all documents for a specific repository (parent repository)
     pub async fn delete_project_documents(&self, repository: &str) -> Result<u64> {
         debug!("delete_project_documents called with repository='{}'", repository);
