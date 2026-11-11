@@ -9,52 +9,32 @@ use tracing::{info, warn};
 ///   "*-archive" matches "old-archive", "backup-archive", etc.
 ///   "v*-stable" matches "v1.0-stable", "v2.3-stable", etc.
 pub fn matches_pattern(text: &str, pattern: &str) -> bool {
-    if pattern == "*" {
-        return true; // Match everything
-    }
-
     if !pattern.contains('*') {
         return text == pattern; // Exact match if no wildcard
     }
 
-    // Simple glob matching: split by *, match parts in sequence
+    // Split on '*': the first and last parts are anchored to the start and end of `text`,
+    // the parts in between must appear in order in the remaining text. Empty parts (from
+    // leading, trailing or consecutive '*') match anything, so "*" and "**" match everything.
     let parts: Vec<&str> = pattern.split('*').collect();
+    let (first, last) = (parts[0], parts[parts.len() - 1]);
 
-    // Check if text starts with the first part (unless it's empty)
-    if !parts[0].is_empty() && !text.starts_with(parts[0]) {
+    // Prefix and suffix must not overlap in `text` ("ab*ba" does not match "aba").
+    if text.len() < first.len() + last.len() || !text.starts_with(first) || !text.ends_with(last) {
         return false;
     }
 
-    // Check if text ends with the last part (unless it's empty)
-    if !parts[parts.len() - 1].is_empty() && !text.ends_with(parts[parts.len() - 1]) {
-        return false;
-    }
-
-    // For patterns like "a*b*c", check that parts appear in order
-    let mut search_start = 0;
-    for (i, &part) in parts.iter().enumerate() {
+    // Slicing is safe: both boundaries are where a whole prefix/suffix match ends or starts.
+    let mut rest = &text[first.len()..text.len() - last.len()];
+    for part in &parts[1..parts.len() - 1] {
         if part.is_empty() {
             continue;
         }
-
-        if i == 0 {
-            // First part: already checked with starts_with
-            search_start = part.len();
-        } else if i == parts.len() - 1 {
-            // Last part: already checked with ends_with
-            // Just verify position
-            if !text[..text.len() - part.len()].ends_with(part) {
-                return false;
-            }
-        } else {
-            // Middle parts: must appear after previous part
-            match text[search_start..].find(part) {
-                Some(pos) => search_start += pos + part.len(),
-                None => return false,
-            }
+        match rest.find(part) {
+            Some(position) => rest = &rest[position + part.len()..],
+            None => return false,
         }
     }
-
     true
 }
 
@@ -333,6 +313,55 @@ mod tests {
         assert!(matches_pattern("anything", "*"));
         assert!(matches_pattern("x", "*"));
         assert!(matches_pattern("123-abc", "*"));
+    }
+
+    #[test]
+    fn test_matches_pattern_suffix() {
+        assert!(matches_pattern("old-archive", "*-archive"));
+        assert!(matches_pattern("backup-archive", "*-archive"));
+        assert!(matches_pattern("-archive", "*-archive"));
+        assert!(!matches_pattern("archive-old", "*-archive"));
+        assert!(matches_pattern("server.pem", "*.pem"));
+        assert!(!matches_pattern("server.pem.bak", "*.pem"));
+        assert!(!matches_pattern("Old-Archive", "*-archive")); // case-sensitive
+    }
+
+    #[test]
+    fn test_matches_pattern_prefix_and_suffix() {
+        assert!(matches_pattern("release-v1-stable", "release-*-stable"));
+        assert!(matches_pattern("release--stable", "release-*-stable")); // empty middle
+        assert!(!matches_pattern("release-stable", "release-*-stable")); // would need the '-' twice
+        assert!(!matches_pattern("release-v1-beta", "release-*-stable"));
+    }
+
+    #[test]
+    fn test_matches_pattern_overlap_is_rejected() {
+        assert!(!matches_pattern("aba", "ab*ba"));
+        assert!(matches_pattern("abba", "ab*ba"));
+        assert!(matches_pattern("abxba", "ab*ba"));
+    }
+
+    #[test]
+    fn test_matches_pattern_several_wildcards_keep_order() {
+        assert!(matches_pattern("axxbyyc", "a*b*c"));
+        assert!(matches_pattern("abc", "a*b*c"));
+        assert!(!matches_pattern("axxcyyb", "a*b*c"));
+        assert!(!matches_pattern("acb", "a*b*c"));
+        assert!(matches_pattern("abc", "*b*"));
+        assert!(matches_pattern("b", "*b*"));
+        assert!(!matches_pattern("ac", "*b*"));
+        assert!(matches_pattern("x-y-z", "*-*-*"));
+        assert!(!matches_pattern("x-y", "*-*-*"));
+    }
+
+    #[test]
+    fn test_matches_pattern_multibyte_characters() {
+        assert!(matches_pattern("café", "*é"));
+        assert!(!matches_pattern("cafe", "*é"));
+        assert!(matches_pattern("été-ü", "é*ü"));
+        assert!(matches_pattern("日本", "日*本"));
+        assert!(!matches_pattern("日", "日*本"));
+        assert!(matches_pattern("こんにちは日本", "*日本"));
     }
 
     // ============================================================================

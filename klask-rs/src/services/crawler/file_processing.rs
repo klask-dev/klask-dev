@@ -1,5 +1,6 @@
 use crate::models::{Repository, RepositoryType};
 use crate::services::crawler::parsers::ParserDispatcher;
+use crate::services::crawler::sensitive_files;
 use crate::services::search::{FileData, SearchService};
 use anyhow::Result;
 use sha2::{Digest, Sha256};
@@ -75,6 +76,12 @@ impl FileProcessor {
         parent_project_name: Option<&str>,
         provided_content: Option<String>,
     ) -> Result<()> {
+        // Last line of defence: sensitive files are never indexed, whatever the caller checked.
+        if sensitive_files::global().is_excluded(relative_path) {
+            debug!("Skipping sensitive file: {}", relative_path);
+            return Ok(());
+        }
+
         let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_string();
         let file_name = file_path.file_name().and_then(|name| name.to_str()).unwrap_or("").to_string();
 

@@ -132,6 +132,47 @@ impl CrawlerService {
         Uuid::from_bytes(uuid_bytes)
     }
 
+    /// Queues the removal of this repository's previous documents (and semantic chunks).
+    ///
+    /// Called only once the source is available (clone or fetch succeeded), so a failed fetch keeps the
+    /// previous content searchable. The deletion is applied by the crawl's final commit; documents
+    /// indexed after it survive, since Tantivy only deletes documents added before the delete operation.
+    async fn queue_repository_purge(&self, repository: &Repository) {
+        self.search_service.queue_project_deletion(&repository.name).await;
+
+        // Mirror the deletion in the semantic vector store (best-effort; not transactional with Tantivy).
+        #[cfg(feature = "semantic-search")]
+        if let Some(indexer) = &self.semantic_indexer {
+            match indexer.delete_project(&repository.name).await {
+                Ok(n) if n > 0 => info!("Deleted {} semantic chunks for repository {}", n, repository.name),
+                Ok(_) => {}
+                Err(e) => warn!(
+                    "Failed to delete semantic chunks for repository {}: {}",
+                    repository.name, e
+                ),
+            }
+        }
+    }
+
+    /// Commits what a crawl has queued so far after a failed or cancelled crawl, so that a queued
+    /// purge is not left pending until an unrelated commit applies it.
+    async fn commit_partial_index(&self, repository: &Repository) {
+        if let Err(e) = self.search_service.commit().await {
+            warn!(
+                "Failed to commit partial index for repository {}: {}",
+                repository.name, e
+            );
+        }
+    }
+
+    /// Commits the partial index when `result` is an error, then returns `result` unchanged.
+    async fn commit_on_error<T>(&self, repository: &Repository, result: Result<T>) -> Result<T> {
+        if result.is_err() {
+            self.commit_partial_index(repository).await;
+        }
+        result
+    }
+
     /// Main entry point for crawling a repository
     pub async fn crawl_repository(&self, repository: &Repository) -> Result<()> {
         let crawl_start_time = std::time::Instant::now();
@@ -144,40 +185,6 @@ impl CrawlerService {
 
         // Mark crawl as started in database
         repo_repo.start_crawl(repository.id, None).await?;
-
-        // Delete all existing documents for this repository/project before crawling
-        // This ensures no duplicates when re-crawling
-        match self.search_service.delete_project_documents(&repository.name).await {
-            Ok(deleted_count) => {
-                if deleted_count > 0 {
-                    info!(
-                        "Deleted {} existing documents for repository {} before crawling",
-                        deleted_count, repository.name
-                    );
-                }
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to delete existing documents for repository {}: {}",
-                    repository.name, e
-                );
-                // Continue anyway - the upsert should handle duplicates
-            }
-        }
-
-        // Mirror the deletion in the semantic vector store before re-crawling so
-        // stale chunks don't linger (best-effort; mirrors the Tantivy cleanup).
-        #[cfg(feature = "semantic-search")]
-        if let Some(indexer) = &self.semantic_indexer {
-            match indexer.delete_project(&repository.name).await {
-                Ok(n) if n > 0 => info!("Deleted {} semantic chunks for repository {}", n, repository.name),
-                Ok(_) => {}
-                Err(e) => warn!(
-                    "Failed to delete semantic chunks for repository {}: {}",
-                    repository.name, e
-                ),
-            }
-        }
 
         // Create cancellation token for this crawl
         let cancellation_token = CancellationToken::new();
@@ -267,6 +274,10 @@ impl CrawlerService {
                     return Err(anyhow!(error_msg));
                 }
 
+                // The source is available: queue the removal of the previous documents. It is applied
+                // by the final commit, together with the documents indexed below.
+                self.queue_repository_purge(repository).await;
+
                 // Update status to processing
                 self.progress_tracker
                     .update_status(repository.id, crate::services::progress::CrawlStatus::Processing)
@@ -275,17 +286,23 @@ impl CrawlerService {
                 // Check for cancellation before processing
                 if cancellation_token.is_cancelled() {
                     self.progress_tracker.cancel_crawl(repository.id).await;
+                    self.commit_partial_index(repository).await;
                     let repo_repo = RepositoryRepository::new(self.database.clone());
                     let _ = repo_repo.cancel_crawl(repository.id).await;
                     self.cleanup_cancellation_token(repository.id).await;
                     return Ok(());
                 }
 
-                self.process_repository_files(repository, &repo_path_git, &mut progress, &cancellation_token).await?;
+                self.commit_on_error(
+                    repository,
+                    self.process_repository_files(repository, &repo_path_git, &mut progress, &cancellation_token).await,
+                )
+                .await?;
 
                 // Check for cancellation before indexing
                 if cancellation_token.is_cancelled() {
                     self.progress_tracker.cancel_crawl(repository.id).await;
+                    self.commit_partial_index(repository).await;
                     let repo_repo = RepositoryRepository::new(self.database.clone());
                     let _ = repo_repo.cancel_crawl(repository.id).await;
                     self.cleanup_cancellation_token(repository.id).await;
@@ -353,16 +370,20 @@ impl CrawlerService {
                         as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
                 };
 
-                self.gitlab_crawler
-                    .crawl_gitlab_repository(
-                        repository,
-                        cancellation_token,
-                        clone_or_update_fn,
-                        process_files_fn,
-                        update_crawl_time_fn,
-                        cleanup_token_fn,
-                    )
-                    .await?;
+                self.commit_on_error(
+                    repository,
+                    self.gitlab_crawler
+                        .crawl_gitlab_repository(
+                            repository,
+                            cancellation_token,
+                            clone_or_update_fn,
+                            process_files_fn,
+                            update_crawl_time_fn,
+                            cleanup_token_fn,
+                        )
+                        .await,
+                )
+                .await?;
             }
             RepositoryType::GitHub => {
                 // For GitHub repositories, discover and clone all sub-repositories
@@ -420,16 +441,20 @@ impl CrawlerService {
                         as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
                 };
 
-                self.github_crawler
-                    .crawl_github_repository(
-                        repository,
-                        cancellation_token,
-                        clone_or_update_fn,
-                        process_files_fn,
-                        update_crawl_time_fn,
-                        cleanup_token_fn,
-                    )
-                    .await?;
+                self.commit_on_error(
+                    repository,
+                    self.github_crawler
+                        .crawl_github_repository(
+                            repository,
+                            cancellation_token,
+                            clone_or_update_fn,
+                            process_files_fn,
+                            update_crawl_time_fn,
+                            cleanup_token_fn,
+                        )
+                        .await,
+                )
+                .await?;
             }
         };
 
@@ -439,6 +464,7 @@ impl CrawlerService {
                 "Crawl was cancelled for repository: {}, skipping finalization",
                 repository.name
             );
+            self.commit_partial_index(repository).await;
             self.progress_tracker.cancel_crawl(repository.id).await;
             let repo_repo = RepositoryRepository::new(self.database.clone());
             let _ = repo_repo.cancel_crawl(repository.id).await;

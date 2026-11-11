@@ -46,36 +46,37 @@ impl GitTreeWalker {
         Ok(files)
     }
 
-    /// Check if a blob size is within acceptable limits
-    pub fn check_blob_size(repo: &gix::Repository, oid: &ObjectId) -> Result<bool> {
-        let obj = repo.find_object(*oid)?;
-        Ok(obj.data.len() as u64 <= MAX_FILE_SIZE)
-    }
+    /// Read a blob as UTF-8 text.
+    ///
+    /// The object size is read from its header first, so oversized blobs are rejected without
+    /// being inflated. Otherwise the blob is loaded once and its buffer is moved into the
+    /// resulting `String` (no copy). Returns `Ok(None)` for oversized or non-UTF-8 (binary) blobs.
+    pub fn read_text_blob(repo: &gix::Repository, oid: &ObjectId) -> Result<Option<String>> {
+        let header = repo.find_header(*oid)?;
+        if header.size() > MAX_FILE_SIZE {
+            debug!(
+                "[BLOB] Skipping blob {} ({} bytes > {} bytes)",
+                oid,
+                header.size(),
+                MAX_FILE_SIZE
+            );
+            return Ok(None);
+        }
 
-    /// Read the content of a blob as a UTF-8 string
-    pub fn read_blob_content(repo: &gix::Repository, oid: &ObjectId) -> Result<Option<String>> {
-        let obj = repo.find_object(*oid)?;
-        let blob = obj.try_into_blob().map_err(|_| anyhow!("Object is not a blob"))?;
+        let mut obj = repo.find_object(*oid)?;
+        if obj.kind != gix::object::Kind::Blob {
+            return Err(anyhow!("Object {} is not a blob", oid));
+        }
 
-        let blob_size = blob.data.len();
-        debug!("[BLOB] Attempting to read blob {} ({} bytes)", oid, blob_size);
-
-        // Try to convert to UTF-8 string
-        match String::from_utf8(blob.data.to_vec()) {
-            Ok(content) => {
-                debug!(
-                    "[BLOB] Successfully converted blob {} to UTF-8 ({} bytes, {} chars)",
-                    oid,
-                    content.len(),
-                    content.chars().count()
-                );
-                Ok(Some(content))
-            }
+        // `Object` returns its buffer to the repository on drop, so take the data out instead of cloning it.
+        let data = std::mem::take(&mut obj.data);
+        let blob_size = data.len();
+        match String::from_utf8(data) {
+            Ok(content) => Ok(Some(content)),
             Err(e) => {
                 debug!(
-                    "[BLOB] Failed to convert blob {} to UTF-8: {} (blob size: {} bytes, valid up to byte {})",
+                    "[BLOB] Blob {} is not UTF-8 ({} bytes, valid up to byte {})",
                     oid,
-                    e,
                     blob_size,
                     e.utf8_error().valid_up_to()
                 );
