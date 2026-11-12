@@ -171,8 +171,9 @@ jobs:
         key: semantic-search
 
     # The vector store (lance) generates code from .proto files at build time.
+    # libprotobuf-dev provides the well-known types they import (google/protobuf/*.proto).
     - name: Install protoc
-      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler libprotobuf-dev
 
     - name: Run clippy (semantic-search)
       run: cargo clippy --all-targets --features semantic-search -- -D warnings
