@@ -298,8 +298,18 @@ mod tests {
     }
 
     /// Runs the git CLI in `dir` with a fixed identity, panicking on failure (test helper only).
+    ///
+    /// The `GIT_*` variables are removed from the environment: git sets `GIT_DIR` and
+    /// `GIT_INDEX_FILE` when it runs a hook, and the pre-push hook runs these tests. With them,
+    /// `git init` and `git add` would act on the repository being pushed instead of `dir`.
     fn git(dir: &Path, args: &[&str]) {
-        let status = std::process::Command::new("git")
+        let mut command = std::process::Command::new("git");
+        for (name, _) in std::env::vars_os() {
+            if name.to_string_lossy().starts_with("GIT_") {
+                command.env_remove(&name);
+            }
+        }
+        let status = command
             .args(["-c", "user.name=test", "-c", "user.email=test@example.invalid"])
             .args(args)
             .current_dir(dir)
