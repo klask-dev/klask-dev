@@ -13,6 +13,9 @@ default, and needs a backend compiled with a cargo feature.
    cargo build --release --features semantic-search
    ```
 
+   The build needs the Protocol Buffers compiler (`protoc`): install
+   `protobuf-compiler` on Debian or Ubuntu, `protobuf` with Homebrew.
+
    The feature pulls in the ONNX runtime and a vector store (LanceDB). The
    `klask-rs/Dockerfile` runs a plain `cargo build --release`, so the standard
    Docker images do not include it unless you change the build command.

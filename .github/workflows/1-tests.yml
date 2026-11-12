@@ -170,6 +170,10 @@ jobs:
         workspaces: klask-rs
         key: semantic-search
 
+    # The vector store (lance) generates code from .proto files at build time.
+    - name: Install protoc
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+
     - name: Run clippy (semantic-search)
       run: cargo clippy --all-targets --features semantic-search -- -D warnings
 
