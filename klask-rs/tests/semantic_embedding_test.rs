@@ -27,6 +27,14 @@ fn test_config() -> SemanticSearchConfig {
     }
 }
 
+/// Loads the test model. The loads are serialised: the tests run in parallel,
+/// and concurrent first downloads into an empty cache make one of them fail.
+fn load_provider() -> FastEmbedProvider {
+    static LOAD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = LOAD.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    FastEmbedProvider::try_new(&test_config()).expect("model should load")
+}
+
 fn cosine(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -37,7 +45,7 @@ fn cosine(a: &[f32], b: &[f32]) -> f32 {
 #[test]
 #[ignore = "Downloads the embedding model on first run"]
 fn test_embeddings_capture_code_semantics() {
-    let provider = FastEmbedProvider::try_new(&test_config()).expect("model should load");
+    let provider = load_provider();
     assert_eq!(provider.dimension(), 384);
     assert_eq!(provider.model_id(), "Xenova/bge-small-en-v1.5");
 
@@ -70,7 +78,7 @@ fn test_embeddings_capture_code_semantics() {
 #[test]
 #[ignore = "Downloads the embedding model on first run"]
 fn test_empty_batch_returns_empty() {
-    let provider = FastEmbedProvider::try_new(&test_config()).expect("model should load");
+    let provider = load_provider();
     let vectors = provider.embed(&[]).expect("empty batch should succeed");
     assert!(vectors.is_empty());
 }
@@ -80,7 +88,7 @@ fn test_empty_batch_returns_empty() {
 #[test]
 #[ignore = "Benchmark; downloads the embedding model on first run"]
 fn test_embedding_throughput_benchmark() {
-    let provider = FastEmbedProvider::try_new(&test_config()).expect("model should load");
+    let provider = load_provider();
 
     // ~1200 lines of synthetic code → ~25 chunks with the default options
     let content = (0..200)
