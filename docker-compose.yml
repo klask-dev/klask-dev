@@ -1,10 +1,14 @@
-# Klask Environment
-# Full-stack code search engine with Rust backend and React frontend
+# Klask - self-hosted stack (pre-built images from ghcr.io)
 #
-# Quick Start:
+# Quick start:
+#   cp .env.example .env     # then fill in the three required secrets
 #   docker compose up -d
-#   Access frontend: http://localhost:8080
-#   Access backend API: http://localhost:3000
+#   Frontend: http://localhost:8080
+#   Backend API: http://localhost:3000
+#
+# POSTGRES_PASSWORD, JWT_SECRET and ENCRYPTION_KEY have no default on purpose:
+# compose refuses to start until they are set. See .env.example and
+# docs/admin/configuration.md. PostgreSQL is not published on the host.
 services:
     # PostgreSQL Database
     postgres:
@@ -13,11 +17,11 @@ services:
         environment:
             POSTGRES_DB: klask_dev
             POSTGRES_USER: klask_user
-            POSTGRES_PASSWORD: klask_password
-        ports:
-            - "5432:5432"
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
         volumes:
-            - postgres_data:/var/lib/postgresql/data
+            # PostgreSQL 18 images keep PGDATA under /var/lib/postgresql/18/docker:
+            # mount the parent directory, not .../data, or the named volume stays empty.
+            - postgres_data:/var/lib/postgresql
         networks:
             - klask-network
         restart: unless-stopped
@@ -29,15 +33,26 @@ services:
 
     # Klask Backend (Rust)
     klask-backend:
-        image: ghcr.io/klask-dev/klask-backend:latest
+        image: ghcr.io/klask-dev/klask-backend:${KLASK_IMAGE_TAG:-latest}
         container_name: klask-backend
         environment:
-            - DATABASE_URL=postgres://klask_user:klask_password@postgres:5432/klask_dev
+            - DATABASE_URL=postgres://klask_user:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/klask_dev
             - RUST_LOG=info
             - PORT=3000
             - HOST=0.0.0.0
-            - ENCRYPTION_KEY=${ENCRYPTION_KEY:-default-encryption-key-change-me}
-            - JWT_SECRET=${JWT_SECRET:-default-jwt-key-change-me}
+            - ENCRYPTION_KEY=${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env (see .env.example)}
+            - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
+            - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8080}
+            # Security defaults (see klask-rs/.env.example): registration closed,
+            # cookie without Secure (set COOKIE_SECURE=true behind HTTPS).
+            - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
+            - COOKIE_SECURE=${COOKIE_SECURE:-false}
+            # By default the browser calls the backend directly (BACKEND_BASE_URL), with no
+            # proxy in between, so X-Forwarded-For is ignored. Set the number of proxies when
+            # requests go through the frontend nginx or a reverse proxy: see
+            # docs/admin/configuration.md.
+            - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-0}
+            - ALLOW_PRIVATE_NETWORK_URLS=${ALLOW_PRIVATE_NETWORK_URLS:-true}
         ports:
             - "3000:3000"
         volumes:
@@ -52,8 +67,14 @@ services:
 
     # Klask Frontend (React)
     klask-frontend:
-        image: ghcr.io/klask-dev/klask-frontend:latest
+        image: ghcr.io/klask-dev/klask-frontend:${KLASK_IMAGE_TAG:-latest}
         container_name: klask-frontend
+        environment:
+            # URL the browser uses to reach the backend API. Set it to an empty
+            # value to serve everything from this container: the browser then calls
+            # /api on the same host and nginx relays it to the backend
+            # (see "Serving Klask on another host name" in docs/admin/installation.md).
+            - BACKEND_BASE_URL=${BACKEND_BASE_URL-http://localhost:3000}
         ports:
             - "8080:8080"
         networks:
@@ -83,12 +104,10 @@ services:
               echo ""
               echo "📊 Frontend:  http://localhost:8080"
               echo "🔌 Backend:   http://localhost:3000"
-              echo "🗄️  Database:  localhost:5432"
               echo ""
               echo "📚 Useful commands:"
               echo "  • View logs:   docker logs -f <container_name>"
               echo "  • Stop:        docker compose -f docker-compose.yml down"
-              echo "  • With tools:  docker compose -f docker-compose.yml --profile tools up -d"
               echo ""
               echo "✅ All services are healthy and running!"
               echo ""

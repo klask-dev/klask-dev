@@ -2,6 +2,7 @@ use super::file_processing::FileProcessor;
 use super::filter::filter_branches;
 use super::git_tree_walker::GitTreeWalker;
 use super::parsers::ParserDispatcher;
+use super::sensitive_files;
 use crate::models::Repository;
 use crate::services::progress::ProgressTracker;
 use crate::services::search::SearchService;
@@ -12,6 +13,9 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+/// Number of blobs read per blocking task (and per repository handle) while processing a branch.
+const BLOB_READ_BATCH_SIZE: usize = 64;
 
 /// Represents a file entry in a Git tree
 #[allow(dead_code)]
@@ -245,7 +249,7 @@ impl BranchProcessor {
         parent_repository_id: Option<Uuid>,
         parent_project_name: Option<&str>, // Parent repository name for GitLab/GitHub multi-project repos
     ) -> Result<()> {
-        use super::git_tree_walker::{GitFileEntry, MAX_FILE_SIZE};
+        use super::git_tree_walker::GitFileEntry;
 
         let repo_path_owned = repo_path.to_owned();
         let branch_name_owned = branch_name.to_string();
@@ -285,119 +289,118 @@ impl BranchProcessor {
             total_files, branch_name, repository.name
         );
 
-        let mut files_skipped_by_filter = 0;
+        let supported_entries: Vec<&GitFileEntry> =
+            files.iter().filter(|entry| Self::is_supported_file_static(std::path::Path::new(&entry.path))).collect();
+        let files_skipped_by_filter = total_files - supported_entries.len();
+        // Counts only, never file names' contents: sensitive files are already excluded above.
+        let sensitive_excluded =
+            files.iter().filter(|entry| sensitive_files::global().is_excluded(&entry.path)).count();
+        if sensitive_excluded > 0 {
+            debug!(
+                "Branch '{}': {} sensitive file(s) excluded from the index",
+                branch_name, sensitive_excluded
+            );
+        }
         let mut files_read_success = 0;
         let mut files_read_failed = 0;
         let mut files_binary_skipped = 0;
 
-        // Process each file by reading directly from Git
-        for (idx, file_entry) in files.iter().enumerate() {
-            if idx % 100 == 0 && idx > 0 {
-                debug!(
-                    "Progress: {}/{} files in branch '{}' - indexed: {}, skipped_filter: {}, binary/too_large: {}, failed: {}",
-                    idx,
-                    total_files,
-                    branch_name,
-                    files_read_success,
-                    files_skipped_by_filter,
-                    files_binary_skipped,
-                    files_read_failed
-                );
-            }
-            // Check for cancellation
+        // Blobs are read in batches: one repository handle per batch instead of one per file.
+        // A batch holds at most BLOB_READ_BATCH_SIZE contents in memory at once.
+        let mut repo_handle: Option<gix::Repository> = None;
+        for batch in supported_entries.chunks(BLOB_READ_BATCH_SIZE) {
             if cancellation_token.is_cancelled() {
                 info!("Crawl cancelled for repository: {}", repository.name);
                 return Ok(());
             }
 
-            // Check if file is supported - skip unsupported files
-            if !Self::is_supported_file_static(std::path::Path::new(&file_entry.path)) {
-                files_skipped_by_filter += 1;
-                continue;
-            }
-
-            // Read file content from Git database
+            let oids: Vec<ObjectId> = batch.iter().map(|entry| entry.oid).collect();
             let repo_path_for_task = repo_path_owned.clone();
-            let oid = file_entry.oid;
-            let path = file_entry.path.clone();
+            // The repository handle is moved into the blocking task and handed back with the
+            // contents, so the branch is opened once rather than once per batch.
+            let cached_repo = repo_handle.take();
+            let batch_result =
+                tokio::task::spawn_blocking(move || -> Result<(gix::Repository, Vec<Result<Option<String>>>)> {
+                    let git_repo = match cached_repo {
+                        Some(git_repo) => git_repo,
+                        None => gix::open(&repo_path_for_task)?,
+                    };
+                    let contents = oids.iter().map(|oid| GitTreeWalker::read_text_blob(&git_repo, oid)).collect();
+                    Ok((git_repo, contents))
+                })
+                .await;
 
-            let content_result = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
-                let git_repo = gix::open(&repo_path_for_task)?;
-
-                // Check file size first
-                if !GitTreeWalker::check_blob_size(&git_repo, &oid)? {
-                    debug!("[GIT] Skipping large file: {} (> {} bytes)", path, MAX_FILE_SIZE);
-                    return Ok(None);
-                }
-
-                // Read the content
-                let result = GitTreeWalker::read_blob_content(&git_repo, &oid);
-                match &result {
-                    Ok(Some(content)) => {
-                        debug!(
-                            "[GIT] Successfully read blob for file {} ({} bytes)",
-                            path,
-                            content.len()
-                        );
-                    }
-                    Ok(None) => {
-                        debug!("[GIT] Blob returned None (likely binary) for file {}", path);
-                    }
-                    Err(e) => {
-                        debug!("[GIT] Failed to read blob for file {}: {}", path, e);
-                    }
-                }
-                result
-            })
-            .await;
-
-            match content_result {
-                Ok(Ok(Some(content))) => {
-                    // Index the file - pass the content we already read from Git
-                    let file_path = std::path::PathBuf::from(&file_entry.path);
-                    match self
-                        .file_processor
-                        .process_single_file(
-                            repository,
-                            &file_path,
-                            &file_entry.path,
-                            branch_name,
-                            parent_project_name,
-                            Some(content), // Pass the content we already have
-                        )
-                        .await
-                    {
-                        Ok(()) => {
-                            progress.files_indexed += 1;
-                            files_read_success += 1;
-                            debug!(
-                                "[GIT] Successfully indexed file {} in branch '{}'",
-                                file_entry.path, branch_name
-                            );
-                        }
-                        Err(e) => {
-                            files_read_failed += 1;
-                            warn!("[GIT] Failed to index file {}: {}", file_entry.path, e);
-                            progress.errors.push(format!("Failed to index {}: {}", file_entry.path, e));
-                        }
-                    }
-
-                    progress.files_processed += 1;
-                }
-                Ok(Ok(None)) => {
-                    // Skipped (binary or too large)
-                    files_binary_skipped += 1;
-                    debug!("[GIT] Skipped file {} (binary or too large)", file_entry.path);
+            let batch_contents = match batch_result {
+                Ok(Ok((git_repo, contents))) => {
+                    repo_handle = Some(git_repo);
+                    contents
                 }
                 Ok(Err(e)) => {
-                    files_read_failed += 1;
-                    warn!("[GIT] Failed to read file {}: {}", file_entry.path, e);
-                    progress.errors.push(format!("Failed to read {}: {}", file_entry.path, e));
+                    warn!(
+                        "[GIT] Failed to open repository for a batch of {} files: {}",
+                        batch.len(),
+                        e
+                    );
+                    files_read_failed += batch.len();
+                    progress.errors.push(format!("Failed to read a batch of {} files: {}", batch.len(), e));
+                    continue;
                 }
                 Err(e) => {
-                    files_read_failed += 1;
-                    warn!("[GIT] Failed to spawn task for file {}: {}", file_entry.path, e);
-                    progress.errors.push(format!("Failed to process {}: {}", file_entry.path, e));
+                    warn!("[GIT] Failed to spawn batch read task: {}", e);
+                    files_read_failed += batch.len();
+                    progress.errors.push(format!("Failed to process a batch of {} files: {}", batch.len(), e));
+                    continue;
+                }
+            };
+
+            for (file_entry, content_result) in batch.iter().zip(batch_contents) {
+                if cancellation_token.is_cancelled() {
+                    info!("Crawl cancelled for repository: {}", repository.name);
+                    return Ok(());
+                }
+
+                match content_result {
+                    Ok(Some(content)) => {
+                        // Index the file - pass the content we already read from Git
+                        let file_path = std::path::PathBuf::from(&file_entry.path);
+                        match self
+                            .file_processor
+                            .process_single_file(
+                                repository,
+                                &file_path,
+                                &file_entry.path,
+                                branch_name,
+                                parent_project_name,
+                                Some(content),
+                            )
+                            .await
+                        {
+                            Ok(()) => {
+                                progress.files_indexed += 1;
+                                files_read_success += 1;
+                                debug!(
+                                    "[GIT] Successfully indexed file {} in branch '{}'",
+                                    file_entry.path, branch_name
+                                );
+                            }
+                            Err(e) => {
+                                files_read_failed += 1;
+                                warn!("[GIT] Failed to index file {}: {}", file_entry.path, e);
+                                progress.errors.push(format!("Failed to index {}: {}", file_entry.path, e));
+                            }
+                        }
+                        progress.files_processed += 1;
+                    }
+                    Ok(None) => {
+                        // Skipped (binary or too large)
+                        files_binary_skipped += 1;
+                        debug!("[GIT] Skipped file {} (binary or too large)", file_entry.path);
+                    }
+                    Err(e) => {
+                        files_read_failed += 1;
+                        warn!("[GIT] Failed to read file {}: {}", file_entry.path, e);
+                        progress.errors.push(format!("Failed to read {}: {}", file_entry.path, e));
+                    }
                 }
             }
         }
@@ -629,6 +632,11 @@ impl BranchProcessor {
 
     /// Check if a file is supported for indexing based on its extension or name
     fn is_supported_file_static(file_path: &Path) -> bool {
+        // Sensitive files (secrets, private keys, local env files) are never indexed.
+        if sensitive_files::global().is_excluded(&file_path.to_string_lossy()) {
+            return false;
+        }
+
         let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
 
         // Check if the file should be filtered (binary files are filtered)
@@ -665,5 +673,31 @@ impl BranchProcessor {
         // Let the parser dispatcher determine if it can be parsed
         // (Unknown parser will try to parse it as text if it's not binary)
         true
+    }
+}
+
+#[cfg(test)]
+mod sensitive_file_tests {
+    use super::BranchProcessor;
+    use std::path::Path;
+
+    #[test]
+    fn sensitive_files_are_not_supported_for_indexing() {
+        for path in [".env.production", "services/app/.env.local", "certs/server.pem", "deploy/id_ed25519", ".npmrc"] {
+            assert!(
+                !BranchProcessor::is_supported_file_static(Path::new(path)),
+                "{path} must not be indexed"
+            );
+        }
+    }
+
+    #[test]
+    fn regular_source_and_env_templates_stay_supported() {
+        for path in ["src/main.rs", "src/credentials.rs", "config/.env.example", "id_rsa.pub"] {
+            assert!(
+                BranchProcessor::is_supported_file_static(Path::new(path)),
+                "{path} must stay indexable"
+            );
+        }
     }
 }

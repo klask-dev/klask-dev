@@ -10,6 +10,15 @@ on:
       - master
   workflow_dispatch:
 
+# Read-only by default; the release job declares the write permissions it needs.
+permissions:
+  contents: read
+
+# Never cancel a running release: two releases must not interleave.
+concurrency:
+  group: semantic-release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Semantic Release
@@ -24,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -37,19 +46,24 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
 
       - name: Install semantic-release and plugins
         run: |
+          # Majors are pinned on purpose: an unpinned install picked
+          # conventional-changelog-conventionalcommits 10, which needs
+          # conventional-changelog-writer 9 while release-notes-generator 14
+          # still ships writer 8, and every release failed with "Missing helper".
+          # Bump these together, after checking that the notes still render.
           npm install --no-save \
-            semantic-release \
-            @semantic-release/changelog \
-            @semantic-release/git \
-            @semantic-release/exec \
-            @semantic-release/github \
-            conventional-changelog-conventionalcommits
+            semantic-release@25 \
+            @semantic-release/changelog@6 \
+            @semantic-release/git@10 \
+            @semantic-release/exec@7 \
+            @semantic-release/github@12 \
+            conventional-changelog-conventionalcommits@9
 
       - name: Run semantic-release
         run: npx semantic-release

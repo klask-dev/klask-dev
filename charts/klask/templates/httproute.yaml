@@ -1,0 +1,47 @@
+{{- if .Values.httpRoute.enabled -}}
+{{- if not .Values.httpRoute.parentRefs }}
+{{- fail "httpRoute.enabled requires at least one entry in httpRoute.parentRefs (the Gateway to attach to)" }}
+{{- end }}
+{{- $fullName := include "klask.fullname" . -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "klask.labels" . | nindent 4 }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+  {{- with .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- if .Values.backend.enabled }}
+    # REST API and MCP endpoint
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+        - path:
+            type: Exact
+            value: /mcp
+      backendRefs:
+        - name: {{ $fullName }}-backend
+          port: {{ .Values.backend.service.port }}
+    {{- end }}
+    {{- if .Values.frontend.enabled }}
+    # Web interface
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ $fullName }}-frontend
+          port: {{ .Values.frontend.service.port }}
+    {{- end }}
+{{- end }}

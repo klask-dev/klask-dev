@@ -25,6 +25,12 @@ impl Database {
         &self.pool
     }
 
+    /// Wrap an existing pool (tests can pass a lazy pool that points nowhere).
+    #[cfg(test)]
+    pub fn from_pool(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
     pub async fn health_check(&self) -> Result<()> {
         sqlx::query("SELECT 1").execute(&self.pool).await?;
         Ok(())

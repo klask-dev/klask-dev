@@ -2,15 +2,17 @@
 
 ## Reporting a Vulnerability
 
-**Please do NOT report security vulnerabilities in public GitHub issues.**
+**Please do NOT report security vulnerabilities in public GitHub issues,
+discussions or pull requests.**
 
-To report a security vulnerability:
-1. Open a [GitHub Security Advisory](https://github.com/klask-dev/klask-dev/security/advisories/new)
-2. Or open a confidential issue on the [issue tracker](https://github.com/klask-dev/klask-dev/issues/new) with the type "Security Issue"
+Report them privately with a
+[GitHub Security Advisory](https://github.com/klask-dev/klask-dev/security/advisories/new).
+Include the affected version, a description of the problem and, if possible, steps
+to reproduce it.
 
 **Response timeline:**
 - Acknowledgement: within 48 hours
-- Initial assessment: within 7 days  
+- Initial assessment: within 7 days
 - Patch release: within 30 days for critical/high severity issues
 
 ## Supported Versions
@@ -35,6 +37,15 @@ To report a security vulnerability:
 - Social engineering
 - Missing security headers (tracked separately)
 
+## Deploying securely
+
+- Set strong, unique values for `JWT_SECRET` and `ENCRYPTION_KEY` (see
+  [Configuration](docs/admin/configuration.md)) and keep `ENCRYPTION_KEY` safe:
+  it protects the repository access tokens stored in the database.
+- Serve Klask over HTTPS behind a reverse proxy, and do not expose PostgreSQL.
+- Set `ALLOW_REGISTRATION=false` if only invited people should have an account.
+
 ## Known Limitations
 
-See [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) for the full security audit with known issues and their remediation status.
+See [docs/dev/security-audit.md](docs/dev/security-audit.md) for the security
+audit of April 2026 and the status of its findings.

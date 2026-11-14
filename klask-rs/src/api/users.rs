@@ -2,11 +2,11 @@ use crate::api::auth::validate_password_strength;
 use crate::auth::AuthError;
 use crate::auth::extractors::{AdminUser, AppState, AuthenticatedUser};
 use crate::models::{
-    ApiTokenInfo, CreateApiTokenRequest, CreateApiTokenResponse, User, UserRole, extract_token_prefix,
+    ApiTokenInfo, CreateApiTokenRequest, CreateApiTokenResponse, TokenScope, User, UserRole, extract_token_prefix,
     generate_api_token, hash_api_token,
 };
 use crate::repositories::{ApiTokenRepository, UserRepository, user_repository::UserStats};
-use crate::utils::password::hash_password;
+use crate::utils::password::hash_password_async;
 use anyhow::Result;
 use axum::{
     Router,
@@ -136,8 +136,11 @@ async fn create_user(
         return Err(AuthError::EmailExists);
     }
 
-    // Hash password using argon2
-    let password_hash = match hash_password(&payload.password) {
+    // Same strength policy as self-service registration
+    validate_password_strength(&payload.password)?;
+
+    // Hash password using argon2 (blocking pool)
+    let password_hash = match hash_password_async(payload.password).await {
         Ok(hash) => hash,
         Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),
     };
@@ -218,7 +221,7 @@ async fn update_user(
     if let Some(password) = payload.password {
         // Validate password strength
         validate_password_strength(&password)?;
-        let password_hash = match hash_password(&password) {
+        let password_hash = match hash_password_async(password).await {
             Ok(hash) => hash,
             Err(_) => return Err(AuthError::InvalidInput("Failed to hash password".to_string())),
         };
@@ -339,6 +342,22 @@ async fn create_token(
     auth_user: AuthenticatedUser,
     Json(payload): Json<CreateApiTokenRequest>,
 ) -> Result<Json<CreateApiTokenResponse>, AuthError> {
+    // Resolve the requested scope; a missing scope means read-only
+    let scope = match payload.scope.as_deref() {
+        None => TokenScope::ReadOnly,
+        Some(value) => TokenScope::parse(value)
+            .ok_or_else(|| AuthError::InvalidInput("Token scope must be 'read-only' or 'read-write'".to_string()))?,
+    };
+
+    // Validate expiration: a zero or negative value would create a token that is already expired
+    if let Some(days) = payload.expires_in_days
+        && !(1..=3650).contains(&days)
+    {
+        return Err(AuthError::InvalidInput(
+            "expires_in_days must be between 1 and 3650".to_string(),
+        ));
+    }
+
     // Validate token name
     if payload.name.trim().is_empty() {
         return Err(AuthError::InvalidInput("Token name cannot be empty".to_string()));
@@ -366,7 +385,7 @@ async fn create_token(
         .create_token(
             auth_user.user.id,
             &payload.name,
-            "read-only",
+            scope.as_str(),
             &token_hash,
             &token_prefix,
             payload.expires_in_days,

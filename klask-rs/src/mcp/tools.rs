@@ -244,8 +244,12 @@ async fn search_code(state: &AppState, arguments: &Value) -> Result<Value, ToolC
 
     let limit = args.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).clamp(1, MAX_SEARCH_LIMIT);
     let page = args.page.unwrap_or(1).max(1);
-    // Compute in u64: (page - 1) * limit overflows u32 for very large pages
-    let offset = ((page as u64 - 1) * limit as u64) as usize;
+    let offset = crate::services::search::result_window_offset(page, limit).ok_or_else(|| {
+        ToolCallError::InvalidParams(format!(
+            "page {page} is too deep: at most {} results can be paged through",
+            crate::services::search::MAX_RESULT_WINDOW
+        ))
+    })?;
 
     let mode = resolve_search_mode(args.regex, args.mode);
 

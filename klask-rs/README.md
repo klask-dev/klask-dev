@@ -1,142 +1,55 @@
-# Klask-RS: Modern Code Search Engine
+# klask-rs
 
-A high-performance code search engine built with Rust, featuring real-time indexing, advanced search capabilities, and modern web technologies.
+The Klask backend: a Rust (Axum) HTTP server that crawls repositories, maintains
+a [Tantivy](https://github.com/quickwit-oss/tantivy) full-text index, stores
+application data in PostgreSQL and exposes the REST API (`/api`), the MCP
+endpoint (`/mcp`), `/health` and `/version`.
 
-## 🚀 Quick Start
+See the [project README](../README.md) for an overview and the
+[documentation](../docs/README.md) for everything else:
 
-### Prerequisites
-- Rust (1.70+)
-- Docker & Docker Compose
-- Git
-- sqlx (cargo install sqlx-cli --no-default-features --features rustls,postgres)
+- [Development setup](../docs/dev/development.md): database, `.env`, `cargo run`
+- [Architecture](../docs/dev/architecture.md): module overview
+- [Testing](../docs/dev/testing.md)
+- [Configuration reference](../docs/admin/configuration.md): environment variables
 
-### Development Setup
+## Quick start
 
-1. **Clone and setup**:
-   ```bash
-   git checkout rust-modernization
-   cd klask-rs
-   ```
+```bash
+# from the repository root: PostgreSQL for development
+docker compose -f docker-compose.dev.yml up -d postgres
 
-2. **Start the database**:
-   ```bash
-   make setup
-   ```
+cd klask-rs
+cp .env.example .env
+cargo run --bin klask-rs      # http://localhost:3000, migrations run at startup
+```
 
-3. **Run the application**:
-   ```bash
-   make dev
-   ```
+## Layout
 
-4. **Access the services**:
-   - API Server: http://localhost:3000
-   - Health Check: http://localhost:3000/health
-   - pgAdmin: http://localhost:8080 (admin@klask.dev / admin)
-
-## 🏗️ Architecture
-
-### Technology Stack
-- **Backend**: Rust + Axum + Tokio
-- **Database**: PostgreSQL + SQLx
-- **Search**: Tantivy (Rust-native search engine)
-- **Repository Integration**: Git2, GitLab API
-
-### Project Structure
 ```
 klask-rs/
 ├── src/
-│   ├── api/           # REST API endpoints
-│   ├── database/      # Database connection and migrations
-│   ├── models/        # Data models
-│   ├── repositories/  # Database operations
-│   ├── services/      # Business logic
-│   └── main.rs        # Application entry point
-├── migrations/        # Database schema migrations
-├── tests/            # Integration tests
-└── docker-compose.yml # Development environment
+│   ├── api/           REST endpoints (auth, users, repositories, search, files, admin, scheduler)
+│   ├── auth/          JWT, API tokens, extractors
+│   ├── mcp/           MCP server
+│   ├── models/        Database models
+│   ├── repositories/  Database queries
+│   ├── services/      Crawler, search, tokenizer, scheduler, encryption, semantic search
+│   ├── config.rs      Environment configuration
+│   └── main.rs        Entry point
+├── migrations/        SQL migrations (applied at startup)
+├── tests/             Integration tests
+└── examples/          Small standalone programs (cron expression checks, regex on raw fields)
 ```
 
-## 📚 API Documentation
+## Cargo features
 
-### Core Endpoints
+| Feature | Effect |
+|---|---|
+| `semantic-search` | Local embeddings and vector store for semantic and hybrid search (see [Semantic search](../docs/admin/semantic-search.md)). Off by default. |
+| `test-utils` | Test helpers. |
+| `pdf-parser`, `docx-parser` | Declared in `Cargo.toml`. |
 
-**Files**
-- `GET /api/files` - List files with pagination
-- `GET /api/files/{id}` - Get file details
+## License
 
-**Search**
-- `GET /api/search?query=...` - Search code with filters
-
-**Repositories**
-- `GET /api/repositories` - List configured repositories
-- `POST /api/repositories` - Add new repository
-- `POST /api/repositories/{id}/crawl` - Trigger crawling
-
-## 🛠️ Development Commands
-
-```bash
-# Database operations
-make dev-db          # Start PostgreSQL only
-make dev-full        # Start all services (DB + tools)
-make migrate         # Run database migrations
-
-# Development
-make dev             # Start development server
-make test            # Run tests
-make build           # Build release version
-
-# Docker operations
-make docker-up       # Start all Docker services
-make docker-down     # Stop Docker services
-make clean           # Clean everything
-```
-
-## 🗄️ Database Schema
-
-### Tables
-- **users**: Authentication and user management
-- **repositories**: Source repository configuration
-- **files**: Indexed file metadata and content
-
-### Environment Variables
-```bash
-DATABASE_URL=postgres://klask:klask@localhost:5432/klask_rs
-HOST=127.0.0.1
-PORT=3000
-JWT_SECRET=your-secret-key
-SEARCH_INDEX_DIR=./index
-```
-
-## 🔍 Search Features (In Development)
-
-- **Full-text search**: Powered by Tantivy search engine
-- **Syntax highlighting**: Code-aware result highlighting
-- **Advanced filtering**: By language, project, version
-- **Real-time indexing**: Automatic updates on code changes
-
-## 🚢 Deployment
-
-The application is designed to be deployed with Docker:
-
-```bash
-# Build production image
-docker build -t klask-rs .
-
-# Run with external database
-docker run -d \
-  -p 3000:3000 \
-  -e DATABASE_URL=postgres://... \
-  klask-rs
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `make test`
-5. Submit a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License.
+GPL-3.0-only, see [LICENSE](../LICENSE).

@@ -1,0 +1,16 @@
+# Local build output and dependencies (the image installs its own)
+node_modules
+dist
+coverage
+test-results
+
+# Version control and editor files
+.git
+.gitignore
+.vscode
+.idea
+
+# Documentation and reports, not needed to build
+*.md
+TESTS_REPORT.md
+TEST_PERFORMANCE_REPORT.md

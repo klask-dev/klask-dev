@@ -10,8 +10,12 @@ mod utils;
 mod version;
 
 use anyhow::Result;
-use auth::{extractors::AppState, jwt::JwtService};
-use axum::{Json, Router, http, routing::get};
+use auth::{extractors::AppState, jwt::JwtService, rate_limit::AuthRateLimits};
+use axum::{
+    Json, Router,
+    http::{self, HeaderName, HeaderValue, StatusCode, header},
+    routing::get,
+};
 use config::AppConfig;
 use database::Database;
 use serde::Serialize;
@@ -20,10 +24,14 @@ use services::{
     scheduler::SchedulerService,
 };
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
+use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -243,7 +251,7 @@ async fn main() -> Result<()> {
         crawl_tasks: Arc::new(RwLock::new(HashMap::new())),
         startup_time,
         delete_account_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
-        login_rate_limiter: Arc::new(RwLock::new(HashMap::new())),
+        auth_rate_limits: Arc::new(AuthRateLimits::default()),
     };
 
     // Build application router
@@ -255,7 +263,10 @@ async fn main() -> Result<()> {
     info!("Server listening on http://{}", bind_address);
 
     // Start server with graceful shutdown
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+    // Connect info gives the peer address used by the auth rate limiter
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     info!("Server shutdown complete");
 
@@ -299,7 +310,7 @@ async fn create_app(app_state: AppState, config: AppConfig) -> Result<Router> {
     let cors = CorsLayer::new()
         .allow_origin(if allowed_origins.is_empty() {
             // Fallback: create a list with localhost if none configured
-            vec!["http://localhost:5173".parse().unwrap(), "http://localhost:8080".parse().unwrap()]
+            vec![HeaderValue::from_static("http://localhost:5173"), HeaderValue::from_static("http://localhost:8080")]
         } else {
             allowed_origins
         })
@@ -333,6 +344,35 @@ async fn create_app(app_state: AppState, config: AppConfig) -> Result<Router> {
         .merge(mcp::create_router())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        // Security headers for API responses. The frontend nginx adds its own
+        // headers on the static site; `if_not_present` keeps this layer from
+        // overriding anything set by a more specific handler.
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("no-referrer"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            HeaderName::from_static("cross-origin-resource-policy"),
+            HeaderValue::from_static("same-origin"),
+        ))
+        // Bounded request bodies (413 when exceeded) and request duration (408)
+        .layer(RequestBodyLimitLayer::new(config.server.max_body_bytes))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(config.server.request_timeout_secs.max(1)),
+        ))
         .with_state(app_state);
 
     Ok(app)
@@ -353,10 +393,15 @@ async fn version_handler() -> Json<VersionInfo> {
     })
 }
 
-async fn health_handler(database: Database) -> &'static str {
+/// Readiness: 200 when the database answers, 503 otherwise, so orchestrators
+/// stop routing traffic to an instance that cannot serve requests.
+async fn health_handler(database: Database) -> (StatusCode, &'static str) {
     match database.health_check().await {
-        Ok(_) => "OK",
-        Err(_) => "Database connection failed",
+        Ok(_) => (StatusCode::OK, "OK"),
+        Err(e) => {
+            error!("Health check failed: database unreachable: {}", e);
+            (StatusCode::SERVICE_UNAVAILABLE, "Database connection failed")
+        }
     }
 }
 
@@ -388,5 +433,18 @@ mod tests {
         let url = "invalid-url";
         let sanitized = sanitize_db_url(url);
         assert_eq!(sanitized, "postgresql://****:****@****");
+    }
+
+    #[tokio::test]
+    async fn test_health_is_503_when_database_unreachable() {
+        use sqlx::postgres::PgPoolOptions;
+        // Nothing listens on port 1: the lazy pool cannot reach the database
+        let pool = PgPoolOptions::new()
+            .acquire_timeout(std::time::Duration::from_secs(2))
+            .connect_lazy("postgres://klask:klask@127.0.0.1:1/klask")
+            .expect("lazy pool creation does not connect");
+        let (status, body) = health_handler(database::Database::from_pool(pool)).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body, "Database connection failed");
     }
 }

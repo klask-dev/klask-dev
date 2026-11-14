@@ -1,11 +1,15 @@
-# Klask Development Environment
-# Full-stack code search engine with Rust backend and React frontend
+# Klask development stack: builds the backend and frontend from this checkout.
+# For a normal installation use docker-compose.yml (pre-built images) instead.
+#
+# The secrets below are fixed development values. They are public: never reuse
+# them for an instance that holds real data. All ports are bound to 127.0.0.1.
 #
 # Quick Start:
 #   docker compose -f docker-compose.dev.yml up -d
-#   A welcome message will display URLs once all services are ready!
 #   Access frontend: http://localhost:8081
 #   Access backend API: http://localhost:3001
+#   PostgreSQL (database only): docker compose -f docker-compose.dev.yml up -d postgres
+#     -> postgres://klask_user:klask_password@localhost:5433/klask_dev
 #   Access pgAdmin: http://localhost:5050 (with --profile tools)
 #
 # Startup Order:
@@ -14,7 +18,7 @@
 #   3. Frontend waits for backend to be healthy
 #   4. Welcome service displays URLs when everything is ready
 #
-# With optional tools (pgAdmin, Redis):
+# With optional tools (pgAdmin, Redis; the backend does not use Redis today):
 #   docker compose -f docker-compose.dev.yml --profile tools up -d
 
 services:
@@ -27,9 +31,9 @@ services:
             POSTGRES_USER: klask_user
             POSTGRES_PASSWORD: klask_password
         ports:
-            - "5433:5432"
+            - "127.0.0.1:5433:5432"
         volumes:
-            - postgres_data:/var/lib/postgresql/data
+            - postgres_data:/var/lib/postgresql
         networks:
             - klask-network
         restart: unless-stopped
@@ -50,10 +54,20 @@ services:
             - RUST_LOG=info
             - PORT=3000
             - HOST=0.0.0.0
-            - ENCRYPTION_KEY=${ENCRYPTION_KEY:-default-encryption-key-change-me}
-            - JWT_SECRET=${JWT_SECRET:-default-jwt-key-change-me}
+            # Development-only values (JWT_SECRET must be at least 32 characters)
+            - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dev-only-encryption-key-01234567}
+            - JWT_SECRET=${JWT_SECRET:-dev-only-jwt-secret-not-for-production-0123456789}
+            - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8081}
+            # Security defaults (see klask-rs/.env.example): registration closed,
+            # cookie without Secure (set COOKIE_SECURE=true behind HTTPS).
+            - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
+            - COOKIE_SECURE=${COOKIE_SECURE:-false}
+            # The browser calls the backend directly (BACKEND_BASE_URL), with no proxy in
+            # between, so X-Forwarded-For is ignored. See docs/admin/configuration.md.
+            - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-0}
+            - ALLOW_PRIVATE_NETWORK_URLS=${ALLOW_PRIVATE_NETWORK_URLS:-true}
         ports:
-            - "3001:3000"
+            - "127.0.0.1:3001:3000"
         volumes:
             - klask_data:/app/data
             - klask_index:/app/index
@@ -77,13 +91,12 @@ services:
             dockerfile: Dockerfile
         container_name: klask-frontend
         ports:
-            - "8081:8080"
+            - "127.0.0.1:8081:8080"
         networks:
             - klask-network
         restart: unless-stopped
         environment:
-            # Backend is exposed on localhost:3000, frontend calls it directly
-            # No nginx proxy needed since backend has permissive CORS
+            # The backend is published on localhost:3001 and the browser calls it directly
             BACKEND_BASE_URL: "http://localhost:3001"
         deploy:
             resources:
@@ -119,7 +132,7 @@ services:
               echo ""
               echo "📊 Frontend:  http://localhost:8081"
               echo "🔌 Backend:   http://localhost:3001"
-              echo "🗄️  Database:  localhost:5432"
+              echo "🗄️  Database:  localhost:5433 (host side)"
               echo ""
               echo "📚 Useful commands:"
               echo "  • View logs:   docker logs -f <container_name>"
@@ -138,7 +151,7 @@ services:
             PGADMIN_DEFAULT_PASSWORD: admin
             PGADMIN_CONFIG_SERVER_MODE: "False"
         ports:
-            - "5050:80"
+            - "127.0.0.1:5050:80"
         depends_on:
             - postgres
         networks:
@@ -157,7 +170,7 @@ services:
         image: redis:7-alpine
         container_name: klask-redis
         ports:
-            - "6379:6379"
+            - "127.0.0.1:6379:6379"
         volumes:
             - redis_data:/data
         command: redis-server --appendonly yes

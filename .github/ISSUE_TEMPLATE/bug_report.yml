@@ -1,0 +1,56 @@
+name: Bug report
+description: Something does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please do not report security
+        vulnerabilities here: see [SECURITY.md](https://github.com/klask-dev/klask-dev/blob/master/SECURITY.md).
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence of steps that triggers the problem (query used, repository type, options enabled...).
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Klask version
+      description: Shown in the interface, or at `/version` on the backend.
+      placeholder: "2.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How do you run Klask?
+      options:
+        - Docker Compose (docker-compose.yml)
+        - Helm chart
+        - From source (cargo run / npm run dev)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Relevant backend logs (set `RUST_LOG=debug` if needed) or browser console errors. Remove any secret first.
+      render: text
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, browser, PostgreSQL version, anything else that may matter.

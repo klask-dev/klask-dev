@@ -2,23 +2,32 @@ name: 1️⃣ Tests
 
 on:
   push:
-    branches: [ main, master ]  # Seulement les branches principales
+    branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]  # Pull requests vers les branches principales
-  workflow_dispatch:             # Déclenchement manuel si besoin
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# Read-only token by default; jobs that need more declare it explicitly.
+permissions:
+  contents: read
+
+# Cancel superseded runs on pull requests (never on pushes to the default branch).
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Détecte quels répertoires ont été modifiés
+  # Detects which directories changed
   detect-changes:
     runs-on: ubuntu-latest
-    # Map a step output to a job output
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
+      docker: ${{ steps.filter.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
         id: filter
         with:
           filters: |
@@ -26,6 +35,14 @@ jobs:
               - 'klask-react/**'
             backend:
               - 'klask-rs/**'
+            docker:
+              - 'klask-rs/Dockerfile'
+              - 'klask-rs/docker-entrypoint.sh'
+              - 'klask-react/Dockerfile'
+              - 'klask-react/entrypoint.sh'
+              - 'klask-react/nginx.conf'
+              - 'klask-react/nginx-proxy.inc'
+              - '**/.dockerignore'
 
   test-frontend:
     needs: detect-changes
@@ -36,10 +53,10 @@ jobs:
         working-directory: ./klask-react
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: '22'
         cache: 'npm'
@@ -51,12 +68,23 @@ jobs:
     - name: Run type check
       run: npm run typecheck
 
+    # TODO: remove continue-on-error once the existing ESLint errors are fixed
+    # (345 problems at the time of writing: 339 errors, mostly no-explicit-any).
+    - name: Run lint
+      run: npm run lint:ci
+      continue-on-error: true
+
     - name: Run tests
-      run: npm test -- --passWithNoTests
-      #continue-on-error: true  # Allow tests to fail without failing CI
+      run: npm run test:ci
 
     - name: Build frontend
       run: npm run build
+
+    # TODO: make blocking once the high-severity advisories are resolved
+    # (npm audit reported 10 high and 13 moderate advisories on 2026-11-11).
+    - name: Audit dependencies
+      run: npm audit --audit-level=high
+      continue-on-error: true
 
   test-backend:
     needs: detect-changes
@@ -81,24 +109,25 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - name: Setup Rust
-      uses: dtolnay/rust-toolchain@v1
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         components: rustfmt, clippy
         toolchain: stable
 
     - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       with:
         workspaces: klask-rs
 
     - name: Check formatting
       run: cargo fmt -- --check
 
+    # --all-targets also lints the tests, benches and examples
     - name: Run clippy
-      run: cargo clippy -- -D warnings
+      run: cargo clippy --all-targets -- -D warnings
 
     - name: Run tests
       run: cargo test
@@ -114,3 +143,119 @@ jobs:
         cargo test --test search_service_test -- --ignored
       env:
         DATABASE_URL: postgres://postgres:postgres@localhost:5432/klask_test
+
+  # The semantic-search feature (fastembed, lancedb) is opt-in and not part of
+  # the default build, so it needs its own job. Its model-dependent tests are
+  # #[ignore]d and never download a model here.
+  test-backend-semantic:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./klask-rs
+
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+      with:
+        components: clippy
+        toolchain: stable
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      with:
+        workspaces: klask-rs
+        key: semantic-search
+
+    # The vector store (lance) generates code from .proto files at build time.
+    # libprotobuf-dev provides the well-known types they import (google/protobuf/*.proto).
+    - name: Install protoc
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler libprotobuf-dev
+
+    - name: Run clippy (semantic-search)
+      run: cargo clippy --all-targets --features semantic-search -- -D warnings
+
+    - name: Run unit tests (semantic-search)
+      run: cargo test --features semantic-search --lib
+
+  # Builds the images without pushing, only when a Dockerfile or entrypoint
+  # changed. Images are built and pushed on the default branch by
+  # 2-build-images.yml, which does not run on pull requests.
+  docker-build-check:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./klask-rs
+          - name: frontend
+            context: ./klask-react
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build ${{ matrix.name }} image (no push)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pr-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=pr-${{ matrix.name }}
+
+  # Supply-chain checks on the Rust dependency tree. Configuration: klask-rs/deny.toml
+  # (advisories, licenses, sources). Runs on every pull request, whatever changed.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check licenses and sources
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        with:
+          manifest-path: klask-rs/Cargo.toml
+          command: check licenses sources
+
+      # TODO: make blocking once the advisories reported on 2026-11-11 are triaged
+      # (19 vulnerability/unsound findings, mostly in lance/lancedb, reqwest/rustls and tantivy).
+      - name: Check advisories
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        continue-on-error: true
+        with:
+          manifest-path: klask-rs/Cargo.toml
+          command: check advisories
+
+  # Single required status check: succeeds when every needed job succeeded or
+  # was legitimately skipped (paths filter). Configure branch protection to
+  # require "CI OK" only.
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs: [detect-changes, test-frontend, test-backend, test-backend-semantic, docker-build-check, dependency-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        env:
+          DETECT: ${{ needs.detect-changes.result }}
+          FRONTEND: ${{ needs.test-frontend.result }}
+          BACKEND: ${{ needs.test-backend.result }}
+          BACKEND_SEMANTIC: ${{ needs.test-backend-semantic.result }}
+          DOCKER: ${{ needs.docker-build-check.result }}
+          AUDIT: ${{ needs.dependency-audit.result }}
+        run: |
+          status=0
+          for result in "$DETECT" "$FRONTEND" "$BACKEND" "$BACKEND_SEMANTIC" "$DOCKER" "$AUDIT"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::A required job finished with result: $result"; status=1 ;;
+            esac
+          done
+          exit $status

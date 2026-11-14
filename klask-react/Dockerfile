@@ -1,34 +1,20 @@
-# Multi-stage build for React frontend
-FROM node:22-alpine as builder
+# Multi-stage build for the React frontend
+FROM node:22.22-alpine AS builder
 
-# Accept build arguments for version info
+# Build arguments carrying version information into the bundle
 ARG VITE_APP_VERSION=2.0.0
 ARG VITE_APP_COMMIT=""
 ARG VITE_APP_BUILD_TIME=""
 
-# Install system dependencies for node-gyp and canvas
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    musl-dev \
-    giflib-dev \
-    pixman-dev \
-    pangomm-dev \
-    libjpeg-turbo-dev \
-    freetype-dev
-
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first to cache the dependency layer
 COPY package*.json ./
 
-# Install all dependencies (including devDependencies for build tools)
-RUN npm ci --silent
+# Install all dependencies (devDependencies are needed to build).
+# The project has no native addons: no compiler or image libraries are required.
+RUN npm ci --no-audit --no-fund
 
 # Copy source code
 COPY . .
@@ -40,13 +26,14 @@ ENV VITE_APP_BUILD_TIME=${VITE_APP_BUILD_TIME}
 RUN npm run build
 
 # Production stage with nginx
-FROM nginx:alpine
+FROM nginx:1.29-alpine
 
 # Install jq for secure JSON encoding in entrypoint.sh
 RUN apk add --no-cache jq
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx-proxy.inc /etc/nginx/klask-proxy.inc
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
@@ -55,9 +42,9 @@ RUN chmod +x /entrypoint.sh
 # Copy built application from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create non-root user for security
+# Non-root user (numeric UID so Kubernetes can verify runAsNonRoot)
 RUN addgroup -g 1001 -S nginx-app && \
-    adduser -S nginx-app -u 1001
+    adduser -S nginx-app -u 1001 -G nginx-app
 
 # Set proper permissions
 RUN chown -R nginx-app:nginx-app /usr/share/nginx/html && \
@@ -65,12 +52,12 @@ RUN chown -R nginx-app:nginx-app /usr/share/nginx/html && \
     chown -R nginx-app:nginx-app /var/log/nginx && \
     chown -R nginx-app:nginx-app /etc/nginx/conf.d
 
-# Create directory for nginx pid
+# Create the pid file location for nginx
 RUN touch /var/run/nginx.pid && \
     chown -R nginx-app:nginx-app /var/run/nginx.pid
 
 # Switch to non-root user
-USER nginx-app
+USER 1001:1001
 
 # Expose port
 EXPOSE 8080
