@@ -1,5 +1,5 @@
 # Multi-stage build for the React frontend
-FROM node:22.22-alpine AS builder
+FROM node:26.12-alpine AS builder
 
 # Build arguments carrying version information into the bundle
 ARG VITE_APP_VERSION=2.0.0
