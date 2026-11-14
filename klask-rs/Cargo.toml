@@ -111,5 +111,5 @@ semantic-search = ["dep:fastembed", "dep:lancedb", "dep:arrow-array", "dep:arrow
 # Testing
 tokio-test = "0.4"
 tempfile = "3.0"
-httpmock = "0.8"
+httpmock = "0.9"
 axum-test = "19.1"
