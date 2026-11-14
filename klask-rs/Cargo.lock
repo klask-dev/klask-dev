@@ -300,7 +300,7 @@ dependencies = [
  "arrow-select",
  "flatbuffers",
  "lz4_flex 0.13.1",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -674,6 +674,12 @@ name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "base64ct"
@@ -2100,6 +2106,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "datasketches"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11c0bd7d22989969a619bae09147b992a6aa7f31dd4f9d9af6345f533744781f"
+
+[[package]]
 name = "deepsize"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2671,6 +2683,12 @@ checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
 ]
+
+[[package]]
+name = "frostem"
+version = "1.20260821.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e2488a10218a17366ce6bd38b6d081b4387a9548d350029db9feddc9bb44d6d"
 
 [[package]]
 name = "fs4"
@@ -3914,6 +3932,9 @@ name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+dependencies = [
+ "foldhash 0.2.0",
+]
 
 [[package]]
 name = "hashlink"
@@ -4943,7 +4964,7 @@ dependencies = [
  "half",
  "hex",
  "rand 0.9.2",
- "rand_distr 0.5.1",
+ "rand_distr",
  "rand_xoshiro",
  "random_word",
 ]
@@ -4982,7 +5003,7 @@ dependencies = [
  "tokio",
  "tracing",
  "xxhash-rust",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -5070,7 +5091,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "rand 0.9.2",
- "rand_distr 0.5.1",
+ "rand_distr",
  "rangemap",
  "rayon",
  "roaring",
@@ -5564,11 +5585,11 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.12.5"
+version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "234cf4f4a04dc1f57e24b96cc0cd600cf2af460d4161ac5ecdd0af8e1f3b2a38"
+checksum = "ef9ac18847474e638e3702b76c65d4eb93428471a74778ef0f1be711717f89b5"
 dependencies = [
- "hashbrown 0.15.5",
+ "hashbrown 0.17.1",
 ]
 
 [[package]]
@@ -5598,18 +5619,18 @@ dependencies = [
 
 [[package]]
 name = "lz4_flex"
-version = "0.11.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
-
-[[package]]
-name = "lz4_flex"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef0d4ed8669f8f8826eb00dc878084aa8f253506c4fd5e8f58f5bce72ddb97e"
 dependencies = [
  "twox-hash",
 ]
+
+[[package]]
+name = "lz4_flex"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f5af6ecc17202a60aebe8502b4e8160bd745820e5a8417c8e5d048af838aec5"
 
 [[package]]
 name = "lzma-rust2"
@@ -5839,9 +5860,9 @@ dependencies = [
 
 [[package]]
 name = "murmurhash32"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2195bf6aa996a481483b29d62a7663eed3fe39600c460e323f8ff41e90bdd89b"
+checksum = "a8afc6df942f4c022d70c5725e18df1a705773870e5b7f96fde94ca0334ce77a"
 
 [[package]]
 name = "native-tls"
@@ -6904,16 +6925,6 @@ checksum = "0c8d0fd677905edcbeedbf2edb6494d676f0e98d54d5cf9bda0b061cb8fb8aba"
 
 [[package]]
 name = "rand_distr"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
-dependencies = [
- "num-traits",
- "rand 0.8.5",
-]
-
-[[package]]
-name = "rand_distr"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8615d50dcf34fa31f7ab52692afec947c4dd0ab803cc87cb3b0b4570ff7463"
@@ -7580,6 +7591,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-tuple-vec-map"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a04d0ebe0de77d7d445bb729a895dcb0a288854b267ca85f030ce51cdc578c82"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7821,9 +7841,9 @@ checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
 name = "sketches-ddsketch"
-version = "0.3.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c6f73aeb92d671e0cc4dca167e59b2deb6387c375391bc99ee743f326994a2b"
+checksum = "e53e2f8d4e9c692f23a90208fad6a64862f413e286d533f1f649f160e2d5caee"
 dependencies = [
  "serde",
 ]
@@ -8364,39 +8384,40 @@ checksum = "7b2093cf4c8eb1e67749a6762251bc9cd836b6fc171623bd0a9d324d37af2417"
 
 [[package]]
 name = "tantivy"
-version = "0.25.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "502915c7381c5cb2d2781503962610cb880ad8f1a0ca95df1bae645d5ebf2545"
+checksum = "ad1ebacf6bc124b741ffbfb088f9835cb55e1e2ff57e182e9219e3efa1377b97"
 dependencies = [
  "aho-corasick",
  "arc-swap",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bitpacking",
  "bon",
  "byteorder",
  "census",
  "crc32fast",
  "crossbeam-channel",
+ "datasketches",
  "downcast-rs",
  "fastdivide",
  "fnv",
+ "frostem",
  "fs4",
  "htmlescape",
- "hyperloglogplus",
  "itertools 0.14.0",
  "levenshtein_automata",
  "log",
  "lru",
- "lz4_flex 0.11.6",
+ "lz4_flex 0.14.1",
  "measure_time",
  "memmap2",
  "once_cell",
  "oneshot",
  "rayon",
  "regex",
- "rust-stemmers",
  "rustc-hash",
  "serde",
+ "serde-tuple-vec-map",
  "serde_json",
  "sketches-ddsketch",
  "smallvec",
@@ -8410,28 +8431,31 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "time",
+ "typetag",
+ "unwrap-infallible",
  "uuid",
  "winapi",
 ]
 
 [[package]]
 name = "tantivy-bitpacker"
-version = "0.9.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3b04eed5108d8283607da6710fe17a7663523440eaf7ea5a1a440d19a1448b6"
+checksum = "2c803ac72b3356f48fe4a399a03e058addd5c94e793e0bb7c6bcc224b238fcd7"
 dependencies = [
  "bitpacking",
 ]
 
 [[package]]
 name = "tantivy-columnar"
-version = "0.6.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b628488ae936c83e92b5c4056833054ca56f76c0e616aee8339e24ac89119cd"
+checksum = "95101fe3dd4a76156bdeff8d14ad41c547f2c1bce7ee0d23fdb6f95599f312ec"
 dependencies = [
  "downcast-rs",
  "fastdivide",
  "itertools 0.14.0",
+ "rand 0.9.2",
  "serde",
  "tantivy-bitpacker",
  "tantivy-common",
@@ -8441,9 +8465,9 @@ dependencies = [
 
 [[package]]
 name = "tantivy-common"
-version = "0.10.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f880aa7cab0c063a47b62596d10991cdd0b6e0e0575d9c5eeb298b307a25de55"
+checksum = "66d062ce97f2a26f2a7b2ed5d926a62241f762e4395ac110eb5c18f3b4a13b71"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -8465,45 +8489,46 @@ dependencies = [
 
 [[package]]
 name = "tantivy-query-grammar"
-version = "0.25.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "768fccdc84d60d86235d42d7e4c33acf43c418258ff5952abf07bd7837fcd26b"
+checksum = "2ef6729a14fc5c5a662ee549a176640743577ef35c70ae7e86f0ca07fa83d161"
 dependencies = [
+ "fnv",
  "nom 7.1.3",
+ "ordered-float",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "tantivy-sstable"
-version = "0.6.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8292095d1a8a2c2b36380ec455f910ab52dde516af36321af332c93f20ab7d5"
+checksum = "9d6b3567417750e8aeb6e7c9c5ae8701376c07c06d51991050825832c2f8c431"
 dependencies = [
  "futures-util",
  "itertools 0.14.0",
  "tantivy-bitpacker",
  "tantivy-common",
  "tantivy-fst",
- "zstd",
+ "zstd 0.14.4",
 ]
 
 [[package]]
 name = "tantivy-stacker"
-version = "0.6.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23d38a379411169f0b3002c9cba61cdfe315f757e9d4f239c00c282497a0749d"
+checksum = "c4213e34acf53de44ab4778aafec3c6800a781be6a7c1906579acdc23c114d94"
 dependencies = [
  "murmurhash32",
- "rand_distr 0.4.3",
  "tantivy-common",
 ]
 
 [[package]]
 name = "tantivy-tokenizer-api"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23024f6aeb25ceb1a0e27740c84bdb0fae52626737b7e9a9de6ad5aa25c7b038"
+checksum = "eac258c2c6390673f2685813afeeafcb8c4e0ee7de8dd3fc46838dcc37263f98"
 dependencies = [
  "serde",
 ]
@@ -9065,6 +9090,12 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
+
+[[package]]
+name = "unwrap-infallible"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e497bb1f828cc9fb236722c2eaa100dcf201563f38f4da6252357a59037adf31"
 
 [[package]]
 name = "ureq"
@@ -10067,7 +10098,16 @@ version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
 dependencies = [
- "zstd-safe",
+ "zstd-safe 7.2.4",
+]
+
+[[package]]
+name = "zstd"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad5020ab8f27bfc0024ad0a07aed6bf022a16208f479686fbed4fdd0c85eb0b3"
+dependencies = [
+ "zstd-safe 8.3.0",
 ]
 
 [[package]]
@@ -10080,10 +10120,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "zstd-sys"
-version = "2.0.16+zstd.1.5.7"
+name = "zstd-safe"
+version = "8.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+checksum = "5a9ea9cc2576c2fcc104e9cec04f46e3ede564f4fbc206831e4ef7e859a4140d"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.1.3+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f729a06d0257428fd9d997ac8db7e1407bd0262ab016b085b36bc52957c0052d"
 dependencies = [
  "cc",
  "pkg-config",

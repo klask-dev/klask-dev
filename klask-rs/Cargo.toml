@@ -18,7 +18,7 @@ tower-http = { version = "0.6", features = ["cors", "fs", "trace", "limit", "set
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "uuid", "chrono", "migrate"] }
 
 # Search engine
-tantivy = "0.25"
+tantivy = "0.27"
 
 # Serialization and validation
 serde = { version = "1.0", features = ["derive"] }
