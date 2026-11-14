@@ -641,7 +641,7 @@ impl SearchService {
         let query = TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
 
         // Get all matching documents
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(10000))?;
+        let top_docs = searcher.search(&query, &TopDocs::with_limit(10000).order_by_score())?;
         let updated_count = top_docs.len() as u64;
 
         // For each document, create a new version with updated project name
@@ -992,7 +992,7 @@ impl SearchService {
             &final_query,
             &(
                 Count,
-                TopDocs::with_limit(effective_limit).and_offset(search_query.offset),
+                TopDocs::with_limit(effective_limit).and_offset(search_query.offset).order_by_score(),
             ),
         )?;
         let total = total as u64;
@@ -1248,7 +1248,7 @@ impl SearchService {
         };
 
         // Search for the specific document
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(1))?;
+        let top_docs = searcher.search(&query, &TopDocs::with_limit(1).order_by_score())?;
 
         if let Some((score, doc_address)) = top_docs.first() {
             let retrieved_doc = searcher.doc::<tantivy::TantivyDocument>(*doc_address)?;
@@ -1445,7 +1445,10 @@ impl SearchService {
 
         // Get all documents for facet calculation (up to a reasonable limit)
         const FACET_CALCULATION_LIMIT: usize = 50000;
-        let top_docs = searcher.search(&match_all_query, &TopDocs::with_limit(FACET_CALCULATION_LIMIT))?;
+        let top_docs = searcher.search(
+            &match_all_query,
+            &TopDocs::with_limit(FACET_CALCULATION_LIMIT).order_by_score(),
+        )?;
 
         let mut repository_counts: HashMap<String, u64> = HashMap::new();
         let mut project_counts: HashMap<String, u64> = HashMap::new();
