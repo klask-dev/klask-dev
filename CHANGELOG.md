@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/klask-dev/klask-dev/compare/2.2.0...2.3.0) (2026-11-14)
+
+### ✨ Features
+
+* **helm:** route /mcp, fix the default API URL and add an HTTPRoute ([a6732b9](https://github.com/klask-dev/klask-dev/commit/a6732b9c918add10bde136d42f27ae697a764d62))
+* **mcp:** expose the search mode to agents, completing phase 6 ([4e5ee15](https://github.com/klask-dev/klask-dev/commit/4e5ee15137105735219ee5268709554a9aa634f1))
+* **search:** support quoted phrases and fix snippets, counts and paging ([ccf3bd8](https://github.com/klask-dev/klask-dev/commit/ccf3bd8bd06c6d0e479ec8c721f2912768057d57))
+* **security:** harden authentication, tokens and repository inputs ([d00911d](https://github.com/klask-dev/klask-dev/commit/d00911dea3f02c05d136b57ee88eec4d2ac5adfb))
+* **semantic:** add embedding infrastructure for hybrid semantic search (phase 1) ([1fa0672](https://github.com/klask-dev/klask-dev/commit/1fa06721531db1abc1220aaf46e9f727fdc54394))
+* **semantic:** add embedding infrastructure for hybrid semantic search (phase 1) ([62a0043](https://github.com/klask-dev/klask-dev/commit/62a004319e2eddc9936f30cf706f50b6b0906469))
+* **semantic:** admin backfill job and progress UI (phase 3) ([fb9b8cd](https://github.com/klask-dev/klask-dev/commit/fb9b8cdfb3292fd9661f5947488e6df265649828))
+* **semantic:** hybrid query path — mode param, vector search & RRF fusion (phase 4) ([aa013e1](https://github.com/klask-dev/klask-dev/commit/aa013e10445ecf5de898dc15a1a72ae066c5281a))
+* **semantic:** LanceDB vector store, embedding worker and crawl integration (phase 2) ([61c3053](https://github.com/klask-dev/klask-dev/commit/61c3053b48192dd313932ff08d4358e9a741ee2c))
+* **semantic:** LanceDB vector store, embedding worker and crawl integration (phase 2) ([f9de377](https://github.com/klask-dev/klask-dev/commit/f9de377220419011094bfd25d66dbdefe6bc720d))
+* **semantic:** search-engine toggle, result badges & capabilities endpoint (phase 5) ([1ace320](https://github.com/klask-dev/klask-dev/commit/1ace320cac93e9a2d9a724a220d3134a33e355c0))
+
+### 🐛 Bug Fixes
+
+* **clippy:** use Option::filter to satisfy Rust 1.99 ([7ac1435](https://github.com/klask-dev/klask-dev/commit/7ac14357c1654b536819af599d29f096f6433605))
+* **compose:** require secrets and fix the PostgreSQL 18 data volume ([da72964](https://github.com/klask-dev/klask-dev/commit/da72964f084a256f45ec2db6d0bc81f1702f373c))
+* **crawler:** make suffix patterns match in branch and project filters ([a1ed20e](https://github.com/klask-dev/klask-dev/commit/a1ed20ef0ee296d45cba69fd9bb0a9a2f5ffd308))
+* **crawler:** stop the slowdown on re-crawl and make fetch reliable ([79371e8](https://github.com/klask-dev/klask-dev/commit/79371e8c5cf3dfb45b8cf0c81bb8a125dd4a5a10)), closes [#135](https://github.com/klask-dev/klask-dev/issues/135)
+* **docker:** let the backend user create directories under /app ([a736d8e](https://github.com/klask-dev/klask-dev/commit/a736d8e34945a6e9926a0b042b9bb6b2bda14863))
+* ensure search queries only execute when authenticated with HttpOnly cookie ([f4fc86c](https://github.com/klask-dev/klask-dev/commit/f4fc86c1358a51a59c5c4d8a0cda548850dcc5a3))
+* **frontend:** make the nginx /api proxy work and relay /mcp ([1aea23b](https://github.com/klask-dev/klask-dev/commit/1aea23b05e9c1a4b5bb9983e06d073aa2cacc856))
+* login latency ([7930315](https://github.com/klask-dev/klask-dev/commit/7930315fe6999d86277f229ce0101f68a138ddb8))
+* **semantic:** real similarity scores, chunk snippets and match provenance ([1b71dd6](https://github.com/klask-dev/klask-dev/commit/1b71dd6f145c12934ef09be482b22ef1cbd16154))
+* **useSearch:** tests following auth-gate ([04fd96c](https://github.com/klask-dev/klask-dev/commit/04fd96c87b5ae713b1374c5754cb42f4a4029082))
+
+### ⚡ Performance Improvements
+
+* **semantic:** batch vector writes and index the store after bulk indexing ([8cdb960](https://github.com/klask-dev/klask-dev/commit/8cdb960af90c7eaa2456bff7afdd7bfbac316931))
+* **semantic:** dedicated query session, token-aligned chunks, indexing progress ([fd71c77](https://github.com/klask-dev/klask-dev/commit/fd71c77e686fc46ef5c33385a6c28e834602fab2))
+
+### ♻️ Refactoring
+
+* **semantic:** single model-list traversal and bounded batch size ([7cf2f6b](https://github.com/klask-dev/klask-dev/commit/7cf2f6b43aee4c0a6267e92d277e5cc4b5dbb6d1))
+* **semantic:** single model-list traversal and bounded batch size ([3299818](https://github.com/klask-dev/klask-dev/commit/329981898b3c69731fd1bbdd7f687fae3260778e))
+
+### 📚 Documentation
+
+* **ci:** describe the new checks and the release tooling pins ([603fa37](https://github.com/klask-dev/klask-dev/commit/603fa37acb13e74d6d06fca645c7c9472dd4d244))
+* describe phrase search and API token scopes ([378344b](https://github.com/klask-dev/klask-dev/commit/378344b7f5787069d63218d9bb28d1d234cb19b3))
+* document the frontend proxy, git timeouts and sensitive file settings ([58f14f1](https://github.com/klask-dev/klask-dev/commit/58f14f125f04f87db1197c90352d99175dc1f5c9))
+* **helm:** list the HTTPRoute values in the chart README ([dfd41fa](https://github.com/klask-dev/klask-dev/commit/dfd41fa4dfc3f2b679a1de652504bcfbdb8b5b7b))
+* Offer private vulnerability reporting in the issue chooser ([be41e12](https://github.com/klask-dev/klask-dev/commit/be41e126eafa2a97183a3d7970383781412829e0))
+* rewrite the README and reorganise the documentation ([8b25ed8](https://github.com/klask-dev/klask-dev/commit/8b25ed8360fbecfc7a08f5fbdff7e9dc641866d2))
+* **semantic:** record indexing cost measurements and their consequences ([db99933](https://github.com/klask-dev/klask-dev/commit/db9993307a0df92dd345038a1392ded47d452a08))
+
 ## [2.2.0](https://github.com/klask-dev/klask-dev/compare/2.1.1...2.2.0) (2026-06-16)
 
 ### ✨ Features
