@@ -1,5 +1,5 @@
 # Multi-stage build for the Rust backend
-FROM rust:1.95.0-slim-trixie AS builder
+FROM rust:1.99.1-slim-trixie AS builder
 
 # Accept build arguments for version info
 ARG KLASK_VERSION=2.2.0
