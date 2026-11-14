@@ -18,7 +18,7 @@ tower-http = { version = "0.6", features = ["cors", "fs", "trace", "limit", "set
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "uuid", "chrono", "migrate"] }
 
 # Search engine
-tantivy = "0.25"
+tantivy = "0.27"
 
 # Serialization and validation
 serde = { version = "1.0", features = ["derive"] }
@@ -72,7 +72,7 @@ sha2 = "0.10"
 once_cell = "1.21"
 
 # Local embedding generation for semantic search (optional, see semantic-search feature)
-fastembed = { version = "5", optional = true }
+fastembed = { version = "7", optional = true }
 
 # Embedded vector store for semantic search (optional, see semantic-search feature).
 # arrow-array/arrow-schema are pinned to the version lancedb re-exports so the
@@ -111,5 +111,5 @@ semantic-search = ["dep:fastembed", "dep:lancedb", "dep:arrow-array", "dep:arrow
 # Testing
 tokio-test = "0.4"
 tempfile = "3.0"
-httpmock = "0.8"
+httpmock = "0.9"
 axum-test = "19.1"

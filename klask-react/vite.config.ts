@@ -16,12 +16,19 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
+    // Vite 8 bundles with Rolldown: vendor chunks are declared as groups
+    // matched on the module path (the object form of manualChunks is gone).
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'ui-vendor': ['react-window', '@headlessui/react', '@heroicons/react'],
-          'syntax-highlighter': ['prism-react-renderer'],
+        codeSplitting: {
+          groups: [
+            { name: 'react-vendor', test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            {
+              name: 'ui-vendor',
+              test: /[\\/]node_modules[\\/](react-window|@headlessui[\\/]react|@heroicons[\\/]react)[\\/]/,
+            },
+            { name: 'syntax-highlighter', test: /[\\/]node_modules[\\/]prism-react-renderer[\\/]/ },
+          ],
         },
       },
     },
@@ -57,13 +64,6 @@ export default defineConfig({
     maxWorkers: 8,
     minWorkers: 1,
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        maxThreads: 8,
-        minThreads: 1,
-      },
-    },
     // Isolate tests to free memory
     isolate: true,
     // Shorter timeouts for stuck tests
