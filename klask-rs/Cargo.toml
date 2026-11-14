@@ -72,7 +72,7 @@ sha2 = "0.10"
 once_cell = "1.21"
 
 # Local embedding generation for semantic search (optional, see semantic-search feature)
-fastembed = { version = "5", optional = true }
+fastembed = { version = "7", optional = true }
 
 # Embedded vector store for semantic search (optional, see semantic-search feature).
 # arrow-array/arrow-schema are pinned to the version lancedb re-exports so the
