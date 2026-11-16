@@ -63,7 +63,7 @@ base64 = "0.22"
 rand = "0.10"
 
 # Scheduling and cron jobs
-croner = "3.0"
+croner = "4.0"
 
 # Cryptographic hashing for deterministic IDs
 sha2 = "0.10"
