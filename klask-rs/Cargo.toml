@@ -77,7 +77,7 @@ fastembed = { version = "7", optional = true }
 # Embedded vector store for semantic search (optional, see semantic-search feature).
 # arrow-array/arrow-schema are pinned to the version lancedb re-exports so the
 # RecordBatch/Schema types we build match the ones lancedb's API expects.
-lancedb = { version = "0.30", optional = true }
+lancedb = { version = "0.41", optional = true }
 arrow-array = { version = "58", optional = true }
 arrow-schema = { version = "58", optional = true }
 # async fn in object-safe traits (Arc<dyn VectorStore>); native async-fn-in-trait
