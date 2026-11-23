@@ -26,7 +26,7 @@ ENV VITE_APP_BUILD_TIME=${VITE_APP_BUILD_TIME}
 RUN npm run build
 
 # Production stage with nginx
-FROM nginx:1.29-alpine
+FROM nginx:1.31-alpine
 
 # Install jq for secure JSON encoding in entrypoint.sh
 RUN apk add --no-cache jq
