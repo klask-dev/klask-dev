@@ -219,7 +219,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check licenses and sources
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        uses: EmbarkStudios/cargo-deny-action@17aeb3c839e42274e2b8adf721c8c65edfdc74dd # v2
         with:
           manifest-path: klask-rs/Cargo.toml
           command: check licenses sources
@@ -227,7 +227,7 @@ jobs:
       # TODO: make blocking once the advisories reported on 2026-11-11 are triaged
       # (19 vulnerability/unsound findings, mostly in lance/lancedb, reqwest/rustls and tantivy).
       - name: Check advisories
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        uses: EmbarkStudios/cargo-deny-action@17aeb3c839e42274e2b8adf721c8c65edfdc74dd # v2
         continue-on-error: true
         with:
           manifest-path: klask-rs/Cargo.toml
